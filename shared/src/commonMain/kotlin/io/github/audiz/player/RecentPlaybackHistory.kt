@@ -21,7 +21,8 @@ internal class RecentPlaybackHistory(
     private val write: (String) -> Unit = ::writeRecentPlaybackHistory,
 ) {
     private val plays = ArrayDeque<String>()
-    private val counts = mutableMapOf<String, Int>()
+    private val lastPlayedAt = mutableMapOf<String, Long>()
+    private var playNumber = 0L
     private val loaded = CompletableDeferred<Unit>()
     private val pendingWrites = Channel<Unit>(Channel.CONFLATED)
 
@@ -41,8 +42,9 @@ internal class RecentPlaybackHistory(
             if (saved.isNotEmpty()) {
                 val earlyPlays = plays.toList()
                 plays.clear()
-                counts.clear()
-                saved.takeLast(LIMIT).forEach(::append)
+                lastPlayedAt.clear()
+                playNumber = 0L
+                saved.takeLast(MAX_TRACKS).forEach(::append)
                 earlyPlays.forEach(::append)
             }
             loaded.complete(Unit)
@@ -70,16 +72,19 @@ internal class RecentPlaybackHistory(
         pendingWrites.trySend(Unit)
     }
 
-    operator fun contains(trackId: String): Boolean = canonicalId(trackId) in counts
+    fun wasPlayedRecently(trackId: String, limit: Int): Boolean {
+        val lastPlay = lastPlayedAt[canonicalId(trackId)] ?: return false
+        return playNumber - lastPlay < limit
+    }
 
     private fun append(id: String) {
-        if (plays.size == LIMIT) {
+        if (plays.size == MAX_TRACKS) {
+            val oldestPlay = playNumber - plays.size + 1
             val oldest = plays.removeFirst()
-            val previousCount = counts.getValue(oldest)
-            if (previousCount == 1) counts.remove(oldest) else counts[oldest] = previousCount - 1
+            if (lastPlayedAt[oldest] == oldestPlay) lastPlayedAt.remove(oldest)
         }
         plays.addLast(id)
-        counts[id] = (counts[id] ?: 0) + 1
+        lastPlayedAt[id] = ++playNumber
     }
 
     private fun canonicalId(trackId: String): String {
@@ -88,7 +93,8 @@ internal class RecentPlaybackHistory(
         return catalogId?.takeIf { it > 0 }?.toString() ?: id
     }
 
-    private companion object {
-        const val LIMIT = 1_000
+    companion object {
+        const val MIN_TRACKS = 100
+        const val MAX_TRACKS = 1_000
     }
 }

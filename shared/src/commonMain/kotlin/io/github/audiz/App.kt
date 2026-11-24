@@ -759,6 +759,7 @@ fun App() {
                     aiFilterMode = searchViewModel.aiFilterMode,
                     aiBlacklistVersion = searchViewModel.aiBlacklist?.version,
                     waveLoopProtectionEnabled = searchViewModel.waveLoopProtectionEnabled,
+                    waveLoopHistoryLimit = searchViewModel.waveLoopHistoryLimit,
                 ),
                 actions = SettingsActions(
                     onClose = { settingsExpanded = false },
@@ -788,6 +789,7 @@ fun App() {
                     onProjectOpened = { supportScope.launch { starPromptManager.complete() } },
                     onSaveAiFilterMode = searchViewModel::saveAiFilterMode,
                     onToggleWaveLoopProtection = searchViewModel::setWaveLoopProtection,
+                    onSaveWaveLoopHistoryLimit = searchViewModel::saveWaveLoopHistoryLimit,
                 )
             )
 

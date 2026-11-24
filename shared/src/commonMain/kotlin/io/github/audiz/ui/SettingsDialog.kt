@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import io.github.audiz.addons.AiFilterMode
+import io.github.audiz.player.RecentPlaybackHistory
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 
@@ -63,6 +64,7 @@ data class SettingsState(
     val aiFilterMode: AiFilterMode = AiFilterMode.OFF,
     val aiBlacklistVersion: Int? = null,
     val waveLoopProtectionEnabled: Boolean = false,
+    val waveLoopHistoryLimit: Int = RecentPlaybackHistory.MAX_TRACKS,
 )
 
 /**
@@ -89,6 +91,7 @@ data class SettingsActions(
     val onProjectOpened: () -> Unit = {},
     val onSaveAiFilterMode: (AiFilterMode) -> Unit = {},
     val onToggleWaveLoopProtection: (Boolean) -> Unit = {},
+    val onSaveWaveLoopHistoryLimit: (Int) -> Unit = {},
 )
 
 /**

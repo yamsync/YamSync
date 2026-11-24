@@ -557,18 +557,35 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     var waveLoopProtectionEnabled by mutableStateOf(false)
         private set
 
+    var waveLoopHistoryLimit by mutableIntStateOf(RecentPlaybackHistory.MAX_TRACKS)
+        private set
+
     private val recentPlaybackHistory = RecentPlaybackHistory(viewModelScope)
     private val waveLoopSettingsLock = Mutex()
     private val waveLoopSettingLoaded = CompletableDeferred<Unit>()
     private var waveLoopSettingEdited = false
+    private var waveLoopLimitEdited = false
 
     fun setWaveLoopProtection(enabled: Boolean) {
         waveLoopSettingEdited = true
         waveLoopProtectionEnabled = enabled
         if (waveManager.isWaveMode && playerIsPlaying) playbackManager.onQueueUpdated()
+        saveWaveLoopSetting(AppConfigKeys.WAVE_LOOP_PROTECTION, enabled.toString())
+    }
+
+    fun saveWaveLoopHistoryLimit(limit: Int) {
+        waveLoopLimitEdited = true
+        val newLimit = limit.coerceIn(RecentPlaybackHistory.MIN_TRACKS, RecentPlaybackHistory.MAX_TRACKS)
+        if (waveLoopHistoryLimit == newLimit && waveLoopSettingLoaded.isCompleted) return
+        waveLoopHistoryLimit = newLimit
+        if (waveLoopProtectionEnabled && waveManager.isWaveMode && playerIsPlaying) playbackManager.onQueueUpdated()
+        saveWaveLoopSetting(AppConfigKeys.WAVE_LOOP_HISTORY_LIMIT, newLimit.toString())
+    }
+
+    private fun saveWaveLoopSetting(key: String, value: String) {
         viewModelScope.launch {
             waveLoopSettingsLock.withLock {
-                withContext(DispatcherIO) { saveAppConfig(AppConfigKeys.WAVE_LOOP_PROTECTION, enabled.toString()) }
+                withContext(DispatcherIO) { saveAppConfig(key, value) }
             }
         }
     }
@@ -584,8 +601,11 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
                 !playlistManager.isTrackLiked(track.id)
         },
         isRecentRepeat = { track ->
-            waveLoopProtectionEnabled &&
-                (track.id in recentPlaybackHistory || track.realId?.let { it in recentPlaybackHistory } == true)
+            val limit = waveLoopHistoryLimit
+            waveLoopProtectionEnabled && (
+                recentPlaybackHistory.wasPlayedRecently(track.id, limit) ||
+                    track.realId?.let { recentPlaybackHistory.wasPlayedRecently(it, limit) } == true
+            )
         },
         awaitRecentHistory = {
             waveLoopSettingLoaded.await()
@@ -921,10 +941,15 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     init {
         viewModelScope.launch {
             try {
-                val enabled = withContext(DispatcherIO) {
-                    loadAppConfig(AppConfigKeys.WAVE_LOOP_PROTECTION) == "true"
+                val (enabled, savedLimit) = withContext(DispatcherIO) {
+                    val enabled = loadAppConfig(AppConfigKeys.WAVE_LOOP_PROTECTION) == "true"
+                    val limit = loadAppConfig(AppConfigKeys.WAVE_LOOP_HISTORY_LIMIT)?.toIntOrNull()
+                    enabled to limit
                 }
                 if (!waveLoopSettingEdited) waveLoopProtectionEnabled = enabled
+                if (!waveLoopLimitEdited && savedLimit != null) {
+                    waveLoopHistoryLimit = savedLimit.coerceIn(RecentPlaybackHistory.MIN_TRACKS, RecentPlaybackHistory.MAX_TRACKS)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

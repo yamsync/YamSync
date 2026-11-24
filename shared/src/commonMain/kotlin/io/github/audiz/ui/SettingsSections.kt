@@ -40,6 +40,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.audiz.YandexCookieService
+import io.github.audiz.player.RecentPlaybackHistory
 import kotlin.math.roundToInt
 
 internal enum class SettingsBlock {
@@ -81,6 +82,7 @@ internal enum class SettingsBlock {
 
 @Composable
 private fun WaveLoopProtectionSettings(state: SettingsState, actions: SettingsActions) {
+    var historyLimit by remember(state.waveLoopHistoryLimit) { mutableFloatStateOf(state.waveLoopHistoryLimit.toFloat()) }
     if (state.uiMode == "desktop") {
         Text("Моя волна", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
@@ -93,7 +95,7 @@ private fun WaveLoopProtectionSettings(state: SettingsState, actions: SettingsAc
         Column(Modifier.weight(1f)) {
             Text("Защита от зацикливания", style = MaterialTheme.typography.labelLarge)
             Text(
-                "Моя волна пропускает треки из последних 1000 воспроизведений в приложении.",
+                "Моя волна пропускает треки, недавно сыгранные в приложении.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -104,6 +106,16 @@ private fun WaveLoopProtectionSettings(state: SettingsState, actions: SettingsAc
             modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
         )
     }
+
+    Spacer(Modifier.height(12.dp))
+    Text("Глубина истории · ${historyLimit.roundToInt()}", style = MaterialTheme.typography.labelLarge)
+    Slider(
+        value = historyLimit,
+        onValueChange = { historyLimit = it },
+        onValueChangeFinished = { actions.onSaveWaveLoopHistoryLimit(historyLimit.roundToInt()) },
+        valueRange = RecentPlaybackHistory.MIN_TRACKS.toFloat()..RecentPlaybackHistory.MAX_TRACKS.toFloat(),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
