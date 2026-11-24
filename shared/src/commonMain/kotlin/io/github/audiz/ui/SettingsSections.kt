@@ -54,7 +54,8 @@ internal enum class SettingsBlock {
     WaveConnection,
     Storage,
     Support,
-    Logs;
+    Logs,
+    Slopless;
 
     @Composable
     fun Content(state: SettingsState, actions: SettingsActions) {
@@ -71,6 +72,7 @@ internal enum class SettingsBlock {
             Storage -> StorageSettings(state, actions)
             Support -> SupportSettings(actions)
             Logs -> LogsSettings(state, actions)
+            Slopless -> SloplessSettings(state, actions)
         }
     }
 }

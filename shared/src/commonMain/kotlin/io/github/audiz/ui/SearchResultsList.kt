@@ -234,6 +234,7 @@ private fun ResultCard(
             val tracksCount = artist.counts?.tracks?.takeIf { it > 0 }
             CompactEntityRow(
                 title = artist.name,
+                artistId = artist.id,
                 typeLabel = "Исполнитель",
                 typeColor = searchTypeColor("artist"),
                 meta = listOf(

@@ -48,7 +48,9 @@ class WaveManager(
     private val restoreTrackDetails: suspend (String) -> FullTrackInfo? = { id ->
         if (getAccessToken().isBlank()) null
         else repository.getTracksDetails(listOf(id)).result.firstOrNull { it.id == id }
-    }
+    },
+    private val onUpcomingTracks: ((List<FullTrackInfo>) -> Unit)? = null,
+    private val shouldSkipRecommendedTrack: ((FullTrackInfo) -> Boolean)? = null
 ) : WavePlaybackBridge {
     private var playbackManager: PlaybackManager? = null
 
@@ -198,6 +200,19 @@ class WaveManager(
     val currentWaveTrack: FullTrackInfo?
         get() = activeWaveTrack ?: waveTracks.getOrNull(waveCurrentIndex)
 
+    fun prefetchWaveTracks() {
+        val start = waveCurrentIndex.coerceIn(0, waveTracks.size)
+        onUpcomingTracks?.invoke(waveTracks.subList(start, minOf(start + 5, waveTracks.size)).toList())
+    }
+
+    private fun recommendedIndex(index: Int): Int {
+        val shouldSkip = shouldSkipRecommendedTrack ?: return index
+        if (waveTracks.getOrNull(index)?.let(shouldSkip) != true) return index
+        return (index + 1 until minOf(index + 5, waveTracks.size)).firstOrNull {
+            !shouldSkip(waveTracks[it])
+        } ?: index
+    }
+
     /**
      * ⏭ Получить кандидата на следующий трек в Моей Волне (для предзагрузки)
      */
@@ -207,9 +222,9 @@ class WaveManager(
         if (futureCandidate != null) return futureCandidate
 
         for (i in (waveCurrentIndex + 1) until waveTracks.size) {
-            val candidate = waveTracks.getOrNull(i)
-            if (candidate != null && candidate.id != currentId) {
-                return candidate
+            val candidate = waveTracks[i]
+            if (candidate.id != currentId) {
+                return waveTracks[recommendedIndex(i)]
             }
         }
         return null
@@ -273,6 +288,7 @@ class WaveManager(
         if (selected != null) waveTracks.add(selected)
         waveTracks.addAll(tracks.filter { it.id != selected?.id }.distinctBy { it.id })
         waveCurrentIndex = 0
+        prefetchWaveTracks()
         activeWaveTrack = waveTracks.firstOrNull()
         isWaveMode = waveTracks.isNotEmpty()
         if (restoredTrack != null && selected != null) playbackManager?.refreshRestoredTrackMetadata(selected)
@@ -357,7 +373,7 @@ class WaveManager(
                 println("WaveManager: Волна инициализирована! Загружено треков: ${waveTracks.size}, batchId: $waveBatchId")
 
                 if (autoPlay && waveTracks.isNotEmpty()) {
-                    playWaveTrack(0, source = source)
+                    playRecommendedWaveTrack(0, source = source)
                 } else if (autoPlay) {
                     playbackManager?.resetLoadingFlags()
                 }
@@ -449,7 +465,7 @@ class WaveManager(
                 println("WaveManager: Тематическая Волна запущена! Загружено треков: ${waveTracks.size}, radioSessionId: $waveRadioSessionId, batchId: $waveBatchId")
 
                 if (autoPlay && waveTracks.isNotEmpty()) {
-                    playWaveTrack(0, source = source)
+                    playRecommendedWaveTrack(0, source = source)
                 } else if (autoPlay) {
                     playbackManager?.resetLoadingFlags()
                 }
@@ -491,10 +507,15 @@ class WaveManager(
         playWaveTrack(waveCurrentIndex, TrackPlaySource.PLAY, 0L)
     }
 
+    private fun playRecommendedWaveTrack(index: Int, source: TrackPlaySource, crossfadeMs: Long = 0L) {
+        playWaveTrack(recommendedIndex(index), source, crossfadeMs)
+    }
+
     override fun playWaveTrack(index: Int, source: TrackPlaySource, crossfadeMs: Long) {
         if (index < 0 || index >= waveTracks.size) return
         val track = waveTracks[index]
         waveCurrentIndex = index
+        prefetchWaveTracks()
         isWaveMode = true
         activeWaveTrack = track
         onTrackPlaybackStarted(track)
@@ -680,7 +701,7 @@ class WaveManager(
         if (!isWaveMode) {
             if (waveTracks.isNotEmpty()) {
                 val nextIndex = if (waveCurrentIndex + 1 < waveTracks.size) waveCurrentIndex + 1 else 0
-                playWaveTrack(nextIndex, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
+                playRecommendedWaveTrack(nextIndex, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
             }
             return
         }
@@ -689,7 +710,6 @@ class WaveManager(
         if (waveCurrentIndex + 1 < waveTracks.size) {
             val oldTrack = currentWaveTrack
             val nextIndex = waveCurrentIndex + 1
-            val nextTrack = waveTracks[nextIndex]
 
             if (oldTrack != null && wavePastTracks.lastOrNull()?.id != oldTrack.id) {
                 wavePastTracks.add(oldTrack)
@@ -700,7 +720,8 @@ class WaveManager(
             waveFutureTracks.clear()
 
             // 1. Мгновенно запускаем воспроизведение следующего трека
-            playWaveTrack(nextIndex, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
+            playRecommendedWaveTrack(nextIndex, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
+            val nextTrack = waveTracks[waveCurrentIndex]
 
             val radioSessionId = waveRadioSessionId ?: ynisonWaveSessionId
             val batchId = waveBatchId
@@ -783,6 +804,7 @@ class WaveManager(
                         newTracks.filter { it.id !in existingIds && it.id != oldTrack?.id && it.id != nextTrack.id }.distinctBy { it.id }
                     }
                     waveTracks.addAll(finalNew)
+                    prefetchWaveTracks()
                     newTracks.forEach { t ->
                         nextResponse.batchId?.let { b -> waveTrackBatchMap[t.id] = b }
                     }
@@ -900,7 +922,7 @@ class WaveManager(
                 println("🌊 Волна: Новая пачка из ${waveTracks.size} треков загружена после skip! Запуск первого трека.")
 
                 if (waveTracks.isNotEmpty()) {
-                    playWaveTrack(0, source = TrackPlaySource.NEXT)
+                    playRecommendedWaveTrack(0, source = TrackPlaySource.NEXT)
                 } else {
                     playbackManager?.resetLoadingFlags()
                 }
@@ -953,12 +975,12 @@ class WaveManager(
             }
             if (nextIndex < waveTracks.size) {
                 println("🌊 Волна: трек доиграл. Переходим к следующему треку пачки ($nextIndex/${waveTracks.size})")
-                playWaveTrack(nextIndex, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
+                playRecommendedWaveTrack(nextIndex, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
 
                 // Проверяем остаток очереди: если осталось <= 4 треков впереди, в фоне дозагружаем следующую пачку
-                val remainingAhead = waveTracks.size - (nextIndex + 1)
+                val remainingAhead = waveTracks.size - (waveCurrentIndex + 1)
                 if (remainingAhead <= 4) {
-                    replenishWaveAhead(current, waveTracks[nextIndex])
+                    replenishWaveAhead(current, waveTracks[waveCurrentIndex])
                 }
                 return
             }
@@ -1063,6 +1085,7 @@ class WaveManager(
                     newTracks.filter { it.id !in existingIds && it.id != finishedTrack?.id && it.id != currentPlayingTrack.id }.distinctBy { it.id }
                 }
                 waveTracks.addAll(finalNew)
+                prefetchWaveTracks()
                 newTracks.forEach { t ->
                     nextResponse.batchId?.let { b -> waveTrackBatchMap[t.id] = b }
                 }
@@ -1136,7 +1159,7 @@ class WaveManager(
                 println("🌊 Волна: Новая пачка из ${waveTracks.size} треков получена после завершения предыдущей! Запуск.")
 
                 if (waveTracks.isNotEmpty()) {
-                    playWaveTrack(0, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
+                    playRecommendedWaveTrack(0, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
                 } else {
                     playbackManager?.resetLoadingFlags()
                 }

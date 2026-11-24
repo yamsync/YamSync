@@ -1,5 +1,7 @@
 package io.github.audiz.ui
 
+import io.github.audiz.addons.SloplessEntity
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,7 +64,8 @@ internal fun CompactEntityRow(
     typeColor: Color,
     meta: List<String>,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    artistId: String? = null
 ) {
     val shape = RoundedCornerShape(12.dp)
     Row(
@@ -77,13 +80,16 @@ internal fun CompactEntityRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = typeLabel.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = typeColor,
-                maxLines = 1
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = typeLabel.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = typeColor,
+                    maxLines = 1
+                )
+                SloplessBadge(SloplessEntity.ARTIST, artistId)
+            }
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
@@ -147,6 +153,7 @@ internal fun CompactTrackRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            SloplessBadge(SloplessEntity.TRACK, track.id, Modifier.padding(start = 6.dp))
             if (track.durationMs > 0) {
                 val sec = track.durationMs / 1000
                 Text(

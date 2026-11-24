@@ -1,5 +1,7 @@
 package io.github.audiz.ui
 
+import io.github.audiz.addons.SloplessEntity
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -100,8 +102,10 @@ fun TrackItemCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    SloplessBadge(SloplessEntity.TRACK, track.id)
                 }
 
                 // ⏱ Длительность трека

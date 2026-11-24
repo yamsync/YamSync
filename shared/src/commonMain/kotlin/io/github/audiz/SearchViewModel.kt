@@ -5,6 +5,9 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.audiz.api.MusicRepository
+import io.github.audiz.addons.Slopless
+import io.github.audiz.addons.SloplessEntity
+import io.github.audiz.addons.SloplessMode
 import io.github.audiz.models.YandexMusicResponse
 import io.github.audiz.models.SearchResult
 import io.github.audiz.models.TypedResult
@@ -57,6 +60,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -526,11 +531,48 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     )
 
+    var sloplessMode by mutableStateOf(
+        loadAppConfig(AppConfigKeys.SLOPLESS_MODE)?.let { saved ->
+            SloplessMode.entries.firstOrNull { it.name == saved }
+        } ?: SloplessMode.OFF
+    )
+        private set
+    var sloplessArtistThreshold by mutableStateOf(
+        loadAppConfig(AppConfigKeys.SLOPLESS_ARTIST_THRESHOLD)?.toIntOrNull()?.coerceIn(1, 100) ?: 10
+    )
+        private set
+
+    private val sloplessSettingsLock = Mutex()
+    internal val slopless = Slopless(viewModelScope, isEnabled = { sloplessMode != SloplessMode.OFF })
+
+    fun saveSloplessMode(mode: SloplessMode) {
+        sloplessMode = mode
+        persistSloplessSetting(AppConfigKeys.SLOPLESS_MODE, mode.name)
+        if (mode != SloplessMode.OFF) waveManager.prefetchWaveTracks()
+    }
+
+    fun saveSloplessArtistThreshold(threshold: Int) {
+        sloplessArtistThreshold = threshold.coerceIn(1, 100)
+        persistSloplessSetting(AppConfigKeys.SLOPLESS_ARTIST_THRESHOLD, sloplessArtistThreshold.toString())
+    }
+
+    private fun persistSloplessSetting(key: String, value: String) {
+        viewModelScope.launch {
+            sloplessSettingsLock.withLock {
+                withContext(DispatcherIO) { saveAppConfig(key, value) }
+            }
+        }
+    }
+
     // 🌊 МЕНЕДЖЕР МОЕЙ ВОЛНЫ:
     val waveManager = WaveManager(
         scope = viewModelScope,
         repository = repository,
         getAccessToken = { settingsManager.currentAccessToken },
+        onUpcomingTracks = { tracks -> tracks.forEach { slopless.request(SloplessEntity.TRACK, it.id) } },
+        shouldSkipRecommendedTrack = { track ->
+            sloplessMode == SloplessMode.SKIP_IN_WAVE && !playlistManager.isTrackLiked(track.id) && slopless.isAiTrack(track.id)
+        },
         onTrackLiked = { trackId -> playlistManager.likedTrackIds.add(trackId.removePrefix("local:").substringBefore(":")) },
         onError = { errorMessage = it }
     )
@@ -1914,6 +1956,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     override fun onCleared() {
         super.onCleared()
+        slopless.close()
         playbackManager.release()
     }
 }

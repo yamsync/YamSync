@@ -49,6 +49,8 @@ import io.github.audiz.ui.PlaylistsDialog
 import io.github.audiz.ui.UpNextDialog
 import io.github.audiz.ui.AddToPlaylistDialog
 import io.github.audiz.ui.LogsDialog
+import io.github.audiz.ui.LocalSlopless
+import io.github.audiz.ui.SloplessUi
 import io.github.audiz.ui.PlayerBar
 import io.github.audiz.ui.PlayerBarState
 import io.github.audiz.ui.PlayerBarActions
@@ -124,6 +126,9 @@ fun App() {
         buildAppColorScheme(isDarkTheme, selectedAccent)
     }
 
+    CompositionLocalProvider(
+        LocalSlopless provides SloplessUi(searchViewModel.slopless, searchViewModel.sloplessMode, searchViewModel.sloplessArtistThreshold)
+    ) {
     MaterialTheme(colorScheme = colors) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -207,6 +212,7 @@ fun App() {
             }
 
             val playerBarState = PlayerBarState(
+                trackId = searchViewModel.playerTrackId ?: currentWave?.id,
                 trackTitle = displayTitle,
                 artistName = displayArtist,
                 isPlaying = searchViewModel.playerIsPlaying,
@@ -743,6 +749,8 @@ fun App() {
                     crossfadeSeconds = searchViewModel.playerCrossfadeSeconds,
                     isUiWatchdogActive = searchViewModel.isUiWatchdogActive,
                     hasPlusSubscription = searchViewModel.hasPlusSubscription,
+                    sloplessMode = searchViewModel.sloplessMode,
+                    sloplessArtistThreshold = searchViewModel.sloplessArtistThreshold,
                 ),
                 actions = SettingsActions(
                     onClose = { settingsExpanded = false },
@@ -769,7 +777,9 @@ fun App() {
                     onSaveCrossfade = { searchViewModel.changeCrossfade(it) },
                     onToggleUiWatchdog = { searchViewModel.toggleUiWatchdog(it) },
                     onRefreshPlusSubscription = { searchViewModel.refreshPlusSubscription() },
-                    onProjectOpened = { supportScope.launch { starPromptManager.complete() } }
+                    onProjectOpened = { supportScope.launch { starPromptManager.complete() } },
+                    onSaveSloplessMode = searchViewModel::saveSloplessMode,
+                    onSaveSloplessArtistThreshold = searchViewModel::saveSloplessArtistThreshold
                 )
             )
 
@@ -902,4 +912,4 @@ fun App() {
         }
     }
 }
-
+}

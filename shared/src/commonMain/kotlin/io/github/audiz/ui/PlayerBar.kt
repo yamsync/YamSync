@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.audiz.addons.SloplessEntity
 import kotlinx.coroutines.delay
 
 /**
@@ -58,6 +59,7 @@ data class PlayerBarState(
     val isQueueOpen: Boolean = false,
     val upNextCount: Int = 0,
     val isDownloadedOrLocal: Boolean = false,
+    val trackId: String? = null,
 )
 
 /**
@@ -229,11 +231,14 @@ fun DesktopPlayerBar(
                 }
 
                 val fullTitle = if (state.artistName.isNotBlank()) "${state.artistName} — ${state.trackTitle}" else state.trackTitle
-                BouncingMarqueeText(
-                    text = fullTitle,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Normal),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    BouncingMarqueeText(
+                        text = fullTitle,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Normal),
+                        modifier = Modifier.weight(1f)
+                    )
+                    SloplessBadge(SloplessEntity.TRACK, state.trackId)
+                }
 
                 ThinSlider(
                     value = if (isDragging) dragProgress else if (state.durationMs > 0) {

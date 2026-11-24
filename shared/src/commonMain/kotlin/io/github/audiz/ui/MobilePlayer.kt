@@ -49,6 +49,7 @@ import kotlin.math.PI
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import io.github.audiz.dsp.AudioVisualizer
+import io.github.audiz.addons.SloplessEntity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -261,12 +262,15 @@ fun MobileMiniPlayerBar(
                         verticalArrangement = Arrangement.Center
                     ) {
                         val fullTitle = if (state.artistName.isNotBlank()) "${state.artistName} — ${state.trackTitle}" else state.trackTitle
-                        BouncingMarqueeText(
-                            text = fullTitle,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            modifier = Modifier.fillMaxWidth(),
-                            enableCopy = false
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            BouncingMarqueeText(
+                                text = fullTitle,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.weight(1f),
+                                enableCopy = false
+                            )
+                            SloplessBadge(SloplessEntity.TRACK, state.trackId)
+                        }
                         val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() && !state.waveTitle.equals("Моя Волна", ignoreCase = true)
                         if (state.isWave) {
                             Row(
@@ -773,14 +777,17 @@ fun MobileFullPlayerSheet(
                 Column(
                     modifier = Modifier.weight(1f).padding(end = 12.dp)
                 ) {
-                    BouncingMarqueeText(
-                        text = state.trackTitle,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        BouncingMarqueeText(
+                            text = state.trackTitle,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        SloplessBadge(SloplessEntity.TRACK, state.trackId)
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = if (state.artistName.isNotBlank()) state.artistName else "Яндекс Музыка",

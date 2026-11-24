@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonOutline
@@ -34,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import io.github.audiz.addons.SloplessMode
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 
@@ -57,6 +59,8 @@ data class SettingsState(
     val crossfadeSeconds: Int = 3,
     val isUiWatchdogActive: Boolean = false,
     val hasPlusSubscription: Boolean? = null,
+    val sloplessMode: SloplessMode = SloplessMode.OFF,
+    val sloplessArtistThreshold: Int = 10,
 )
 
 /**
@@ -81,6 +85,8 @@ data class SettingsActions(
     val onToggleUiWatchdog: (Boolean) -> Unit = {},
     val onRefreshPlusSubscription: () -> Unit = {},
     val onProjectOpened: () -> Unit = {},
+    val onSaveSloplessMode: (SloplessMode) -> Unit = {},
+    val onSaveSloplessArtistThreshold: (Int) -> Unit = {},
 )
 
 /**
@@ -98,15 +104,24 @@ fun SettingsDialog(
     val useSectionMenu = state.uiMode != "desktop"
     var selectedSection by remember { mutableStateOf<SettingsSection?>(null) }
     val currentSection = selectedSection.takeIf { useSectionMenu }
+    var selectedAddon by remember { mutableStateOf<SettingsAddon?>(null) }
+    val currentAddon = selectedAddon.takeIf { currentSection == SettingsSection.Addons }
 
     fun goBack() {
         focusManager.clearFocus()
         keyboardController?.hide()
-        if (currentSection != null) selectedSection = null else actions.onClose()
+        when {
+            currentAddon != null -> selectedAddon = null
+            currentSection != null -> selectedSection = null
+            else -> actions.onClose()
+        }
     }
 
     LaunchedEffect(visible) {
-        if (!visible) selectedSection = null
+        if (!visible) {
+            selectedSection = null
+            selectedAddon = null
+        }
     }
     BackHandler(enabled = visible, onBack = ::goBack)
 
@@ -116,7 +131,7 @@ fun SettingsDialog(
         exit = fadeOut(),
         modifier = modifier.fillMaxSize()
     ) {
-        val settingsScrollState = key(useSectionMenu, currentSection) { rememberScrollState() }
+        val settingsScrollState = key(useSectionMenu, currentSection, currentAddon) { rememberScrollState() }
         var dragOffsetY by remember { mutableStateOf(0f) }
         val animatedOffsetY by animateFloatAsState(targetValue = dragOffsetY)
 
@@ -225,14 +240,14 @@ fun SettingsDialog(
                                 if (currentSection != null) {
                                     TopBarIconButton(
                                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "К разделам настроек",
+                                        contentDescription = if (currentAddon != null) "К дополнениям" else "К разделам настроек",
                                         modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                                         size = 40.dp,
                                         onClick = ::goBack
                                     )
                                 }
                                 Text(
-                                    text = currentSection?.title ?: "Настройки",
+                                    text = currentAddon?.title ?: currentSection?.title ?: "Настройки",
                                     style = if (useSectionMenu) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -266,8 +281,15 @@ fun SettingsDialog(
                         ) {
                             if (useSectionMenu && currentSection == null) {
                                 SettingsSectionMenu(state, onOpen = { selectedSection = it })
+                            } else if (currentSection == SettingsSection.Addons && currentAddon == null) {
+                                SettingsAddon.entries.forEach { addon ->
+                                    SettingsMenuRow(addon.title, addon.icon, addon.summary(state)) {
+                                        selectedAddon = addon
+                                    }
+                                }
                             } else {
-                                val blocks = currentSection?.blocks ?: SettingsBlock.entries
+                                val blocks = currentAddon?.let { listOf(it.block) }
+                                    ?: currentSection?.blocks ?: SettingsBlock.entries
                                 blocks.forEachIndexed { index, block ->
                                     if (index > 0) {
                                         Spacer(Modifier.height(12.dp))
@@ -291,6 +313,14 @@ fun SettingsDialog(
 }
 
 
+private enum class SettingsAddon(val title: String, val icon: ImageVector, val block: SettingsBlock) {
+    Slopless("Slopless", Icons.Filled.GraphicEq, SettingsBlock.Slopless);
+
+    fun summary(state: SettingsState): String = when (this) {
+        Slopless -> state.sloplessMode.title
+    }
+}
+
 private enum class SettingsSection(
     val title: String,
     val icon: ImageVector,
@@ -303,6 +333,7 @@ private enum class SettingsSection(
     ),
     Appearance("Оформление", Icons.Filled.Palette, listOf(SettingsBlock.Theme, SettingsBlock.InterfaceMode)),
     Account("Аккаунт Яндекса", Icons.Filled.PersonOutline, listOf(SettingsBlock.YandexAccount)),
+    Addons("Дополнения", Icons.Filled.Extension, emptyList()),
     Diagnostics("Диагностика", Icons.Filled.MonitorHeart, listOf(SettingsBlock.Logs, SettingsBlock.WaveConnection)),
     Support("Поддержать проект", Icons.Filled.FavoriteBorder, listOf(SettingsBlock.Support));
 
@@ -317,6 +348,7 @@ private enum class SettingsSection(
             }
             "$theme · ${AppAccentColor.fromKey(state.accentColor).title}"
         }
+        Addons -> "Slopless · ${state.sloplessMode.title}"
         Account, Diagnostics, Support -> null
     }
 }
@@ -324,42 +356,47 @@ private enum class SettingsSection(
 @Composable
 private fun SettingsSectionMenu(state: SettingsState, onOpen: (SettingsSection) -> Unit) {
     SettingsSection.entries.forEach { section ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(role = Role.Button) { onOpen(section) }
-                .pointerHoverIcon(PointerIcon.Hand)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(section.icon, contentDescription = null, modifier = Modifier.size(22.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SettingsMenuRow(section.title, section.icon, section.summary(state)) { onOpen(section) }
+    }
+}
+
+@Composable
+private fun SettingsMenuRow(title: String, icon: ImageVector, summary: String?, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            summary?.let {
                 Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                section.summary(state)?.let { summary ->
-                    Text(
-                        text = summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
-            Icon(
-                Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Icon(
+            Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
     }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
