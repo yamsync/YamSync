@@ -1324,11 +1324,12 @@ fun CoverSpectrumVisualizer(
                 .fillMaxWidth()
                 .height(spectrumHeight + bottomInset)
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bottomInset)
         ) {
             val totalW = size.width
-            val maxH = size.height
+            val maxH = size.height - bottomInset.toPx()
             if (totalW <= 0f || maxH <= 0f) return@Canvas
+            val reflectionTop = maxH + 1.dp.toPx()
+            val reflectionScale = ((size.height - reflectionTop) / maxH).coerceIn(0f, 0.30f)
 
             // Кадр спектра читается только здесь: обновление каждый кадр перерисовывает
             // Canvas, не вызывая рекомпозицию BoxWithConstraints.
@@ -1361,13 +1362,14 @@ fun CoverSpectrumVisualizer(
                 val h = (maxH * level.coerceIn(0.08f, 1f)).coerceAtLeast(minOf(barW, maxH)) * envelope
                 val x = startX + i * (barW + spacing)
                 val y = maxH - h
+                val barRadius = CornerRadius(minOf(1.dp.toPx(), barW * 0.2f))
 
                 // Все столбики имеют общую плоскую нижнюю границу.
                 drawRoundRect(
                     brush = barBrush,
                     topLeft = Offset(x, y),
                     size = Size(barW, h),
-                    cornerRadius = CornerRadius(minOf(1.dp.toPx(), barW * 0.2f)),
+                    cornerRadius = barRadius,
                     alpha = opacity
                 )
 
@@ -1382,6 +1384,21 @@ fun CoverSpectrumVisualizer(
                     topLeft = Offset(x, peakY),
                     size = Size(barW, taperedPeakH)
                 )
+
+                if (reflectionScale > 0f) {
+                    drawRoundRect(
+                        brush = barBrush,
+                        topLeft = Offset(x, reflectionTop),
+                        size = Size(barW, h * reflectionScale),
+                        cornerRadius = barRadius,
+                        alpha = opacity * 0.20f
+                    )
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.14f * opacity),
+                        topLeft = Offset(x, reflectionTop + (maxH - peakY - taperedPeakH) * reflectionScale),
+                        size = Size(barW, taperedPeakH * reflectionScale)
+                    )
+                }
             }
         }
     }
