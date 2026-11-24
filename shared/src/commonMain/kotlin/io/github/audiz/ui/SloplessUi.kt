@@ -46,10 +46,10 @@ internal fun SloplessBadge(entity: SloplessEntity, id: String?, modifier: Modifi
     LaunchedEffect(slopless.service, id, entity, slopless.mode) {
         slopless.service.request(entity, id)
     }
-    val score = slopless.service.score(entity, id) ?: return
+    val assessment = slopless.service.assessment(entity, id) ?: return
     val marked = when (entity) {
-        SloplessEntity.TRACK -> score > 0.5
-        SloplessEntity.ARTIST -> score >= slopless.artistThreshold / 100.0
+        SloplessEntity.TRACK -> assessment.isAiTrack
+        SloplessEntity.ARTIST -> assessment.isAiArtist(slopless.artistThreshold / 100.0)
     }
     if (marked) {
         Surface(

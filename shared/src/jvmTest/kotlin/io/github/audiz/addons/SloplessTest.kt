@@ -20,7 +20,7 @@ class SloplessTest {
     @Test
     fun wavePlaysWithoutWaitingForSlowLookupAndSkipsOnlyFromCache() = runBlocking {
         val started = CompletableDeferred<Unit>()
-        val response = CompletableDeferred<Double>()
+        val response = CompletableDeferred<SloplessAssessment?>()
         val service = Slopless(this, isEnabled = { true }) { _, id ->
             assertEquals("202", id)
             started.complete(Unit)
@@ -43,7 +43,7 @@ class SloplessTest {
             wave.onWaveTrackFinished(0L)
             assertEquals("202", wave.currentWaveTrack?.id)
 
-            response.complete(0.94)
+            response.complete(parseSloplessAssessment(SloplessEntity.TRACK, "202", """{"id":202,"score":-1,"scoreYandex":1}"""))
             withTimeout(2_000) { snapshotFlow { service.isAiTrack("202") }.first { it } }
             assertEquals("202", wave.currentWaveTrack?.id, "A late result must not interrupt the current track")
 
@@ -62,7 +62,7 @@ class SloplessTest {
         val service = Slopless(this, isEnabled = { true }) { _, id ->
             val response = CompletableDeferred<Double>()
             started.send(id to response)
-            response.await()
+            SloplessAssessment(classifierScore = response.await())
         }
         try {
             listOf("101", "101:55", "202", "303").forEach { service.request(SloplessEntity.TRACK, it) }
@@ -104,11 +104,35 @@ class SloplessTest {
 
     @Test
     fun parserSeparatesArtistShareFromTrackScoreAndIgnoresUnknownScores() {
-        assertEquals(0.12, parseSloplessScore(SloplessEntity.ARTIST, "1", """{"id":1,"aiTracks":12,"totalTracks":100}"""))
-        assertEquals(0.85, parseSloplessScore(SloplessEntity.TRACK, "2", """{"id":2,"score":0.85,"scoreYandex":null}"""))
-        assertNull(parseSloplessScore(SloplessEntity.TRACK, "2", """{"id":2,"score":-1}"""))
-        assertNull(parseSloplessScore(SloplessEntity.TRACK, "2", """{"id":2,"score":null}"""))
-        assertNull(parseSloplessScore(SloplessEntity.TRACK, "2", """{"id":3,"score":0.9}"""))
+        val artist = parseSloplessAssessment(SloplessEntity.ARTIST, "1", """{"id":1,"aiTracks":12,"totalTracks":100}""")
+        val track = parseSloplessAssessment(SloplessEntity.TRACK, "2", """{"id":2,"score":0.85,"scoreYandex":null}""")
+        assertTrue(artist?.isAiArtist(0.12) == true)
+        assertFalse(artist?.isAiArtist(0.13) == true)
+        assertTrue(track?.isAiTrack == true)
+        assertNull(parseSloplessAssessment(SloplessEntity.TRACK, "2", """{"id":2,"score":-1}"""))
+        assertNull(parseSloplessAssessment(SloplessEntity.TRACK, "2", """{"id":2,"score":null}"""))
+        assertNull(parseSloplessAssessment(SloplessEntity.TRACK, "2", """{"id":3,"score":0.9,"scoreYandex":1}"""))
+    }
+
+    @Test
+    fun yandexTrackStatusesCanMarkTracksWithoutAClassifierScore() {
+        for (status in 0..4) {
+            val track = parseSloplessAssessment(SloplessEntity.TRACK, "2", """{"id":2,"score":-1,"scoreYandex":$status}""")
+            assertEquals(status in 1..3, track?.isAiTrack == true, "Yandex status $status")
+        }
+    }
+
+    @Test
+    fun yandexArtistShareUsesItsOwnCheckedTrackCount() {
+        val artist = parseSloplessAssessment(
+            SloplessEntity.ARTIST, "1", """{"id":1,"aiTracks":0,"totalTracks":100,"yandexAiTracks":2,"yandexCheckedTracks":10}"""
+        )
+        assertTrue(artist?.isAiArtist(0.20) == true)
+        assertFalse(artist?.isAiArtist(0.21) == true)
+        val unchecked = parseSloplessAssessment(
+            SloplessEntity.ARTIST, "1", """{"id":1,"yandexAiTracks":2,"yandexCheckedTracks":0}"""
+        )
+        assertNull(unchecked)
     }
 
     @Test

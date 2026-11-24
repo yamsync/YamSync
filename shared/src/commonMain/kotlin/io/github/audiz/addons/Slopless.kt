@@ -32,14 +32,25 @@ enum class SloplessMode(val title: String) {
 
 internal enum class SloplessEntity(val path: String) { TRACK("track"), ARTIST("artist") }
 
+internal data class SloplessAssessment(
+    val classifierScore: Double? = null,
+    val isTrackMarkedByYandex: Boolean = false,
+    val yandexArtistShare: Double? = null
+) {
+    val isAiTrack: Boolean get() = isTrackMarkedByYandex || (classifierScore ?: 0.0) > 0.5
+
+    fun isAiArtist(threshold: Double): Boolean =
+        maxOf(classifierScore ?: 0.0, yandexArtistShare ?: 0.0) >= threshold
+}
+
 /** Запросы ставятся в очередь из UI, а воспроизведение читает только готовый кеш. */
 internal class Slopless(
     scope: CoroutineScope,
     private val isEnabled: () -> Boolean,
-    private val fetchOverride: (suspend (SloplessEntity, String) -> Double?)? = null
+    private val fetchOverride: (suspend (SloplessEntity, String) -> SloplessAssessment?)? = null
 ) {
     private data class Key(val entity: SloplessEntity, val id: String)
-    private data class Entry(val score: Double?, val expiresAt: TimeMark)
+    private data class Entry(val assessment: SloplessAssessment?, val expiresAt: TimeMark)
 
     private val cache = mutableStateMapOf<Key, Entry>()
     private val pending = mutableSetOf<Key>()
@@ -68,19 +79,19 @@ internal class Slopless(
         for (key in requests) {
             try {
                 if (!isEnabled() || isCoolingDown()) continue
-                val score = withTimeoutOrNull(1_500) {
+                val result = withTimeoutOrNull(1_500) {
                     withContext(DispatcherIO) {
-                        val lookup = fetchOverride ?: ::fetchScore
+                        val lookup = fetchOverride ?: ::fetchAssessment
                         LookupResult(lookup(key.entity, key.id))
                     }
                 } ?: error("Slopless lookup timed out")
-                val lifetime = if (score.value == null) 5.minutes else 60.minutes
+                val lifetime = if (result.value == null) 5.minutes else 60.minutes
                 Snapshot.withMutableSnapshot {
                     if (cache.size >= 512 && key !in cache) {
                         val oldest = cache.minByOrNull { -it.value.expiresAt.elapsedNow() }
                         oldest?.let { cache.remove(it.key) }
                     }
-                    cache[key] = Entry(score.value, TimeSource.Monotonic.markNow() + lifetime)
+                    cache[key] = Entry(result.value, TimeSource.Monotonic.markNow() + lifetime)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -92,7 +103,7 @@ internal class Slopless(
         }
     }
 
-    private data class LookupResult(val value: Double?)
+    private data class LookupResult(val value: SloplessAssessment?)
 
     fun request(entity: SloplessEntity, id: String?) {
         val key = key(entity, id) ?: return
@@ -100,12 +111,12 @@ internal class Slopless(
         if (pending.add(key) && !requests.trySend(key).isSuccess) pending.remove(key)
     }
 
-    fun score(entity: SloplessEntity, id: String?): Double? {
+    fun assessment(entity: SloplessEntity, id: String?): SloplessAssessment? {
         val key = key(entity, id) ?: return null
-        return cache[key]?.takeIf { it.expiresAt.hasNotPassedNow() }?.score
+        return cache[key]?.takeIf { it.expiresAt.hasNotPassedNow() }?.assessment
     }
 
-    fun isAiTrack(id: String?): Boolean = (score(SloplessEntity.TRACK, id) ?: 0.0) > 0.5
+    fun isAiTrack(id: String?): Boolean = assessment(SloplessEntity.TRACK, id)?.isAiTrack == true
 
     fun close() {
         requests.cancel()
@@ -119,23 +130,37 @@ internal class Slopless(
 
     private fun isCoolingDown(): Boolean = retryAfter?.hasNotPassedNow() == true
 
-    private suspend fun fetchScore(entity: SloplessEntity, id: String): Double? {
+    private suspend fun fetchAssessment(entity: SloplessEntity, id: String): SloplessAssessment? {
         val response = client.value.get("https://slopless.art/api/${entity.path}/$id")
         if (response.status == HttpStatusCode.NotFound) return null
         check(response.status == HttpStatusCode.OK)
-        return parseSloplessScore(entity, id, response.bodyAsText())
+        return parseSloplessAssessment(entity, id, response.bodyAsText())
     }
 }
 
-internal fun parseSloplessScore(entity: SloplessEntity, id: String, body: String): Double? {
+internal fun parseSloplessAssessment(entity: SloplessEntity, id: String, body: String): SloplessAssessment? {
     val fields = Json.parseToJsonElement(body).jsonObject
     if (fields["id"]?.jsonPrimitive?.longOrNull != id.toLongOrNull()) return null
+
+    fun share(aiKey: String, totalKey: String): Double? {
+        val total = fields[totalKey]?.jsonPrimitive?.longOrNull?.takeIf { it > 0 } ?: return null
+        val ai = fields[aiKey]?.jsonPrimitive?.longOrNull?.takeIf { it in 0..total } ?: return null
+        return ai.toDouble() / total
+    }
+
     return when (entity) {
-        SloplessEntity.TRACK -> fields["score"]?.jsonPrimitive?.doubleOrNull?.takeIf { it in 0.0..1.0 }
+        SloplessEntity.TRACK -> {
+            val score = fields["score"]?.jsonPrimitive?.doubleOrNull?.takeIf { it in 0.0..1.0 }
+            val yandexStatus = fields["scoreYandex"]?.jsonPrimitive?.longOrNull
+            val markedByYandex = yandexStatus != null && yandexStatus in 1L..3L
+            if (score == null && !markedByYandex) return null
+            SloplessAssessment(classifierScore = score, isTrackMarkedByYandex = markedByYandex)
+        }
         SloplessEntity.ARTIST -> {
-            val total = fields["totalTracks"]?.jsonPrimitive?.longOrNull?.takeIf { it > 0 } ?: return null
-            val ai = fields["aiTracks"]?.jsonPrimitive?.longOrNull?.takeIf { it in 0..total } ?: return null
-            ai.toDouble() / total
+            val classifierShare = share("aiTracks", "totalTracks")
+            val yandexShare = share("yandexAiTracks", "yandexCheckedTracks")
+            if (classifierShare == null && yandexShare == null) return null
+            SloplessAssessment(classifierScore = classifierShare, yandexArtistShare = yandexShare)
         }
     }
 }
