@@ -551,7 +551,7 @@ fun MobileFullPlayerSheet(
 
                     val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() && !state.waveTitle.equals("Моя Волна", ignoreCase = true)
                     val contextLabel = when {
-                        isThematicWave -> "МОЯ ВОЛНА • ${state.waveTitle}"
+                        isThematicWave -> "${state.waveTitle} • МОЯ ВОЛНА"
                         state.isWave -> "МОЯ ВОЛНА"
                         else -> "СЕЙЧАС ИГРАЕТ"
                     }
