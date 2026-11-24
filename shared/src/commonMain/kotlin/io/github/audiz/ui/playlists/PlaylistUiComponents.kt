@@ -107,23 +107,18 @@ internal fun formatTrackPlural(count: Int): String {
 }
 
 /**
- * 🏷 Интерактивная плашка раскрытия треков в стиле макета: [🎵 17 треков ⌄]
+ * Количество треков в плейлисте.
  */
 @Composable
 internal fun PlaylistTracksPill(
     trackCount: Int,
-    isExpanded: Boolean,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        onClick = onClick,
         shape = RoundedCornerShape(6.dp),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)),
-        modifier = modifier
-            .height(24.dp)
-            .pointerHoverIcon(PointerIcon.Hand)
+        modifier = modifier.height(24.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
@@ -144,12 +139,6 @@ internal fun PlaylistTracksPill(
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 softWrap = false
-            )
-            Icon(
-                imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (isExpanded) "Свернуть треки" else "Развернуть треки",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(14.dp)
             )
         }
     }

@@ -130,8 +130,9 @@ fun App() {
         ) {
 
 
-            // Навигация: если список загруженных треков активен и не пуст — переключаемся на Экран Б
-            val showTracksScreen = searchViewModel.isTracksListVisible && (searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
+            // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
+            val showTracksScreen = searchViewModel.isTracksListVisible &&
+                (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
             var settingsExpanded by remember { mutableStateOf(false) }
             var isMobilePlayerExpanded by remember {
                 mutableStateOf(loadAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED) == "true")

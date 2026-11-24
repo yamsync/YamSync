@@ -19,20 +19,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.audiz.AppConfigKeys
 import io.github.audiz.DispatcherIO
 import io.github.audiz.SearchViewModel
-import io.github.audiz.loadAppConfig
 import io.github.audiz.localFileExists
 import io.github.audiz.models.CustomMediaSource
 import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.LocalSourceType
 import io.github.audiz.resolveLocalPath
-import io.github.audiz.saveAppConfig
 
 /**
  * 💾 Вкладка 1: Локальные источники (папки, файлы, M3U) и оффлайн-плейлисты
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LocalPlaylistsTab(
     viewModel: SearchViewModel,
@@ -46,10 +44,6 @@ internal fun LocalPlaylistsTab(
     onOpenSync: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
-    var expandedPlaylistId by remember {
-        mutableStateOf(loadAppConfig(AppConfigKeys.EXPANDED_PLAYLIST_ID)?.takeIf { it.isNotBlank() })
-    }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -271,9 +265,13 @@ internal fun LocalPlaylistsTab(
                 val availableCount = availability
                 val isFullyAvailable = availableCount != null && availableCount == playlist.trackCount
                 val isNoneAvailable = availableCount == 0 && playlist.trackCount > 0
-                val isExpanded = expandedPlaylistId == playlist.id
 
-                PlaylistCardSurface(modifier = Modifier.fillMaxWidth()) {
+                PlaylistCardSurface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClickLabel = "Открыть плейлист") { onOpenPlaylist(playlist) }
+                        .pointerHoverIcon(PointerIcon.Hand)
+                ) {
                     Column(
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -297,19 +295,11 @@ internal fun LocalPlaylistsTab(
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
+                                FlowRow(
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    PlaylistTracksPill(
-                                        trackCount = playlist.trackCount,
-                                        isExpanded = isExpanded,
-                                        onClick = {
-                                            val next = if (isExpanded) null else playlist.id
-                                            expandedPlaylistId = next
-                                            saveAppConfig(AppConfigKeys.EXPANDED_PLAYLIST_ID, next ?: "")
-                                        }
-                                    )
+                                    PlaylistTracksPill(trackCount = playlist.trackCount)
 
                                     PlaylistSourceBadge(isOffline = true)
 
@@ -327,7 +317,7 @@ internal fun LocalPlaylistsTab(
                                 }
                             }
 
-                            // Правый ряд действий: [YamSync (если нужен)] [⋮ Меню] [▶ Играть]
+                            // Правый ряд действий: [YamSync (если нужен)] [⋮ Меню]
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -354,130 +344,6 @@ internal fun LocalPlaylistsTab(
                                     onExportM3u = { viewModel.exportLocalPlaylist(playlist.id) },
                                     onDelete = { onDeleteClick(playlist) }
                                 )
-
-                                PlaylistPlayButton(
-                                    onClick = { onOpenPlaylist(playlist) },
-                                    buttonSize = 28.dp
-                                )
-                            }
-                        }
-
-                        // 📜 Разворачивающийся список треков с возможностью удаления
-                        if (expandedPlaylistId == playlist.id) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 14.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
-                                thickness = 1.dp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            if (playlist.trackPaths.isEmpty()) {
-                                Text(
-                                    text = "В плейлисте пока нет треков. Добавьте их из поиска или плеера!",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                )
-                            } else {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
-                                ) {
-                                    playlist.trackPaths.forEach { trackPath ->
-                                        val filename = trackPath
-                                            .substringAfterLast('/')
-                                            .substringAfterLast('\\')
-                                            .substringBeforeLast('.')
-                                        val isFileAvailable = remember(trackPath) {
-                                            try {
-                                                localFileExists(resolveLocalPath(trackPath)) || run {
-                                                    val fn = trackPath.substringAfterLast('/').substringAfterLast('\\')
-                                                    fn.isNotBlank() && localFileExists(resolveLocalPath(fn))
-                                                }
-                                            } catch (_: Throwable) {
-                                                false
-                                            }
-                                        }
-
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = MaterialTheme.colorScheme.surface.copy(alpha = if (isFileAvailable) 0.55f else 0.3f),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    if (isFileAvailable) {
-                                                        val resolved = resolveLocalPath(trackPath).takeIf { localFileExists(it) }
-                                                            ?: run {
-                                                                val fn = trackPath.substringAfterLast('/').substringAfterLast('\\')
-                                                                resolveLocalPath(fn).takeIf { localFileExists(it) }
-                                                            } ?: trackPath
-                                                        viewModel.openLocalPlaylist(playlist, restoreTrackId = resolved, autoPlayFirst = true)
-                                                        onDismiss()
-                                                    } else if (onOpenSync != null) {
-                                                        onDismiss()
-                                                        onOpenSync()
-                                                    } else {
-                                                        viewModel.errorMessage = "Файл '$filename' не найден на устройстве. Синхронизируйте его через YamSync."
-                                                    }
-                                                }
-                                                .pointerHoverIcon(PointerIcon.Hand)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .heightIn(min = 56.dp)
-                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isFileAvailable) Icons.Filled.MusicNote else Icons.Filled.CloudOff,
-                                                    contentDescription = null,
-                                                    tint = if (isFileAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                                Column(
-                                                    modifier = Modifier.weight(1f),
-                                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = filename,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = if (isFileAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    if (!isFileAvailable) {
-                                                        Text(
-                                                            text = "Не скачан",
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = MaterialTheme.colorScheme.error,
-                                                            fontSize = 11.sp,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                    }
-                                                }
-
-                                                IconButton(
-                                                    onClick = {
-                                                        viewModel.removeTrackFromLocalPlaylist(playlist.id, trackPath)
-                                                    },
-                                                    modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Close,
-                                                        contentDescription = "Убрать из плейлиста",
-                                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                             }
                         }
                     }

@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,21 +16,18 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.audiz.SearchViewModel
-import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.models.PlaylistInfo
-import io.github.audiz.models.YandexPlaylistTrackItem
 
 /**
  * ☁️ Вкладка 2: Плейлисты пользователя из Яндекс Музыки
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun YandexUserPlaylistsTab(
     viewModel: SearchViewModel,
     onOpenPlaylist: (PlaylistInfo) -> Unit,
-    onRenameClick: (PlaylistInfo) -> Unit = {},
-    onDismiss: () -> Unit = {}
+    onRenameClick: (PlaylistInfo) -> Unit = {}
 ) {
     if (viewModel.currentAccessToken.isBlank()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -62,32 +58,23 @@ internal fun YandexUserPlaylistsTab(
         return
     }
 
-    var expandedPlaylistKind by remember { mutableStateOf<Long?>(null) }
-    val yandexPlaylistTracksCache = remember { mutableStateMapOf<Long, List<YandexPlaylistTrackItem>>() }
-    val isDeletingTrackMap = remember { mutableStateMapOf<String, Boolean>() }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         itemsIndexed(viewModel.userPlaylists, key = { index, playlist -> "yandex_pl_${playlist.kind ?: playlist.uid}_$index" }) { index, playlist ->
             val kind = playlist.kind
-            val isExpanded = expandedPlaylistKind == kind
             val playlistKey = playlist.kind?.toString() ?: playlist.playlistUuid ?: playlist.title
             val downloadProgress = viewModel.activePlaylistDownloadProgress
             val isThisDownloading = downloadProgress != null && downloadProgress.playlistId == playlistKey
             val isAnyDownloading = downloadProgress != null
 
-            LaunchedEffect(isExpanded, kind) {
-                if (isExpanded && kind != null && !yandexPlaylistTracksCache.containsKey(kind)) {
-                    val details = viewModel.loadYandexPlaylistDetails(playlist)
-                    if (details != null) {
-                        yandexPlaylistTracksCache[kind] = details.tracks
-                    }
-                }
-            }
-
-            PlaylistCardSurface(modifier = Modifier.fillMaxWidth()) {
+            PlaylistCardSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = "Открыть плейлист") { onOpenPlaylist(playlist) }
+                    .pointerHoverIcon(PointerIcon.Hand)
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -111,23 +98,17 @@ internal fun YandexUserPlaylistsTab(
                                 overflow = TextOverflow.Ellipsis
                             )
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            FlowRow(
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                PlaylistTracksPill(
-                                    trackCount = playlist.trackCount,
-                                    isExpanded = isExpanded,
-                                    onClick = {
-                                        expandedPlaylistKind = if (isExpanded) null else kind
-                                    }
-                                )
+                                PlaylistTracksPill(trackCount = playlist.trackCount)
 
                                 PlaylistSourceBadge(isOffline = false)
                             }
                         }
 
-                        // Правый ряд действий: [⬇ Скачать / Спиннер] [⋮ Меню] [▶ Играть]
+                        // Правый ряд действий: [⬇ Скачать / Спиннер] [⋮ Меню]
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -165,11 +146,6 @@ internal fun YandexUserPlaylistsTab(
                                     onRename = { onRenameClick(playlist) }
                                 )
                             }
-
-                            PlaylistPlayButton(
-                                onClick = { onOpenPlaylist(playlist) },
-                                buttonSize = 28.dp
-                            )
                         }
                     }
 
@@ -246,131 +222,6 @@ internal fun YandexUserPlaylistsTab(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                }
-                            }
-                        }
-                    }
-
-                    // 📜 Разворачивающийся список треков облачного плейлиста
-                    if (isExpanded) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 14.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
-                            thickness = 1.dp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        val cachedTracks = kind?.let { yandexPlaylistTracksCache[it] }
-
-                        if (cachedTracks == null) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            }
-                        } else if (cachedTracks.isEmpty()) {
-                            Text(
-                                text = "В плейлисте пока нет треков. Добавьте их из поиска или плеера!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                            )
-                        } else {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
-                            ) {
-                                cachedTracks.forEach { item ->
-                                    val isDeleting = isDeletingTrackMap[item.id] == true
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.loadPlaylist(playlist, restoreTrackId = item.id)
-                                                onDismiss()
-                                            }
-                                            .pointerHoverIcon(PointerIcon.Hand)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.MusicNote,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = item.title.ifBlank { "Трек #${item.id}" },
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        fontWeight = FontWeight.Medium,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    if (item.artist.isNotBlank()) {
-                                                        Text(
-                                                            text = item.artist,
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            if (isDeleting) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(16.dp).padding(2.dp),
-                                                    strokeWidth = 2.dp
-                                                )
-                                            } else {
-                                                IconButton(
-                                                    onClick = {
-                                                        isDeletingTrackMap[item.id] = true
-                                                        val fullTrack = FullTrackInfo(
-                                                            id = item.id,
-                                                            realId = item.id,
-                                                            title = item.title
-                                                        )
-                                                        viewModel.removeTrackFromYandexPlaylist(playlist, fullTrack) { success ->
-                                                            isDeletingTrackMap[item.id] = false
-                                                            if (success && kind != null) {
-                                                                val currentList = yandexPlaylistTracksCache[kind]?.toMutableList()
-                                                                currentList?.removeAll { it.id == item.id }
-                                                                if (currentList != null) {
-                                                                    yandexPlaylistTracksCache[kind] = currentList
-                                                                }
-                                                            }
-                                                        }
-                                                    },
-                                                    modifier = Modifier.size(24.dp).pointerHoverIcon(PointerIcon.Hand)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Close,
-                                                        contentDescription = "Убрать из плейлиста",
-                                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }

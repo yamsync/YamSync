@@ -230,7 +230,7 @@ fun PlaylistsDialog(
                                 onRenameClick = { playlistToRename = it },
                                 onDeleteClick = { playlistToDelete = it },
                                 onOpenPlaylist = {
-                                    viewModel.openLocalPlaylist(it, autoPlayFirst = true)
+                                    viewModel.openLocalPlaylist(it)
                                     onDismiss()
                                 },
                                 onOpenSync = onOpenSync,
@@ -242,8 +242,7 @@ fun PlaylistsDialog(
                                     viewModel.loadPlaylist(it)
                                     onDismiss()
                                 },
-                                onRenameClick = { yandexPlaylistToRename = it },
-                                onDismiss = onDismiss
+                                onRenameClick = { yandexPlaylistToRename = it }
                             )
                         }
                     }
