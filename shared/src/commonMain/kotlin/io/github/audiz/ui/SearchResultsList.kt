@@ -86,7 +86,7 @@ fun SearchResultsList(
         } ?: emptyList()
     }
 
-    LaunchedEffect(searchItems.size) {
+    LaunchedEffect(result.result?.text) {
         if (searchItems.isNotEmpty()) {
             listState.scrollToItem(0)
         }

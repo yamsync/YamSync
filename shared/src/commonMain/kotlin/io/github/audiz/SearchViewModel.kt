@@ -43,6 +43,9 @@ import io.github.audiz.search.SearchSuggestion
 import io.github.audiz.search.SearchSuggestionType
 import io.github.audiz.search.buildSearchSuggestions
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -50,6 +53,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,6 +90,9 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     }
 
     var searchQuery by mutableStateOf("")
+    var activeSearchQuery by mutableStateOf<String?>(null)
+        private set
+    private var searchJob: Job? = null
     var isLoading by mutableStateOf(false)
         private set
     var errorMessage by mutableStateOf<String?>(null)
@@ -995,23 +1002,30 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    suspend fun getSearchSuggestions(query: String): List<SearchSuggestion> {
+    fun getSearchSuggestions(query: String): Flow<List<SearchSuggestion>> = flow {
         val text = query.trim()
-        if (text.isEmpty() || DeepLinkHandler.extractTrackId(text) != null) return emptyList()
-        return withContext(DispatcherIO) {
-            val localTracks = getCachedLocalTracks()
-            val results = if (currentAccessToken.isBlank()) emptyList() else try {
+        if (text.isEmpty() || DeepLinkHandler.extractTrackId(text) != null) return@flow
+
+        val localSuggestions = buildSearchSuggestions(text, emptyList(), getCachedLocalTracks())
+        emit(localSuggestions)
+
+        if (currentAccessToken.isNotBlank()) {
+            val onlineResults = try {
                 repository.searchSuggestions(text).result?.results.orEmpty()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                emptyList()
+                return@flow
             }
-            buildSearchSuggestions(text, results, localTracks)
+            if (onlineResults.isNotEmpty()) {
+                val matchedLocalTracks = localSuggestions.mapNotNull { it.localTrack }
+                emit(buildSearchSuggestions(text, onlineResults, matchedLocalTracks))
+            }
         }
-    }
+    }.flowOn(DispatcherIO)
 
     fun selectSearchSuggestion(suggestion: SearchSuggestion) {
+        cancelSearch()
         searchQuery = suggestion.title
         when (suggestion.type) {
             SearchSuggestionType.LOCAL_TRACK -> suggestion.localTrack?.let {
@@ -1074,65 +1088,64 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     fun performSearch() {
         val query = searchQuery.trim()
-        if (query.isBlank() || isLoading) return
+        if (query.isBlank() || query == activeSearchQuery) return
 
-        // 🔗 Если в поиск вставлена ссылка или ID трека из YamSync / Яндекс Музыки
+        cancelSearch()
         val linkTrackId = DeepLinkHandler.extractTrackId(query)
         if (linkTrackId != null) {
             playTrackByExternalId(linkTrackId)
             return
         }
 
-        if (currentAccessToken.isBlank()) {
-            val local = findMatchingLocalTracks(query)
-            if (local.isNotEmpty()) {
-                val typedResults = local.map { TypedResult("track", track = it.toTrackInfo()) }
-                searchResult = YandexMusicResponse(result = SearchResult(text = query, results = typedResults))
-                return
-            }
-            errorMessage = "⚠️ Требуется авторизация. Пожалуйста, откройте настройки (шестерёнка вверху) и сохраните OAuth токен Яндекс Музыки."
-            return
-        }
-
-        isDownloadedTracksScreen = false
-        launchSafe {
-            isLoading = true
-            errorMessage = null
-            resetPagination()
+        searchResult = null
+        errorMessage = null
+        activeSearchQuery = query
+        searchJob = launchSafe {
             try {
-                val localMatches = withContext(DispatcherIO) {
-                    findMatchingLocalTracks(query)
+                val localResults = withContext(DispatcherIO) {
+                    findMatchingLocalTracks(query).map { TypedResult("track", track = it.toTrackInfo()) }
                 }
+                if (localResults.isNotEmpty()) {
+                    searchResult = YandexMusicResponse(result = SearchResult(text = query, results = localResults))
+                }
+
+                if (currentAccessToken.isBlank()) {
+                    if (localResults.isEmpty()) errorMessage = "На устройстве ничего не найдено."
+                    return@launchSafe
+                }
+
                 val onlineResult = withContext(DispatcherIO) {
                     try {
                         repository.searchInstant(query)
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null
                     }
                 }
-                if (localMatches.isNotEmpty()) {
-                    val localTypedResults = localMatches.map { TypedResult("track", track = it.toTrackInfo()) }
-                    val onlineList = onlineResult?.result?.results.orEmpty()
-                    val merged = localTypedResults + onlineList
-                    val baseResult = onlineResult?.result ?: SearchResult(text = query)
-                    searchResult = (onlineResult ?: YandexMusicResponse()).copy(
-                        result = baseResult.copy(results = merged)
+                val result = onlineResult?.result
+                if (result != null) {
+                    searchResult = onlineResult.copy(
+                        result = result.copy(text = query, results = localResults + result.results)
                     )
-                } else if (onlineResult != null) {
-                    searchResult = onlineResult
-                } else {
-                    errorMessage = "Не удалось выполнить поиск"
+                } else if (localResults.isEmpty()) {
+                    errorMessage = "На устройстве ничего не найдено. Поиск в Яндекс Музыке недоступен."
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                if (e is CancellationException) throw e
                 errorMessage = e.message ?: e.toString()
                 AppLogger.e("SearchViewModel", "Ошибка поиска: ${e.message}")
             } finally {
-                isLoading = false
+                if (isActive) activeSearchQuery = null
             }
         }
+    }
+
+    private fun cancelSearch() {
+        activeSearchQuery = null
+        searchJob?.cancel()
+        searchJob = null
     }
 
     private fun findMatchingLocalTracks(query: String): List<FullTrackInfo> {
@@ -1159,6 +1172,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
      * 🔍 Сброс поискового запроса и скрытие результатов поиска
      */
     fun clearSearch() {
+        cancelSearch()
         searchQuery = ""
         searchResult = null
         errorMessage = null
@@ -1642,7 +1656,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         downloadManager.isTrackDownloaded(artistName, trackTitle)
 
 
-    private fun resetPagination() = trackListCoordinator.resetPagination()
 
     fun closeArtistTracks() {
         queueScrollRequest = null

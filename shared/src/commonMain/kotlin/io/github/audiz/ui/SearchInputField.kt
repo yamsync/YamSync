@@ -40,6 +40,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import io.github.audiz.getPlatform
 import io.github.audiz.search.SearchSuggestion
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @Composable
 fun SearchInputField(
@@ -50,7 +52,7 @@ fun SearchInputField(
     onClear: (() -> Unit)? = null,
     onSettingsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    loadSuggestions: suspend (String) -> List<SearchSuggestion> = { emptyList() },
+    loadSuggestions: (String) -> Flow<List<SearchSuggestion>> = { emptyFlow() },
     onSuggestionClick: (SearchSuggestion) -> Unit = {}
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -61,17 +63,17 @@ fun SearchInputField(
     val parsedTrackId = remember(query) { io.github.audiz.DeepLinkHandler.extractTrackId(query) }
     val isLink = parsedTrackId != null
     val isMobile = remember { getPlatform().isMobile }
-    var suggestions by remember(query, isFocused, isLink, isLoading) {
+    var suggestions by remember(query, isFocused, isLink) {
         mutableStateOf<List<SearchSuggestion>>(emptyList())
     }
     var suggestionsDismissed by remember(query, isFocused) { mutableStateOf(false) }
     var selectedSuggestion by remember(query, suggestions) { mutableStateOf(-1) }
-    val suggestionsExpanded = isFocused && !isLink && !isLoading && !suggestionsDismissed && suggestions.isNotEmpty()
+    val suggestionsExpanded = isFocused && !isLink && !suggestionsDismissed && suggestions.isNotEmpty()
 
-    LaunchedEffect(query, isFocused, isLink, isLoading, suggestionsDismissed) {
+    LaunchedEffect(query, isFocused, isLink, suggestionsDismissed) {
         suggestions = emptyList()
-        if (isFocused && query.isNotBlank() && !isLink && !isLoading && !suggestionsDismissed) {
-            suggestions = loadSuggestions(query)
+        if (isFocused && query.isNotBlank() && !isLink && !suggestionsDismissed) {
+            loadSuggestions(query).collect { suggestions = it }
         }
     }
 

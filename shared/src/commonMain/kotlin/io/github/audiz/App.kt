@@ -382,13 +382,13 @@ fun App() {
                                             query = searchViewModel.searchQuery,
                                             onQueryChange = {
                                                 searchViewModel.searchQuery = it
-                                                if (it.isBlank() && searchViewModel.searchResult != null) {
+                                                if (it.isBlank()) {
                                                     searchViewModel.clearSearch()
                                                 }
                                             },
                                             onSearchClick = { searchViewModel.performSearch() },
                                             onClear = { searchViewModel.clearSearch() },
-                                            isLoading = searchViewModel.isLoading,
+                                            isLoading = searchViewModel.activeSearchQuery == searchViewModel.searchQuery.trim(),
                                             onSettingsClick = { settingsExpanded = true },
                                             loadSuggestions = searchViewModel::getSearchSuggestions,
                                             onSuggestionClick = searchViewModel::selectSearchSuggestion
@@ -406,7 +406,7 @@ fun App() {
                             // 🏠 МУЗЫКАЛЬНЫЙ ХАБ (Скрывается при активном поиске)
                             // ==================================================
                             AnimatedVisibility(
-                                visible = searchViewModel.searchResult == null && !searchViewModel.isLoading,
+                                visible = searchViewModel.searchResult == null && searchViewModel.activeSearchQuery == null,
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
