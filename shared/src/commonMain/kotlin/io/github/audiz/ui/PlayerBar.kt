@@ -212,8 +212,11 @@ fun DesktopPlayerBar(
                             val bitrateText = if (bitrate >= 1000) "${bitrate / 1000}M" else "${bitrate}k"
                             Text(
                                 text = "${if (bitrate >= 256) "HQ" else "LQ"} · $bitrateText",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = tint,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Normal
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )

@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -351,6 +352,7 @@ private fun MiniPlayerProgressBar(
  * - Открывается по тапу на мини-плеер.
  * - Огромные кнопки Play (68 dp), Prev/Next (52 dp), комфортный скруббер (36 dp touch target).
  * - Свайп вниз и кнопка «Свернуть» для закрытия.
+ * - Свайп влево переключает на следующий трек, вправо — на предыдущий.
  * - Полный доступ ко всем функциям: качество, эквалайзер, сохранение на диск, плейлист, шаринг.
  */
 @Composable
@@ -414,6 +416,30 @@ fun MobileFullPlayerSheet(
     }
     val breathingAlpha by breathingAlphaState
 
+    val currentActions by rememberUpdatedState(actions)
+    val currentState by rememberUpdatedState(state)
+    val trackSwipeModifier = Modifier.pointerInput(Unit) {
+        val swipeThreshold = 64.dp.toPx()
+        var dragDistance = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { dragDistance = 0f },
+            onHorizontalDrag = { change, dragAmount ->
+                change.consume()
+                dragDistance += dragAmount
+            },
+            onDragEnd = {
+                when {
+                    dragDistance <= -swipeThreshold && !currentState.isNextLoading ->
+                        currentActions.onNext?.invoke()
+                    dragDistance >= swipeThreshold && !currentState.isPrevLoading ->
+                        currentActions.onPrev?.invoke()
+                }
+                dragDistance = 0f
+            },
+            onDragCancel = { dragDistance = 0f }
+        )
+    }
+
     val dismissDragModifier = Modifier.pointerInput(Unit) {
         detectVerticalDragGestures(
             onVerticalDrag = { change, dragAmount ->
@@ -442,6 +468,7 @@ fun MobileFullPlayerSheet(
     Surface(
         modifier = modifier
             .fillMaxSize()
+            .then(trackSwipeModifier)
             .offset { IntOffset(0, (dragOffsetY + animatedOffsetY.value).roundToInt()) },
         color = MaterialTheme.colorScheme.surface
     ) {
@@ -775,9 +802,9 @@ fun MobileFullPlayerSheet(
                             text = bitrateText,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFeatureSettings = "tnum",
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Normal
                             ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.align(Alignment.Center)
                         )
                     }
