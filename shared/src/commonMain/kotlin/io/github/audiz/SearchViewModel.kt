@@ -69,6 +69,7 @@ enum class TracksListOrigin {
     HOME,
     SEARCH,
     FOLDER_BROWSER,
+    MEDIA_LIBRARY,
     MOBILE_PLAYER
 }
 

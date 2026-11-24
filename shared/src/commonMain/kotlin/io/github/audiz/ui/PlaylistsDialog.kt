@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.audiz.SearchViewModel
+import io.github.audiz.TracksListOrigin
 import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.PlaylistInfo
 import io.github.audiz.ui.playlists.*
@@ -34,9 +35,10 @@ import io.github.audiz.ui.playlists.*
 fun PlaylistsDialog(
     viewModel: SearchViewModel,
     onDismiss: () -> Unit,
-    onOpenSync: (() -> Unit)? = null
+    onOpenSync: (() -> Unit)? = null,
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("💾 Локальные", "☁️ Яндекс")
 
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -183,7 +185,7 @@ fun PlaylistsDialog(
                         tabs.forEachIndexed { index, title ->
                             Tab(
                                 selected = selectedTab == index,
-                                onClick = { selectedTab = index },
+                                onClick = { onTabSelected(index) },
                                 text = {
                                     Text(
                                         text = title,
@@ -231,6 +233,7 @@ fun PlaylistsDialog(
                                 onDeleteClick = { playlistToDelete = it },
                                 onOpenPlaylist = {
                                     viewModel.openLocalPlaylist(it)
+                                    viewModel.tracksListOrigin = TracksListOrigin.MEDIA_LIBRARY
                                     onDismiss()
                                 },
                                 onOpenSync = onOpenSync,
@@ -240,6 +243,7 @@ fun PlaylistsDialog(
                                 viewModel = viewModel,
                                 onOpenPlaylist = {
                                     viewModel.loadPlaylist(it)
+                                    viewModel.tracksListOrigin = TracksListOrigin.MEDIA_LIBRARY
                                     onDismiss()
                                 },
                                 onRenameClick = { yandexPlaylistToRename = it }

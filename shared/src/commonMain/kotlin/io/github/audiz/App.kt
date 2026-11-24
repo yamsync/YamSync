@@ -137,7 +137,7 @@ fun App() {
             var isMobilePlayerExpanded by remember {
                 mutableStateOf(loadAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED) == "true")
             }
-            var mobilePlayerDragDistance by remember { mutableFloatStateOf(0f) }
+            var mobilePlayerDragTop by remember { mutableStateOf<Float?>(null) }
             var isDraggingMobilePlayerOpen by remember { mutableStateOf(false) }
             fun updateMobilePlayerExpanded(expanded: Boolean) {
                 isMobilePlayerExpanded = expanded
@@ -150,6 +150,7 @@ fun App() {
             var showEqualizerDialog by remember { mutableStateOf(false) }
             var equalizerInitialTab by remember { mutableStateOf(0) }
             var showPlaylistsDialog by remember { mutableStateOf(false) }
+            var mediaLibraryTab by remember { mutableIntStateOf(0) }
             fun updateShowPlaylistsDialog(show: Boolean) {
                 showPlaylistsDialog = show
             }
@@ -322,9 +323,9 @@ fun App() {
                 } else null,
                 onExpandMobilePlayer = { updateMobilePlayerExpanded(true) },
                 onResetWave = { searchViewModel.resetToDefaultWave() },
-                onMobilePlayerDrag = { distance ->
+                onMobilePlayerDrag = { top ->
                     isDraggingMobilePlayerOpen = true
-                    mobilePlayerDragDistance = distance
+                    mobilePlayerDragTop = top
                 },
                 onMobilePlayerDragEnd = { open ->
                     if (open) updateMobilePlayerExpanded(true)
@@ -549,22 +550,30 @@ fun App() {
                         val isBackGoingToFolderBrowser = searchViewModel.tracksListOrigin == TracksListOrigin.FOLDER_BROWSER && searchViewModel.activeBrowsedFolderSource != null
                         val isBackGoingToMobilePlayer = isMobileUi && searchViewModel.tracksListOrigin == TracksListOrigin.MOBILE_PLAYER
 
-                        BackHandler(enabled = showTracksScreen) {
-                            if (isBackGoingToFolderBrowser) {
-                                val targetSource = searchViewModel.activeBrowsedFolderSource
-                                val targetPath = searchViewModel.activeBrowsedFolderPath
-                                searchViewModel.closeArtistTracks()
-                                searchViewModel.activeBrowsedFolderSource = targetSource
-                                searchViewModel.activeBrowsedFolderPath = targetPath
-                                updateShowPlaylistsDialog(true)
-                            } else if (isBackGoingToMobilePlayer) {
-                                searchViewModel.isTracksListVisible = false
-                                searchViewModel.tracksListOrigin = TracksListOrigin.HOME
-                                updateMobilePlayerExpanded(true)
-                            } else {
-                                searchViewModel.closeArtistTracks()
+                        val isBackGoingToMediaLibrary = searchViewModel.tracksListOrigin == TracksListOrigin.MEDIA_LIBRARY
+
+                        val goBackFromTracks: () -> Unit = {
+                            when {
+                                isBackGoingToFolderBrowser -> {
+                                    val targetSource = searchViewModel.activeBrowsedFolderSource
+                                    val targetPath = searchViewModel.activeBrowsedFolderPath
+                                    searchViewModel.closeArtistTracks()
+                                    searchViewModel.activeBrowsedFolderSource = targetSource
+                                    searchViewModel.activeBrowsedFolderPath = targetPath
+                                    updateShowPlaylistsDialog(true)
+                                }
+                                isBackGoingToMediaLibrary -> {
+                                    searchViewModel.closeArtistTracks()
+                                    updateShowPlaylistsDialog(true)
+                                }
+                                isBackGoingToMobilePlayer -> {
+                                    searchViewModel.closeArtistTracks()
+                                    updateMobilePlayerExpanded(true)
+                                }
+                                else -> searchViewModel.closeArtistTracks()
                             }
                         }
+                        BackHandler(enabled = showTracksScreen, onBack = goBackFromTracks)
 
                         // ==================================================
                         // 🎵 ЭКРАН Б: БЕСКОНЕЧНЫЙ СПИСОК ТРЕКОВ ИСПОЛНИТЕЛЯ
@@ -581,23 +590,10 @@ fun App() {
                                 searchViewModel.clearSearch()
                                 searchViewModel.closeArtistTracks()
                             },
-                            onBackClick = if (isBackGoingToFolderBrowser || isBackGoingToMobilePlayer || searchViewModel.tracksListOrigin == TracksListOrigin.SEARCH) {
-                                {
-                                    if (isBackGoingToFolderBrowser) {
-                                        val targetSource = searchViewModel.activeBrowsedFolderSource
-                                        val targetPath = searchViewModel.activeBrowsedFolderPath
-                                        searchViewModel.closeArtistTracks()
-                                        searchViewModel.activeBrowsedFolderSource = targetSource
-                                        searchViewModel.activeBrowsedFolderPath = targetPath
-                                        updateShowPlaylistsDialog(true)
-                                    } else if (isBackGoingToMobilePlayer) {
-                                        searchViewModel.closeArtistTracks()
-                                        updateMobilePlayerExpanded(true)
-                                    } else {
-                                        searchViewModel.closeArtistTracks()
-                                    }
-                                }
-                            } else null,
+                            onBackClick = goBackFromTracks.takeIf {
+                                isBackGoingToFolderBrowser || isBackGoingToMediaLibrary || isBackGoingToMobilePlayer ||
+                                    searchViewModel.tracksListOrigin == TracksListOrigin.SEARCH
+                            },
                             isTrackDownloading = searchViewModel.isTrackDownloading,
                             downloadingTrackId = searchViewModel.downloadingTrackId,
                             onDownloadTrack = { trackId, trackTitle, artistName ->
@@ -680,9 +676,10 @@ fun App() {
 
                     LaunchedEffect(isMobilePlayerExpanded, isDraggingMobilePlayerOpen, heightPx) {
                         if (!isDraggingMobilePlayerOpen) {
-                            if (mobilePlayerDragDistance > 0f && heightPx > 0f) {
-                                openingProgress.snapTo((mobilePlayerDragDistance / heightPx).coerceIn(0f, 1f))
-                                mobilePlayerDragDistance = 0f
+                            val draggedTop = mobilePlayerDragTop
+                            if (draggedTop != null && heightPx > 0f) {
+                                openingProgress.snapTo((1f - draggedTop / heightPx).coerceIn(0f, 1f))
+                                mobilePlayerDragTop = null
                             }
                             openingProgress.animateTo(
                                 targetValue = if (isMobilePlayerExpanded) 1f else 0f,
@@ -697,7 +694,7 @@ fun App() {
 
                     val showFullPlayer by remember {
                         derivedStateOf {
-                            isMobilePlayerExpanded || mobilePlayerDragDistance > 0f || openingProgress.value > 0f
+                            isMobilePlayerExpanded || mobilePlayerDragTop != null || openingProgress.value > 0f
                         }
                     }
                     if (showFullPlayer) {
@@ -706,12 +703,12 @@ fun App() {
                             actions = playerBarActions,
                             onDismiss = { updateMobilePlayerExpanded(false) },
                             modifier = Modifier.offset {
-                                val revealPx = if (isDraggingMobilePlayerOpen || mobilePlayerDragDistance > 0f) {
-                                    mobilePlayerDragDistance.coerceAtMost(heightPx)
+                                val top = mobilePlayerDragTop ?: if (isDraggingMobilePlayerOpen) {
+                                    heightPx
                                 } else {
-                                    openingProgress.value * heightPx
+                                    (1f - openingProgress.value) * heightPx
                                 }
-                                IntOffset(0, (heightPx - revealPx).roundToInt())
+                                IntOffset(0, top.coerceIn(0f, heightPx).roundToInt())
                             },
                             backHandlerEnabled = isMobilePlayerExpanded
                         )
@@ -794,6 +791,8 @@ fun App() {
                 PlaylistsDialog(
                     viewModel = searchViewModel,
                     onDismiss = { updateShowPlaylistsDialog(false) },
+                    selectedTab = mediaLibraryTab,
+                    onTabSelected = { mediaLibraryTab = it },
                     onOpenSync = {
                         updateShowPlaylistsDialog(false)
                         showYamSyncDialog = true

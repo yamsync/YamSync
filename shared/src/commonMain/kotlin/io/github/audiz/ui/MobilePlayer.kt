@@ -1,6 +1,7 @@
 package io.github.audiz.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -56,6 +57,8 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,6 +66,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -85,6 +89,7 @@ fun MobileMiniPlayerBar(
     } else 0f
 
     val currentActions by rememberUpdatedState(actions)
+    var miniPlayerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val expandDragModifier = Modifier.pointerInput(Unit) {
         val openThreshold = 96.dp.toPx()
         var distance = 0f
@@ -103,9 +108,12 @@ fun MobileMiniPlayerBar(
                     dragging = true
                     distance = 0f
                 },
-                onVerticalDrag = { _, delta ->
+                onVerticalDrag = { change, delta ->
                     distance = (distance - delta).coerceAtLeast(0f)
-                    currentActions.onMobilePlayerDrag(distance)
+                    val top = miniPlayerCoordinates
+                        ?.takeIf { it.isAttached && distance > 0f }
+                        ?.localToRoot(change.position)?.y
+                    currentActions.onMobilePlayerDrag(top)
                 },
                 onDragEnd = { finish(distance >= openThreshold) },
                 onDragCancel = { finish(false) }
@@ -120,6 +128,8 @@ fun MobileMiniPlayerBar(
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { miniPlayerCoordinates = it }
+            .then(expandDragModifier)
             .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
@@ -135,7 +145,6 @@ fun MobileMiniPlayerBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(expandDragModifier)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -178,7 +187,6 @@ fun MobileMiniPlayerBar(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .then(expandDragModifier)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -438,14 +446,31 @@ fun MobileFullPlayerSheet(
 
     val currentActions by rememberUpdatedState(actions)
     val currentState by rememberUpdatedState(state)
+    val trackDragOffsetX = remember { mutableFloatStateOf(0f) }
     val trackSwipeModifier = Modifier.pointerInput(Unit) {
         val swipeThreshold = 64.dp.toPx()
         var dragDistance = 0f
+        var startingOffset = 0f
+        var settleJob: Job? = null
+
+        fun settle() {
+            settleJob = coroutineScope.launch {
+                animate(trackDragOffsetX.floatValue, 0f, animationSpec = tween(180, easing = FastOutSlowInEasing)) { value, _ ->
+                    trackDragOffsetX.floatValue = value
+                }
+            }
+        }
+
         detectHorizontalDragGestures(
-            onDragStart = { dragDistance = 0f },
+            onDragStart = {
+                settleJob?.cancel()
+                startingOffset = trackDragOffsetX.floatValue
+                dragDistance = 0f
+            },
             onHorizontalDrag = { change, dragAmount ->
                 change.consume()
                 dragDistance += dragAmount
+                trackDragOffsetX.floatValue = startingOffset + dragDistance
             },
             onDragEnd = {
                 when {
@@ -454,9 +479,9 @@ fun MobileFullPlayerSheet(
                     dragDistance >= swipeThreshold && !currentState.isPrevLoading ->
                         currentActions.onPrev?.invoke()
                 }
-                dragDistance = 0f
+                settle()
             },
-            onDragCancel = { dragDistance = 0f }
+            onDragCancel = { settle() }
         )
     }
 
@@ -492,7 +517,11 @@ fun MobileFullPlayerSheet(
             .offset { IntOffset(0, (dragOffsetY + animatedOffsetY.value).roundToInt()) },
         color = MaterialTheme.colorScheme.surface
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                translationX = trackDragOffsetX.floatValue
+            }
+        ) {
             val isNarrow = maxWidth < 360.dp
             val isVeryNarrow = maxWidth < 300.dp
             val horizontalPadding = when {
