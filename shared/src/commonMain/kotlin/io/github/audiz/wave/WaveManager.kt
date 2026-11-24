@@ -49,7 +49,6 @@ class WaveManager(
         if (getAccessToken().isBlank()) null
         else repository.getTracksDetails(listOf(id)).result.firstOrNull { it.id == id }
     },
-    private val onUpcomingTracks: ((List<FullTrackInfo>) -> Unit)? = null,
     private val shouldSkipRecommendedTrack: ((FullTrackInfo) -> Boolean)? = null
 ) : WavePlaybackBridge {
     private var playbackManager: PlaybackManager? = null
@@ -200,11 +199,6 @@ class WaveManager(
     val currentWaveTrack: FullTrackInfo?
         get() = activeWaveTrack ?: waveTracks.getOrNull(waveCurrentIndex)
 
-    fun prefetchWaveTracks() {
-        val start = waveCurrentIndex.coerceIn(0, waveTracks.size)
-        onUpcomingTracks?.invoke(waveTracks.subList(start, minOf(start + 5, waveTracks.size)).toList())
-    }
-
     private fun recommendedIndex(index: Int): Int {
         val shouldSkip = shouldSkipRecommendedTrack ?: return index
         if (waveTracks.getOrNull(index)?.let(shouldSkip) != true) return index
@@ -288,7 +282,6 @@ class WaveManager(
         if (selected != null) waveTracks.add(selected)
         waveTracks.addAll(tracks.filter { it.id != selected?.id }.distinctBy { it.id })
         waveCurrentIndex = 0
-        prefetchWaveTracks()
         activeWaveTrack = waveTracks.firstOrNull()
         isWaveMode = waveTracks.isNotEmpty()
         if (restoredTrack != null && selected != null) playbackManager?.refreshRestoredTrackMetadata(selected)
@@ -515,7 +508,6 @@ class WaveManager(
         if (index < 0 || index >= waveTracks.size) return
         val track = waveTracks[index]
         waveCurrentIndex = index
-        prefetchWaveTracks()
         isWaveMode = true
         activeWaveTrack = track
         onTrackPlaybackStarted(track)
@@ -804,7 +796,6 @@ class WaveManager(
                         newTracks.filter { it.id !in existingIds && it.id != oldTrack?.id && it.id != nextTrack.id }.distinctBy { it.id }
                     }
                     waveTracks.addAll(finalNew)
-                    prefetchWaveTracks()
                     newTracks.forEach { t ->
                         nextResponse.batchId?.let { b -> waveTrackBatchMap[t.id] = b }
                     }
@@ -1085,7 +1076,6 @@ class WaveManager(
                     newTracks.filter { it.id !in existingIds && it.id != finishedTrack?.id && it.id != currentPlayingTrack.id }.distinctBy { it.id }
                 }
                 waveTracks.addAll(finalNew)
-                prefetchWaveTracks()
                 newTracks.forEach { t ->
                     nextResponse.batchId?.let { b -> waveTrackBatchMap[t.id] = b }
                 }

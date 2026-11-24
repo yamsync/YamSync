@@ -35,7 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import io.github.audiz.addons.SloplessMode
+import io.github.audiz.addons.AiFilterMode
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 
@@ -59,8 +59,8 @@ data class SettingsState(
     val crossfadeSeconds: Int = 3,
     val isUiWatchdogActive: Boolean = false,
     val hasPlusSubscription: Boolean? = null,
-    val sloplessMode: SloplessMode = SloplessMode.OFF,
-    val sloplessArtistThreshold: Int = 10,
+    val aiFilterMode: AiFilterMode = AiFilterMode.OFF,
+    val aiBlacklistVersion: Int? = null,
 )
 
 /**
@@ -85,8 +85,7 @@ data class SettingsActions(
     val onToggleUiWatchdog: (Boolean) -> Unit = {},
     val onRefreshPlusSubscription: () -> Unit = {},
     val onProjectOpened: () -> Unit = {},
-    val onSaveSloplessMode: (SloplessMode) -> Unit = {},
-    val onSaveSloplessArtistThreshold: (Int) -> Unit = {},
+    val onSaveAiFilterMode: (AiFilterMode) -> Unit = {},
 )
 
 /**
@@ -314,10 +313,10 @@ fun SettingsDialog(
 
 
 private enum class SettingsAddon(val title: String, val icon: ImageVector, val block: SettingsBlock) {
-    Slopless("Slopless", Icons.Filled.GraphicEq, SettingsBlock.Slopless);
+    AiFilter("Фильтр ИИ-музыки", Icons.Filled.GraphicEq, SettingsBlock.AiFilter);
 
     fun summary(state: SettingsState): String = when (this) {
-        Slopless -> state.sloplessMode.title
+        AiFilter -> state.aiFilterMode.title
     }
 }
 
@@ -348,7 +347,7 @@ private enum class SettingsSection(
             }
             "$theme · ${AppAccentColor.fromKey(state.accentColor).title}"
         }
-        Addons -> "Slopless · ${state.sloplessMode.title}"
+        Addons -> "Фильтр ИИ-музыки · ${state.aiFilterMode.title}"
         Account, Diagnostics, Support -> null
     }
 }

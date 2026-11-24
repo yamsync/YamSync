@@ -1,6 +1,5 @@
 package io.github.audiz.ui
 
-import io.github.audiz.addons.SloplessEntity
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,7 +87,7 @@ internal fun CompactEntityRow(
                     color = typeColor,
                     maxLines = 1
                 )
-                SloplessBadge(SloplessEntity.ARTIST, artistId)
+                AiArtistBadge(artistId)
             }
             Text(
                 text = title,
@@ -153,7 +152,7 @@ internal fun CompactTrackRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            SloplessBadge(SloplessEntity.TRACK, track.id, Modifier.padding(start = 6.dp))
+            AiTrackBadge(track.id, track.artists, Modifier.padding(start = 6.dp))
             if (track.durationMs > 0) {
                 val sec = track.durationMs / 1000
                 Text(

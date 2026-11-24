@@ -55,7 +55,7 @@ internal enum class SettingsBlock {
     Storage,
     Support,
     Logs,
-    Slopless;
+    AiFilter;
 
     @Composable
     fun Content(state: SettingsState, actions: SettingsActions) {
@@ -72,7 +72,7 @@ internal enum class SettingsBlock {
             Storage -> StorageSettings(state, actions)
             Support -> SupportSettings(actions)
             Logs -> LogsSettings(state, actions)
-            Slopless -> SloplessSettings(state, actions)
+            AiFilter -> AiFilterSettings(state, actions)
         }
     }
 }

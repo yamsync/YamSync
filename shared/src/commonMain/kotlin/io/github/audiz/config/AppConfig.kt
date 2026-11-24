@@ -6,8 +6,8 @@ package io.github.audiz
  */
 object AppConfigKeys {
     const val STAR_PROMPT_STATE = "star_prompt_state"
-    const val SLOPLESS_MODE = "slopless_mode"
-    const val SLOPLESS_ARTIST_THRESHOLD = "slopless_artist_threshold"
+    // Preserve the mode selected before switching to the bundled database.
+    const val AI_FILTER_MODE = "slopless_mode"
     const val DOWNLOAD_QUALITY = "download_quality"
     const val APP_THEME = "app_theme"
     const val ACCENT_COLOR = "accent_color"

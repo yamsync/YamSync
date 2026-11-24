@@ -5,9 +5,9 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.audiz.api.MusicRepository
-import io.github.audiz.addons.Slopless
-import io.github.audiz.addons.SloplessEntity
-import io.github.audiz.addons.SloplessMode
+import io.github.audiz.addons.AiBlacklist
+import io.github.audiz.addons.AiFilterMode
+import io.github.audiz.addons.loadBundledAiBlacklist
 import io.github.audiz.models.YandexMusicResponse
 import io.github.audiz.models.SearchResult
 import io.github.audiz.models.TypedResult
@@ -531,35 +531,23 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     )
 
-    var sloplessMode by mutableStateOf(
-        loadAppConfig(AppConfigKeys.SLOPLESS_MODE)?.let { saved ->
-            SloplessMode.entries.firstOrNull { it.name == saved }
-        } ?: SloplessMode.OFF
-    )
-        private set
-    var sloplessArtistThreshold by mutableStateOf(
-        loadAppConfig(AppConfigKeys.SLOPLESS_ARTIST_THRESHOLD)?.toIntOrNull()?.coerceIn(1, 100) ?: 10
+    var aiFilterMode by mutableStateOf(
+        loadAppConfig(AppConfigKeys.AI_FILTER_MODE)?.let { saved ->
+            AiFilterMode.entries.firstOrNull { it.name == saved }
+        } ?: AiFilterMode.OFF
     )
         private set
 
-    private val sloplessSettingsLock = Mutex()
-    internal val slopless = Slopless(viewModelScope, isEnabled = { sloplessMode != SloplessMode.OFF })
+    internal var aiBlacklist by mutableStateOf<AiBlacklist?>(null)
+        private set
 
-    fun saveSloplessMode(mode: SloplessMode) {
-        sloplessMode = mode
-        persistSloplessSetting(AppConfigKeys.SLOPLESS_MODE, mode.name)
-        if (mode != SloplessMode.OFF) waveManager.prefetchWaveTracks()
-    }
+    private val aiFilterSettingsLock = Mutex()
 
-    fun saveSloplessArtistThreshold(threshold: Int) {
-        sloplessArtistThreshold = threshold.coerceIn(1, 100)
-        persistSloplessSetting(AppConfigKeys.SLOPLESS_ARTIST_THRESHOLD, sloplessArtistThreshold.toString())
-    }
-
-    private fun persistSloplessSetting(key: String, value: String) {
+    fun saveAiFilterMode(mode: AiFilterMode) {
+        aiFilterMode = mode
         viewModelScope.launch {
-            sloplessSettingsLock.withLock {
-                withContext(DispatcherIO) { saveAppConfig(key, value) }
+            aiFilterSettingsLock.withLock {
+                withContext(DispatcherIO) { saveAppConfig(AppConfigKeys.AI_FILTER_MODE, mode.name) }
             }
         }
     }
@@ -569,9 +557,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         scope = viewModelScope,
         repository = repository,
         getAccessToken = { settingsManager.currentAccessToken },
-        onUpcomingTracks = { tracks -> tracks.forEach { slopless.request(SloplessEntity.TRACK, it.id) } },
         shouldSkipRecommendedTrack = { track ->
-            sloplessMode == SloplessMode.SKIP_IN_WAVE && !playlistManager.isTrackLiked(track.id) && slopless.isAiTrack(track.id)
+            aiFilterMode == AiFilterMode.SKIP_IN_WAVE &&
+                aiBlacklist?.containsTrack(track.id) == true &&
+                !playlistManager.isTrackLiked(track.id)
         },
         onTrackLiked = { trackId -> playlistManager.likedTrackIds.add(trackId.removePrefix("local:").substringBefore(":")) },
         onError = { errorMessage = it }
@@ -802,6 +791,19 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     fun changeCrossfade(seconds: Int) = playbackManager.changeCrossfade(seconds)
 
     val playerTrackId: String? get() = playbackManager.trackId
+    internal val playerTrackArtists by derivedStateOf {
+        val id = playerTrackId
+        if (id == null) {
+            currentWaveTrack?.artists.orEmpty()
+        } else {
+            val waveTrack = currentWaveTrack
+            if (waveTrack != null && PlaybackQueueManager.isSameTrack(waveTrack, id) && waveTrack.artists.isNotEmpty()) {
+                waveTrack.artists
+            } else {
+                playbackManager.findTrackInfo(id)?.artists.orEmpty()
+            }
+        }
+    }
     val playerAlbumId: Long? get() = playbackManager.albumId
     val playerIsPlaying: Boolean get() = playbackManager.isPlaying
     val playerIsPaused: Boolean get() = playbackManager.isPaused
@@ -887,6 +889,15 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         )
 
     init {
+        viewModelScope.launch {
+            try {
+                aiBlacklist = loadBundledAiBlacklist()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e("AiBlacklist", "Не удалось загрузить встроенную базу ИИ-музыки", e)
+            }
+        }
         io.github.audiz.ui.CoverImageLoader.repository = repository
         waveManager.attachPlayback(playbackManager)
         playbackManager.isTrackLiked = { id ->
@@ -1956,7 +1967,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     override fun onCleared() {
         super.onCleared()
-        slopless.close()
         playbackManager.release()
     }
 }

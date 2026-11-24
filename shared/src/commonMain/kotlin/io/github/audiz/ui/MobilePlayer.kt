@@ -48,7 +48,6 @@ import kotlin.math.PI
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import io.github.audiz.dsp.AudioVisualizer
-import io.github.audiz.addons.SloplessEntity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -268,7 +267,7 @@ fun MobileMiniPlayerBar(
                                 modifier = Modifier.weight(1f),
                                 enableCopy = false
                             )
-                            SloplessBadge(SloplessEntity.TRACK, state.trackId)
+                            AiTrackBadge(state.trackId, state.trackArtists)
                         }
                         val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() && !state.waveTitle.equals("Моя Волна", ignoreCase = true)
                         if (state.isWave) {
@@ -792,7 +791,7 @@ fun MobileFullPlayerSheet(
                             ),
                             modifier = Modifier.weight(1f)
                         )
-                        SloplessBadge(SloplessEntity.TRACK, state.trackId)
+                        AiTrackBadge(state.trackId, state.trackArtists)
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(

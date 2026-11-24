@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.audiz.addons.SloplessEntity
+import io.github.audiz.models.FullArtistInfo
 import kotlinx.coroutines.delay
 
 /**
@@ -60,6 +60,7 @@ data class PlayerBarState(
     val upNextCount: Int = 0,
     val isDownloadedOrLocal: Boolean = false,
     val trackId: String? = null,
+    val trackArtists: List<FullArtistInfo> = emptyList(),
 )
 
 /**
@@ -237,7 +238,7 @@ fun DesktopPlayerBar(
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Normal),
                         modifier = Modifier.weight(1f)
                     )
-                    SloplessBadge(SloplessEntity.TRACK, state.trackId)
+                    AiTrackBadge(state.trackId, state.trackArtists)
                 }
 
                 ThinSlider(
