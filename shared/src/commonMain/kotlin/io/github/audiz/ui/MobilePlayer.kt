@@ -266,7 +266,7 @@ fun MobileMiniPlayerBar(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val waveLabel = if (isThematicWave) "🌊 Моя Волна • ${state.waveTitle}" else "🌊 Моя Волна"
+                                val waveLabel = if (isThematicWave) "Моя Волна • ${state.waveTitle}" else "Моя Волна"
                                 Text(
                                     text = waveLabel,
                                     style = MaterialTheme.typography.labelSmall,
