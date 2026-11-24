@@ -41,6 +41,8 @@ class MusicRepository(
 
     // === Отметки «Мне нравится» / «Не нравится» ===
 
+    suspend fun getLikedArtistIds(): Set<Long> = playlistsClient.getLikedArtistIds()
+
     suspend fun likeTrack(trackIdWithAlbum: String): Boolean =
         playlistsClient.likeTrack(trackIdWithAlbum)
 

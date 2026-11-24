@@ -67,7 +67,7 @@ internal fun AiFilterSettings(state: SettingsState, actions: SettingsActions) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Фильтр ИИ-музыки", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Метки работают офлайн по встроенной базе. В «Моей волне» можно пропускать треки, которые входят в список ИИ-треков.",
+            "Метки работают офлайн по встроенной базе. Автопропуск в «Моей волне» учитывает лайки треков и артистов.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

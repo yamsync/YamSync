@@ -6,7 +6,9 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.*
+import kotlin.coroutines.coroutineContext
 
 /**
  * 📂 Клиент плейлистов, альбомов, отметок мне нравится/не нравится и истории прослушиваний
@@ -20,6 +22,27 @@ class PlaylistsClient(
 
     private fun HttpRequestBuilder.applyAuthHeaders() {
         with(context) { applyAuthHeaders() }
+    }
+
+    suspend fun getLikedArtistIds(): Set<Long> {
+        val userId = context.getUserId()?.toLongOrNull()
+            ?: error("Не удалось определить пользователя для загрузки любимых артистов")
+        coroutineContext.ensureActive()
+        val response = client.get("https://api.music.yandex.ru/users/$userId/likes/artists") {
+            applyAuthHeaders()
+            parameter("with-timestamps", false)
+        }
+        check(response.status.isSuccess()) { "Не удалось загрузить любимых артистов (HTTP ${response.status.value})" }
+        val result = playlistJson.parseToJsonElement(response.bodyAsText()).jsonObject["result"] as? JsonArray
+            ?: error("Некорректный ответ со списком любимых артистов")
+        return buildSet {
+            for (entry in result) {
+                val item = entry as? JsonObject ?: continue
+                val artist = (item["artist"] as? JsonObject) ?: item.takeUnless { "artist" in it } ?: continue
+                val id = (artist["id"] as? JsonPrimitive)?.longOrNull ?: continue
+                if (id > 0) add(id)
+            }
+        }
     }
 
     /**

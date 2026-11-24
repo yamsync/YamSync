@@ -14,6 +14,18 @@ import kotlin.test.assertTrue
 
 class AiBlacklistTest {
     @Test
+    fun waveKeepsTracksByLikedArtistsAndUsesTheFilterOnceLikesAreAvailable() {
+        val blacklist = AiBlacklist(version = 1, artists = setOf(12), tracks = setOf(202))
+        val track = FullTrackInfo(id = "202", artists = listOf(FullArtistInfo(id = 11), FullArtistInfo(id = 12)))
+
+        assertFalse(blacklist.shouldSkipInWave(track, likedArtistIds = null) { false })
+        assertFalse(blacklist.shouldSkipInWave(track, likedArtistIds = setOf(12)) { false })
+        assertFalse(blacklist.shouldSkipInWave(track, likedArtistIds = emptySet()) { true })
+        assertTrue(blacklist.shouldSkipInWave(track, likedArtistIds = emptySet()) { false })
+        assertFalse(blacklist.shouldSkipInWave(track.copy(id = "303"), likedArtistIds = emptySet()) { false })
+    }
+
+    @Test
     fun bundledSnapshotLoadsFromComposeResources() = runBlocking {
         val blacklist = loadBundledAiBlacklist()
 

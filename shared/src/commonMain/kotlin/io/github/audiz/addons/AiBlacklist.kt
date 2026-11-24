@@ -2,6 +2,7 @@ package io.github.audiz.addons
 
 import io.github.audiz.DispatcherIO
 import io.github.audiz.models.FullArtistInfo
+import io.github.audiz.models.FullTrackInfo
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -33,6 +34,12 @@ internal class AiBlacklist(
         trackArtists.any { containsArtist(it.id) } -> AiMatch.ARTIST
         else -> null
     }
+
+    fun shouldSkipInWave(track: FullTrackInfo, likedArtistIds: Set<Long>?, isTrackLiked: () -> Boolean): Boolean =
+        likedArtistIds != null &&
+            containsTrack(track.id) &&
+            track.artists.none { it.id in likedArtistIds } &&
+            !isTrackLiked()
 }
 
 internal suspend fun loadBundledAiBlacklist(): AiBlacklist = withContext(DispatcherIO) {

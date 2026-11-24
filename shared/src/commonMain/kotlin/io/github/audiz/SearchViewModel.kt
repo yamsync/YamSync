@@ -520,6 +520,9 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val settingsManager: SettingsManager = SettingsManager(
         repository = repository,
         onTokenUpdated = { _ ->
+            likedArtistsSyncJob?.cancel()
+            likedArtistsSyncJob = null
+            likedArtistIds = null
             playlistManager.syncLikedTrackIds()
             playlistManager.loadPersonalPlaylists()
             playlistManager.loadUserPlaylists()
@@ -544,12 +547,33 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         private set
 
     private val aiFilterSettingsLock = Mutex()
+    @Volatile
+    private var likedArtistIds: Set<Long>? = null
+    private var likedArtistsSyncJob: Job? = null
 
     fun saveAiFilterMode(mode: AiFilterMode) {
         aiFilterMode = mode
+        syncLikedArtistsForAiFilter()
         viewModelScope.launch {
             aiFilterSettingsLock.withLock {
                 withContext(DispatcherIO) { saveAppConfig(AppConfigKeys.AI_FILTER_MODE, mode.name) }
+            }
+        }
+    }
+
+    private fun syncLikedArtistsForAiFilter() {
+        val token = settingsManager.currentAccessToken
+        if (aiFilterMode != AiFilterMode.SKIP_IN_WAVE || token.isBlank() || likedArtistsSyncJob?.isActive == true) return
+        likedArtistsSyncJob = viewModelScope.launch {
+            try {
+                val ids = withContext(DispatcherIO) { repository.getLikedArtistIds() }
+                if (settingsManager.currentAccessToken != token) return@launch
+                likedArtistIds = ids
+                if (waveManager.isWaveMode && playerIsPlaying) playbackManager.onQueueUpdated()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e("SearchViewModel", "Не удалось обновить список любимых артистов", e)
             }
         }
     }
@@ -597,8 +621,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         getAccessToken = { settingsManager.currentAccessToken },
         shouldSkipRecommendedTrack = { track ->
             aiFilterMode == AiFilterMode.SKIP_IN_WAVE &&
-                aiBlacklist?.containsTrack(track.id) == true &&
-                !playlistManager.isTrackLiked(track.id)
+                aiBlacklist?.shouldSkipInWave(track, likedArtistIds) { playlistManager.isTrackLiked(track.id) } == true
         },
         isRecentRepeat = { track ->
             val limit = waveLoopHistoryLimit
@@ -981,6 +1004,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         loadLocalPlaylistsFromDisk()
         if (currentAccessToken.isNotBlank()) {
             syncLikedTrackIds()
+            syncLikedArtistsForAiFilter()
             loadPersonalPlaylists()
             loadUserPlaylists()
             launchSafe { settingsManager.checkPlusSubscription() }
@@ -1062,6 +1086,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     }
 
     fun loadInitialWave(autoPlay: Boolean = false, source: TrackPlaySource = TrackPlaySource.PLAY) {
+        syncLikedArtistsForAiFilter()
         if (autoPlay) playbackManager.clearUpNextForSelection()
         waveManager.loadInitialWave(autoPlay, source)
     }
@@ -1091,6 +1116,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     }
 
     fun startThematicWave(title: String?, seeds: List<String>, autoPlay: Boolean = true) {
+        syncLikedArtistsForAiFilter()
         if (autoPlay) playbackManager.clearUpNextForSelection()
         playbackSessionManager.recordWave(title, seeds)
         waveManager.startThematicWave(title, seeds, autoPlay = autoPlay)
