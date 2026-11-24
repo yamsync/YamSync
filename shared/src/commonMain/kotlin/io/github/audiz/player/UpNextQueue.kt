@@ -65,10 +65,11 @@ class UpNextQueue {
         state = state.copy(pending = items)
     }
 
-    fun peek(): FullTrackInfo? = state.pending.firstOrNull()?.takeIf { it.playNext }?.track
+    fun peek(canResumeTrack: (FullTrackInfo) -> Boolean = { true }): FullTrackInfo? =
+        state.pending.firstOrNull()?.takeIf { it.playNext }?.track
         ?: state.forward.lastOrNull()?.track
         ?: state.pending.firstOrNull()?.track
-        ?: state.resumeTrack.takeIf { state.suspended }
+        ?: state.resumeTrack?.takeIf { state.suspended && canResumeTrack(it) }
 
     fun captureShuffleCycle(ids: Set<String>) {
         if (state.started) state = state.copy(shuffleCycle = ids.toSet())
@@ -79,7 +80,8 @@ class UpNextQueue {
         current: FullTrackInfo?,
         resume: () -> FullTrackInfo?,
         shuffleCycle: () -> Set<String>,
-        past: List<FullTrackInfo> = emptyList()
+        past: List<FullTrackInfo> = emptyList(),
+        canResumeTrack: (FullTrackInfo) -> Boolean = { true },
     ): FullTrackInfo? {
         if (!state.started && state.pending.isEmpty()) return null
         if (!state.started) state = state.copy(
@@ -106,7 +108,7 @@ class UpNextQueue {
             return entry.track
         }
         if (state.suspended) {
-            val candidate = state.resumeTrack
+            val candidate = state.resumeTrack?.takeIf(canResumeTrack)
             state = state.copy(suspended = false, resumeTrack = null)
             if (candidate != null) {
                 visit(QueueVisit(candidate))

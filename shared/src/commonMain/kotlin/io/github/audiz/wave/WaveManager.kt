@@ -21,6 +21,7 @@ import io.github.audiz.player.PlaybackQueueManager
 import io.github.audiz.player.WavePlaybackBridge
 import io.github.audiz.AppConfigKeys
 import io.github.audiz.loadAppConfig
+import io.github.audiz.releasePlaybackWakeLock
 import io.github.audiz.saveAppConfig
 import io.github.audiz.models.ThematicWavePreset
 import io.github.audiz.util.AppLogger
@@ -49,7 +50,9 @@ class WaveManager(
         if (getAccessToken().isBlank()) null
         else repository.getTracksDetails(listOf(id)).result.firstOrNull { it.id == id }
     },
-    private val shouldSkipRecommendedTrack: ((FullTrackInfo) -> Boolean)? = null
+    private val shouldSkipRecommendedTrack: ((FullTrackInfo) -> Boolean)? = null,
+    private val isRecentRepeat: (FullTrackInfo) -> Boolean = { false },
+    private val awaitRecentHistory: suspend () -> Unit = {},
 ) : WavePlaybackBridge {
     private var playbackManager: PlaybackManager? = null
 
@@ -199,12 +202,37 @@ class WaveManager(
     val currentWaveTrack: FullTrackInfo?
         get() = activeWaveTrack ?: waveTracks.getOrNull(waveCurrentIndex)
 
-    private fun recommendedIndex(index: Int): Int {
-        val shouldSkip = shouldSkipRecommendedTrack ?: return index
-        if (waveTracks.getOrNull(index)?.let(shouldSkip) != true) return index
-        return (index + 1 until minOf(index + 5, waveTracks.size)).firstOrNull {
-            !shouldSkip(waveTracks[it])
-        } ?: index
+    override fun isRecentWaveRepeat(track: FullTrackInfo): Boolean = isRecentRepeat(track)
+
+    private fun recommendedIndex(start: Int, currentId: String? = null): Int? {
+        val firstEligible = (start until waveTracks.size).firstOrNull {
+            val track = waveTracks[it]
+            track.id != currentId && !isRecentRepeat(track)
+        } ?: return null
+
+        val shouldSkip = shouldSkipRecommendedTrack ?: return firstEligible
+        if (!shouldSkip(waveTracks[firstEligible])) return firstEligible
+        return (firstEligible + 1 until minOf(firstEligible + 5, waveTracks.size)).firstOrNull {
+            val track = waveTracks[it]
+            track.id != currentId && !isRecentRepeat(track) && !shouldSkip(track)
+        } ?: firstEligible
+    }
+
+    /** Try a few fresh batches when every recommendation in the response was already played. */
+    private suspend fun findUnplayedBatch(initial: RotorSessionResponse, sessionId: String?): RotorSessionResponse {
+        awaitRecentHistory()
+        var response = initial
+        if (sessionId == null) return response
+        repeat(3) {
+            val tracks = response.sequence.mapNotNull { it.track }
+            if (response.terminated || tracks.isEmpty() || tracks.any { !isRecentRepeat(it) }) return response
+            response = repository.getRotorNextTracks(
+                radioSessionId = sessionId,
+                feedbacks = emptyList(),
+                remainingQueue = emptyList()
+            )
+        }
+        return response
     }
 
     /**
@@ -212,16 +240,8 @@ class WaveManager(
      */
     override fun getNextWaveTrackCandidate(): FullTrackInfo? {
         val currentId = currentWaveTrack?.id
-        val futureCandidate = waveFutureTracks.firstOrNull { it.id != currentId }
-        if (futureCandidate != null) return futureCandidate
-
-        for (i in (waveCurrentIndex + 1) until waveTracks.size) {
-            val candidate = waveTracks[i]
-            if (candidate.id != currentId) {
-                return waveTracks[recommendedIndex(i)]
-            }
-        }
-        return null
+        val futureCandidate = waveFutureTracks.firstOrNull { it.id != currentId && !isRecentRepeat(it) }
+        return futureCandidate ?: recommendedIndex(waveCurrentIndex + 1, currentId)?.let(waveTracks::get)
     }
 
     // 🌊 История навигации Моей Волны (до 5 треков назад / вперед):
@@ -340,8 +360,8 @@ class WaveManager(
                     rotorResponse = repository.createRotorSession(listOf("user:onyourwave"))
                 }
 
+                val response = if (autoPlay) findUnplayedBatch(rotorResponse, rotorResponse.radioSessionId ?: sid) else rotorResponse
                 if (restoredTrack != null && (!isWaveMode || currentWaveTrack?.id != restoredTrack.id)) return@launch
-                val response = rotorResponse
                 waveRadioSessionId = response.radioSessionId ?: sid
                 waveBatchId = response.batchId
                 replenishmentJob?.cancel()
@@ -366,7 +386,7 @@ class WaveManager(
                 println("WaveManager: Волна инициализирована! Загружено треков: ${waveTracks.size}, batchId: $waveBatchId")
 
                 if (autoPlay && waveTracks.isNotEmpty()) {
-                    playRecommendedWaveTrack(0, source = source)
+                    playFirstRecommendation(source = source)
                 } else if (autoPlay) {
                     playbackManager?.resetLoadingFlags()
                 }
@@ -426,8 +446,9 @@ class WaveManager(
             isWaveLoading = true
             try {
                 println("WaveManager: Запуск тематической Волны '$title', seeds=$seeds")
-                val response = repository.createRotorSession(seeds)
-                val sid = response.radioSessionId
+                val initial = repository.createRotorSession(seeds)
+                val sid = initial.radioSessionId
+                val response = if (autoPlay) findUnplayedBatch(initial, sid) else initial
                 val parsedTracks = response.sequence.mapNotNull { it.track }.distinctBy { it.id }
                 if (parsedTracks.isEmpty()) {
                     throw IllegalStateException("Для волны не найдено доступных треков")
@@ -458,7 +479,7 @@ class WaveManager(
                 println("WaveManager: Тематическая Волна запущена! Загружено треков: ${waveTracks.size}, radioSessionId: $waveRadioSessionId, batchId: $waveBatchId")
 
                 if (autoPlay && waveTracks.isNotEmpty()) {
-                    playRecommendedWaveTrack(0, source = source)
+                    playFirstRecommendation(source = source)
                 } else if (autoPlay) {
                     playbackManager?.resetLoadingFlags()
                 }
@@ -500,8 +521,15 @@ class WaveManager(
         playWaveTrack(waveCurrentIndex, TrackPlaySource.PLAY, 0L)
     }
 
-    private fun playRecommendedWaveTrack(index: Int, source: TrackPlaySource, crossfadeMs: Long = 0L) {
-        playWaveTrack(recommendedIndex(index), source, crossfadeMs)
+    private fun playFirstRecommendation(source: TrackPlaySource, crossfadeMs: Long = 0L) {
+        val index = recommendedIndex(0)
+        if (index == null) {
+            playbackManager?.resetLoadingFlags()
+            releasePlaybackWakeLock()
+            onError?.invoke("В рекомендациях Моей волны пока только недавно сыгранные треки")
+        } else {
+            playWaveTrack(index, source, crossfadeMs)
+        }
     }
 
     override fun playWaveTrack(index: Int, source: TrackPlaySource, crossfadeMs: Long) {
@@ -638,7 +666,7 @@ class WaveManager(
         playbackManager?.setLoadingFlags(next = true, prev = false, play = false)
 
         val current = currentWaveTrack
-        while (waveFutureTracks.isNotEmpty() && waveFutureTracks.first().id == current?.id) {
+        while (waveFutureTracks.firstOrNull()?.let { it.id == current?.id || isRecentRepeat(it) } == true) {
             waveFutureTracks.removeAt(0)
         }
 
@@ -663,7 +691,15 @@ class WaveManager(
     override fun resumeOrLoadWave(autoPlay: Boolean, source: TrackPlaySource) {
         if (waveTracks.isNotEmpty()) {
             if (autoPlay) {
-                playWaveTrack(waveCurrentIndex, source)
+                val current = waveTracks.getOrNull(waveCurrentIndex)
+                val playingId = playbackManager?.trackId
+                if (current != null && (PlaybackQueueManager.isSameTrack(current, playingId) || !isRecentRepeat(current))) {
+                    playWaveTrack(waveCurrentIndex, source)
+                } else {
+                    val index = recommendedIndex(waveCurrentIndex)
+                    if (index != null) playWaveTrack(index, source)
+                    else loadNextWaveBatchAfterNaturalCompletion(current)
+                }
             }
         } else if (currentWaveSeeds.isNotEmpty()) {
             startThematicWave(currentWaveTitle, currentWaveSeeds, autoPlay = autoPlay, source = source)
@@ -693,15 +729,17 @@ class WaveManager(
         if (!isWaveMode) {
             if (waveTracks.isNotEmpty()) {
                 val nextIndex = if (waveCurrentIndex + 1 < waveTracks.size) waveCurrentIndex + 1 else 0
-                playRecommendedWaveTrack(nextIndex, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
+                val index = recommendedIndex(nextIndex)
+                if (index != null) playWaveTrack(index, TrackPlaySource.NEXT, crossfadeMs)
+                else playbackManager?.resetLoadingFlags()
             }
             return
         }
 
         // Если в текущей очереди есть следующий трек — мгновенно переключаем на него (Zero Latency)
-        if (waveCurrentIndex + 1 < waveTracks.size) {
+        val nextIndex = recommendedIndex(waveCurrentIndex + 1, currentWaveTrack?.id)
+        if (nextIndex != null) {
             val oldTrack = currentWaveTrack
-            val nextIndex = waveCurrentIndex + 1
 
             if (oldTrack != null && wavePastTracks.lastOrNull()?.id != oldTrack.id) {
                 wavePastTracks.add(oldTrack)
@@ -712,7 +750,7 @@ class WaveManager(
             waveFutureTracks.clear()
 
             // 1. Мгновенно запускаем воспроизведение следующего трека
-            playRecommendedWaveTrack(nextIndex, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
+            playWaveTrack(nextIndex, TrackPlaySource.NEXT, crossfadeMs)
             val nextTrack = waveTracks[waveCurrentIndex]
 
             val radioSessionId = waveRadioSessionId ?: ynisonWaveSessionId
@@ -878,11 +916,12 @@ class WaveManager(
                 val transitionQueue = emptyList<String>()
 
                 println("🌊 Волна: очередь пуста, отправка ${feedbacksToSend.size} фидбеков, запрашиваем новую пачку...")
-                val nextResponse = repository.getRotorNextTracks(
+                val initial = repository.getRotorNextTracks(
                     radioSessionId = radioSessionId,
                     feedbacks = feedbacksToSend,
                     remainingQueue = transitionQueue
                 )
+                val nextResponse = findUnplayedBatch(initial, radioSessionId)
 
                 waveBatchId = nextResponse.batchId
                 waveTracks.clear()
@@ -913,7 +952,7 @@ class WaveManager(
                 println("🌊 Волна: Новая пачка из ${waveTracks.size} треков загружена после skip! Запуск первого трека.")
 
                 if (waveTracks.isNotEmpty()) {
-                    playRecommendedWaveTrack(0, source = TrackPlaySource.NEXT)
+                    playFirstRecommendation(source = TrackPlaySource.NEXT)
                 } else {
                     playbackManager?.resetLoadingFlags()
                 }
@@ -948,7 +987,7 @@ class WaveManager(
         if (current != null) recordWaveTrackFinished(current)
 
         // Очищаем из waveFutureTracks любые вхождения текущего доигравшего трека
-        while (waveFutureTracks.isNotEmpty() && waveFutureTracks.first().id == current?.id) {
+        while (waveFutureTracks.firstOrNull()?.let { it.id == current?.id || isRecentRepeat(it) } == true) {
             waveFutureTracks.removeAt(0)
         }
 
@@ -959,22 +998,15 @@ class WaveManager(
             return
         }
 
-        if (waveCurrentIndex + 1 < waveTracks.size) {
-            var nextIndex = waveCurrentIndex + 1
-            while (nextIndex < waveTracks.size && waveTracks[nextIndex].id == current?.id) {
-                nextIndex++
+        val nextIndex = recommendedIndex(waveCurrentIndex + 1, current?.id)
+        if (nextIndex != null) {
+            println("🌊 Волна: трек доиграл. Переходим к следующему треку пачки ($nextIndex/${waveTracks.size})")
+            playWaveTrack(nextIndex, TrackPlaySource.PLAY, crossfadeMs)
+            val remainingAhead = waveTracks.size - (waveCurrentIndex + 1)
+            if (remainingAhead <= 4) {
+                replenishWaveAhead(current, waveTracks[waveCurrentIndex])
             }
-            if (nextIndex < waveTracks.size) {
-                println("🌊 Волна: трек доиграл. Переходим к следующему треку пачки ($nextIndex/${waveTracks.size})")
-                playRecommendedWaveTrack(nextIndex, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
-
-                // Проверяем остаток очереди: если осталось <= 4 треков впереди, в фоне дозагружаем следующую пачку
-                val remainingAhead = waveTracks.size - (waveCurrentIndex + 1)
-                if (remainingAhead <= 4) {
-                    replenishWaveAhead(current, waveTracks[waveCurrentIndex])
-                }
-                return
-            }
+            return
         }
 
         println("🌊 Волна: вся пачка из ${waveTracks.size} треков доиграла. Запрашиваем следующую пачку...")
@@ -1114,11 +1146,12 @@ class WaveManager(
                 val queueList = emptyList<String>()
 
                 println("🌊 Волна: пачка завершена, отправка ${feedbacksToSend.size} накопленных фидбеков...")
-                val nextResponse = repository.getRotorNextTracks(
+                val initial = repository.getRotorNextTracks(
                     radioSessionId = radioSessionId,
                     feedbacks = feedbacksToSend,
                     remainingQueue = queueList
                 )
+                val nextResponse = findUnplayedBatch(initial, radioSessionId)
 
                 waveBatchId = nextResponse.batchId
                 waveTracks.clear()
@@ -1149,7 +1182,7 @@ class WaveManager(
                 println("🌊 Волна: Новая пачка из ${waveTracks.size} треков получена после завершения предыдущей! Запуск.")
 
                 if (waveTracks.isNotEmpty()) {
-                    playRecommendedWaveTrack(0, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
+                    playFirstRecommendation(source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
                 } else {
                     playbackManager?.resetLoadingFlags()
                 }

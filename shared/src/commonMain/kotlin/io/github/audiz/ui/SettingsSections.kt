@@ -52,6 +52,7 @@ internal enum class SettingsBlock {
     DownloadFolder,
     YandexAccount,
     WaveConnection,
+    WaveLoopProtection,
     Storage,
     Support,
     Logs,
@@ -69,11 +70,39 @@ internal enum class SettingsBlock {
             DownloadFolder -> DownloadFolderSettings(state, actions)
             YandexAccount -> YandexAccountSettings(state, actions)
             WaveConnection -> WaveConnectionSettings(state, actions)
+            WaveLoopProtection -> WaveLoopProtectionSettings(state, actions)
             Storage -> StorageSettings(state, actions)
             Support -> SupportSettings(actions)
             Logs -> LogsSettings(state, actions)
             AiFilter -> AiFilterSettings(state, actions)
         }
+    }
+}
+
+@Composable
+private fun WaveLoopProtectionSettings(state: SettingsState, actions: SettingsActions) {
+    if (state.uiMode == "desktop") {
+        Text("Моя волна", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Защита от зацикливания", style = MaterialTheme.typography.labelLarge)
+            Text(
+                "Моя волна пропускает треки из последних 1000 воспроизведений в приложении.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = state.waveLoopProtectionEnabled,
+            onCheckedChange = actions.onToggleWaveLoopProtection,
+            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+        )
     }
 }
 

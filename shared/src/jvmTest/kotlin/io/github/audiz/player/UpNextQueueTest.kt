@@ -14,6 +14,19 @@ class UpNextQueueTest {
         next(current, { resume }, { setOf(a.id) })
 
     @Test
+    fun rejectedWaveResumeDoesNotBlockExplicitQueueEntries() {
+        val queue = UpNextQueue()
+        queue.add(x)
+        queue.add(y)
+        assertEquals(x, queue.next())
+        assertEquals(y, queue.peek { false })
+        assertEquals(y, queue.next(x, { b }, { emptySet() }, canResumeTrack = { false }))
+        assertNull(queue.peek { false })
+        assertNull(queue.next(y, { b }, { emptySet() }, canResumeTrack = { false }))
+        assertFalse(queue.state.suspended)
+    }
+
+    @Test
     fun insertionPlaysInOrderAndResumesFrozenPlaylistCandidate() {
         val queue = UpNextQueue()
         queue.add(x)

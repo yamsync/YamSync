@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,6 +62,7 @@ data class SettingsState(
     val hasPlusSubscription: Boolean? = null,
     val aiFilterMode: AiFilterMode = AiFilterMode.OFF,
     val aiBlacklistVersion: Int? = null,
+    val waveLoopProtectionEnabled: Boolean = false,
 )
 
 /**
@@ -86,6 +88,7 @@ data class SettingsActions(
     val onRefreshPlusSubscription: () -> Unit = {},
     val onProjectOpened: () -> Unit = {},
     val onSaveAiFilterMode: (AiFilterMode) -> Unit = {},
+    val onToggleWaveLoopProtection: (Boolean) -> Unit = {},
 )
 
 /**
@@ -332,6 +335,7 @@ private enum class SettingsSection(
     ),
     Appearance("Оформление", Icons.Filled.Palette, listOf(SettingsBlock.Theme, SettingsBlock.InterfaceMode)),
     Account("Аккаунт Яндекса", Icons.Filled.PersonOutline, listOf(SettingsBlock.YandexAccount)),
+    MyWave("Моя волна", Icons.Filled.Waves, listOf(SettingsBlock.WaveLoopProtection)),
     Addons("Дополнения", Icons.Filled.Extension, emptyList()),
     Diagnostics("Диагностика", Icons.Filled.MonitorHeart, listOf(SettingsBlock.Logs, SettingsBlock.WaveConnection)),
     Support("Поддержать проект", Icons.Filled.FavoriteBorder, listOf(SettingsBlock.Support));
@@ -347,6 +351,7 @@ private enum class SettingsSection(
             }
             "$theme · ${AppAccentColor.fromKey(state.accentColor).title}"
         }
+        MyWave -> if (state.waveLoopProtectionEnabled) "Защита от зацикливания включена" else null
         Addons -> "Фильтр ИИ-музыки · ${state.aiFilterMode.title}"
         Account, Diagnostics, Support -> null
     }

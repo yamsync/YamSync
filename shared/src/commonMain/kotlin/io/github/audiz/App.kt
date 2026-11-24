@@ -758,6 +758,7 @@ fun App() {
                     hasPlusSubscription = searchViewModel.hasPlusSubscription,
                     aiFilterMode = searchViewModel.aiFilterMode,
                     aiBlacklistVersion = searchViewModel.aiBlacklist?.version,
+                    waveLoopProtectionEnabled = searchViewModel.waveLoopProtectionEnabled,
                 ),
                 actions = SettingsActions(
                     onClose = { settingsExpanded = false },
@@ -785,7 +786,8 @@ fun App() {
                     onToggleUiWatchdog = { searchViewModel.toggleUiWatchdog(it) },
                     onRefreshPlusSubscription = { searchViewModel.refreshPlusSubscription() },
                     onProjectOpened = { supportScope.launch { starPromptManager.complete() } },
-                    onSaveAiFilterMode = searchViewModel::saveAiFilterMode
+                    onSaveAiFilterMode = searchViewModel::saveAiFilterMode,
+                    onToggleWaveLoopProtection = searchViewModel::setWaveLoopProtection,
                 )
             )
 

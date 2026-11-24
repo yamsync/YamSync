@@ -40,4 +40,6 @@ interface WavePlaybackBridge {
 
     /** Получение запланированного следующего кандидата для предзагрузки */
     fun getNextWaveTrackCandidate(): FullTrackInfo?
+
+    fun isRecentWaveRepeat(track: FullTrackInfo): Boolean = false
 }

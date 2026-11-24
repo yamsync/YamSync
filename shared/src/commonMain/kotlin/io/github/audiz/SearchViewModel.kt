@@ -23,6 +23,7 @@ import io.github.audiz.api.generatePlayUuid
 import io.github.audiz.download.DownloadManager
 import io.github.audiz.player.LocalTrackResolver
 import io.github.audiz.player.PlaybackManager
+import io.github.audiz.player.RecentPlaybackHistory
 import io.github.audiz.player.PlaybackQueueSource
 import io.github.audiz.player.PlaybackQueueManager
 import io.github.audiz.player.PlayerUiState
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -552,6 +554,25 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
+    var waveLoopProtectionEnabled by mutableStateOf(false)
+        private set
+
+    private val recentPlaybackHistory = RecentPlaybackHistory(viewModelScope)
+    private val waveLoopSettingsLock = Mutex()
+    private val waveLoopSettingLoaded = CompletableDeferred<Unit>()
+    private var waveLoopSettingEdited = false
+
+    fun setWaveLoopProtection(enabled: Boolean) {
+        waveLoopSettingEdited = true
+        waveLoopProtectionEnabled = enabled
+        if (waveManager.isWaveMode && playerIsPlaying) playbackManager.onQueueUpdated()
+        viewModelScope.launch {
+            waveLoopSettingsLock.withLock {
+                withContext(DispatcherIO) { saveAppConfig(AppConfigKeys.WAVE_LOOP_PROTECTION, enabled.toString()) }
+            }
+        }
+    }
+
     // 🌊 МЕНЕДЖЕР МОЕЙ ВОЛНЫ:
     val waveManager = WaveManager(
         scope = viewModelScope,
@@ -561,6 +582,14 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             aiFilterMode == AiFilterMode.SKIP_IN_WAVE &&
                 aiBlacklist?.containsTrack(track.id) == true &&
                 !playlistManager.isTrackLiked(track.id)
+        },
+        isRecentRepeat = { track ->
+            waveLoopProtectionEnabled &&
+                (track.id in recentPlaybackHistory || track.realId?.let { it in recentPlaybackHistory } == true)
+        },
+        awaitRecentHistory = {
+            waveLoopSettingLoaded.await()
+            recentPlaybackHistory.awaitLoaded()
         },
         onTrackLiked = { trackId -> playlistManager.likedTrackIds.add(trackId.removePrefix("local:").substringBefore(":")) },
         onError = { errorMessage = it }
@@ -656,6 +685,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         getSelectedQuality = { settingsManager.selectedQuality },
         isRecordToDisk = { downloadManager.isRecordToDiskActive },
         onTrackSavedToDisk = { downloadManager.incrementDownloadVersion() },
+        onPlaybackConfirmed = { trackId -> recentPlaybackHistory.record(trackId) },
         onTrackStarted = { trackId, title, artist, cover, isWave ->
             if (playbackManager.upNextQueue.state.current?.inserted != true) {
                 if (isWave) {
@@ -891,6 +921,20 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     init {
         viewModelScope.launch {
             try {
+                val enabled = withContext(DispatcherIO) {
+                    loadAppConfig(AppConfigKeys.WAVE_LOOP_PROTECTION) == "true"
+                }
+                if (!waveLoopSettingEdited) waveLoopProtectionEnabled = enabled
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e("SearchViewModel", "Не удалось загрузить настройку защиты от зацикливания", e)
+            } finally {
+                waveLoopSettingLoaded.complete(Unit)
+            }
+        }
+        viewModelScope.launch {
+            try {
                 aiBlacklist = loadBundledAiBlacklist()
             } catch (e: CancellationException) {
                 throw e
@@ -921,6 +965,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
         viewModelScope.launch {
             playbackManager.restoreUpNextQueue()
+            waveLoopSettingLoaded.await()
+            recentPlaybackHistory.awaitLoaded()
             restoreLastPlaybackSession()
         }
     }
@@ -1915,7 +1961,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     fun togglePlayPause() {
         if (playbackManager.trackId == null && waveManager.currentWaveTrack != null) {
-            waveManager.playWaveTrack(waveManager.waveCurrentIndex)
+            waveManager.resumeOrLoadWave()
         } else {
             playbackManager.togglePlayPause()
         }

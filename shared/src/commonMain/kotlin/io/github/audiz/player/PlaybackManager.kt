@@ -63,7 +63,8 @@ class PlaybackManager(
     private val onTrackSavedToDisk: (() -> Unit)? = null,
     private val onTrackStarted: ((trackId: String, title: String, artist: String, coverUri: String?, isWave: Boolean) -> Unit)? = null,
     private val onError: (String) -> Unit = {},
-    private val onTrackMetadataChanged: ((FullTrackInfo) -> Unit)? = null
+    private val onTrackMetadataChanged: ((FullTrackInfo) -> Unit)? = null,
+    private val onPlaybackConfirmed: ((String) -> Unit)? = null,
 ) {
     val upNextQueue = UpNextQueue()
     private var restoringUpNext = false
@@ -223,7 +224,10 @@ class PlaybackManager(
             override fun playPrevWaveTrack() { onPlayPrevWave?.invoke() }
             override fun onWaveTrackFinished(crossfadeMs: Long) { onWaveTrackFinished?.invoke(crossfadeMs) }
             override fun loadInitialWave(autoPlay: Boolean, source: TrackPlaySource) { onInitialWave?.invoke(autoPlay, source) }
-            override fun resumeOrLoadWave(autoPlay: Boolean, source: TrackPlaySource) { onInitialWave?.invoke(autoPlay, source) }
+            override fun resumeOrLoadWave(autoPlay: Boolean, source: TrackPlaySource) {
+                if (autoPlay && waveTracks.isNotEmpty()) playWaveTrack(waveCurrentIndex, source)
+                else onInitialWave?.invoke(autoPlay, source)
+            }
             override fun getNextWaveTrackCandidate(): FullTrackInfo? = getNextWaveTrack?.invoke()
             override fun reportWaveTrackFinished(trackId: String?) { onWaveTrackFinishedReported?.invoke(trackId) }
         },
@@ -348,7 +352,9 @@ class PlaybackManager(
         }
 
         audioPlayer.setOnPlaybackStartedListener {
+            val startedId = trackId
             scope.launch {
+                startedId?.let { onPlaybackConfirmed?.invoke(it) }
                 transitionLead.onPlaybackStarted()
                 isNextLoading = false
                 isPrevLoading = false
@@ -521,12 +527,7 @@ class PlaybackManager(
                 return
             }
             isPlayLoading = true
-            val waveTracks = waveBridge?.waveTracks ?: emptyList()
-            if (waveTracks.isNotEmpty()) {
-                waveBridge?.playWaveTrack(waveBridge.waveCurrentIndex, TrackPlaySource.PLAY)
-            } else {
-                waveBridge?.resumeOrLoadWave(true, TrackPlaySource.PLAY)
-            }
+            waveBridge?.resumeOrLoadWave(true, TrackPlaySource.PLAY)
         } else if (waveBridge?.isWaveMode == true && upNextQueue.state.current?.inserted != true &&
             waveBridge.waveTracks.getOrNull(waveBridge.waveCurrentIndex)?.id == trackId) {
             waveBridge.playWaveTrack(waveBridge.waveCurrentIndex, TrackPlaySource.PLAY)
@@ -1393,10 +1394,16 @@ class PlaybackManager(
             it.anchorId.takeIf { _ -> it.suspended && it.pending.isEmpty() && it.forward.isEmpty() }
         }
         val currentInfo = (currentId ?: trackId)?.let { findTrackInfo(it) }
-        val queued = upNextQueue.next(currentInfo, resume = {
-            queueManager.plannedNextTrack = null
-            calculateResumeTrack(currentId ?: trackId)
-        }, shuffleCycle = { queueManager.playedInCycleTrackIds }, past = historyBeforeUpNext())
+        val queued = upNextQueue.next(
+            current = currentInfo,
+            resume = {
+                queueManager.plannedNextTrack = null
+                calculateResumeTrack(currentId ?: trackId)
+            },
+            shuffleCycle = { queueManager.playedInCycleTrackIds },
+            past = historyBeforeUpNext(),
+            canResumeTrack = ::canResumeRecommendedTrack,
+        )
         if (queued != null) {
             playUpNextTrack(queued, source, crossfadeMs)
             return
@@ -1657,6 +1664,9 @@ class PlaybackManager(
         }
     }
 
+    private fun canResumeRecommendedTrack(track: FullTrackInfo): Boolean =
+        waveBridge?.let { !it.isWaveMode || !it.isRecentWaveRepeat(track) } ?: true
+
     /**
      * ⏭ Вычислить кандидата на следующий трек в очереди с учетом приоритетов:
      * 1. Моя Волна (getNextWaveTrack)
@@ -1665,7 +1675,7 @@ class PlaybackManager(
      * 4. Результаты поиска (searchTracks)
      */
     fun calculateNextTrackCandidate(): FullTrackInfo? {
-        upNextQueue.peek()?.let { return it }
+        upNextQueue.peek(::canResumeRecommendedTrack)?.let { return it }
         val candidate = calculateBaseNextTrackCandidate(if (upNextQueue.state.suspended) upNextQueue.state.anchorId else trackId)
         if (upNextQueue.state.current?.inserted != true) {
             upNextQueue.captureShuffleCycle(queueManager.playedInCycleTrackIds)
