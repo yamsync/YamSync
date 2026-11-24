@@ -10,8 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.changedToUp
@@ -378,6 +377,11 @@ private fun MiniPlayerProgressBar(
     }
 }
 
+private fun Modifier.blockPlayerSwipes() = pointerInput(Unit) {
+    // The detector consumes drags after touch slop and leaves taps to the button.
+    detectDragGestures { _, _ -> }
+}
+
 /**
  * 📲 Полноэкранный раскрывающийся экран плеера (Full-screen Sheet) для iOS / Android
  * - Открывается по тапу на мини-плеер.
@@ -572,7 +576,7 @@ fun MobileFullPlayerSheet(
                 ) {
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(44.dp).blockPlayerSwipes()
                     ) {
                         Icon(
                             imageVector = Icons.Filled.KeyboardArrowDown,
@@ -610,6 +614,7 @@ fun MobileFullPlayerSheet(
                                     .size(22.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                                    .blockPlayerSwipes()
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
@@ -632,7 +637,7 @@ fun MobileFullPlayerSheet(
                     if (actions.onConfigClick != null) {
                         IconButton(
                             onClick = { actions.onConfigClick.invoke() },
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(44.dp).blockPlayerSwipes()
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
@@ -762,6 +767,7 @@ fun MobileFullPlayerSheet(
                         onOpenEqualizer = actions.onOpenEqualizer,
                         coverCornerRadius = coverCornerRadius,
                         modifier = Modifier.align(Alignment.BottomCenter)
+                            .then(if (actions.onOpenEqualizer != null) Modifier.blockPlayerSwipes() else Modifier)
                     )
                 }
             }
@@ -795,6 +801,7 @@ fun MobileFullPlayerSheet(
                             .then(
                                 if (actions.onOpenArtist != null) Modifier
                                     .pointerHoverIcon(PointerIcon.Hand)
+                                    .blockPlayerSwipes()
                                     .clickable(onClick = actions.onOpenArtist)
                                 else Modifier
                             ),
@@ -811,6 +818,7 @@ fun MobileFullPlayerSheet(
                 // Кнопка Лайк (48 dp)
                 FavoriteButton(
                     isFavorite = state.isFavorite,
+                    modifier = Modifier.blockPlayerSwipes(),
                     size = 48.dp,
                     onClick = { actions.onToggleFavorite?.invoke() }
                 )
@@ -899,6 +907,7 @@ fun MobileFullPlayerSheet(
                     GhostIconButton(
                         icon = Icons.Filled.Shuffle,
                         contentDescription = "Случайный порядок",
+                        modifier = Modifier.blockPlayerSwipes(),
                         size = sideSlotButtonSize,
                         iconSize = if (isNarrow) 20.dp else 24.dp,
                         contentColor = if (state.isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -914,6 +923,7 @@ fun MobileFullPlayerSheet(
                     OutlineIconButton(
                         icon = Icons.Filled.SkipPrevious,
                         contentDescription = "Предыдущий",
+                        modifier = Modifier.blockPlayerSwipes(),
                         size = skipButtonSize,
                         isLoading = state.isPrevLoading,
                         onClick = { actions.onPrev?.invoke() }
@@ -922,6 +932,7 @@ fun MobileFullPlayerSheet(
                     FilledIconButton(
                         icon = if (state.isPlaying && !state.isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (state.isPlaying && !state.isPaused) "Пауза" else "Воспроизведение",
+                        modifier = Modifier.blockPlayerSwipes(),
                         size = playButtonSize,
                         isLoading = state.isPlayLoading,
                         onClick = actions.onPlayPause
@@ -930,6 +941,7 @@ fun MobileFullPlayerSheet(
                     OutlineIconButton(
                         icon = Icons.Filled.SkipNext,
                         contentDescription = "Следующий",
+                        modifier = Modifier.blockPlayerSwipes(),
                         size = skipButtonSize,
                         isLoading = state.isNextLoading,
                         onClick = { actions.onNext?.invoke() }
@@ -944,6 +956,7 @@ fun MobileFullPlayerSheet(
                     DesktopVolumeControl(
                         volume = state.volume,
                         onVolumeChange = actions.onVolumeChange,
+                        modifier = Modifier.blockPlayerSwipes(),
                         buttonSize = sideSlotButtonSize,
                         bottomPlayerPadding = 0.dp
                     )
@@ -985,6 +998,7 @@ fun MobileFullPlayerSheet(
                     GhostIconButton(
                         icon = Icons.Filled.Delete,
                         contentDescription = "Удалить трек",
+                        modifier = Modifier.blockPlayerSwipes(),
                         size = actionButtonSize,
                         iconSize = actionIconSize,
                         contentColor = dislikeTint,
@@ -1004,6 +1018,7 @@ fun MobileFullPlayerSheet(
                         GhostIconButton(
                             icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                             contentDescription = "Очередь воспроизведения",
+                            modifier = Modifier.blockPlayerSwipes(),
                             size = actionButtonSize,
                             iconSize = actionIconSize,
                             contentColor = if (state.isQueueOpen) MaterialTheme.colorScheme.primary else defaultActionTint,
@@ -1023,6 +1038,7 @@ fun MobileFullPlayerSheet(
                     GhostIconButton(
                         icon = Icons.Default.Tune,
                         contentDescription = "Эквалайзер",
+                        modifier = Modifier.blockPlayerSwipes(),
                         size = actionButtonSize,
                         iconSize = actionIconSize,
                         contentColor = if (state.isEqualizerActive) MaterialTheme.colorScheme.primary else defaultActionTint,
@@ -1037,7 +1053,7 @@ fun MobileFullPlayerSheet(
                 ) {
                     if (state.isSavingToDisk) {
                         Box(
-                            modifier = Modifier.size(actionButtonSize),
+                            modifier = Modifier.size(actionButtonSize).blockPlayerSwipes(),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
@@ -1050,6 +1066,7 @@ fun MobileFullPlayerSheet(
                         GhostIconButton(
                             icon = Icons.Filled.Save,
                             contentDescription = if (state.isRecordToDisk) "Сохранено на диск (нажмите для удаления)" else "Сохранить на диск",
+                            modifier = Modifier.blockPlayerSwipes(),
                             size = actionButtonSize,
                             iconSize = actionIconSize,
                             contentColor = if (state.isRecordToDisk) MaterialTheme.colorScheme.primary else defaultActionTint,
@@ -1079,6 +1096,7 @@ fun MobileFullPlayerSheet(
                     }
                     GhostIconButton(
                         icon = playlistIcon,
+                        modifier = Modifier.blockPlayerSwipes(),
                         contentDescription = when {
                             !state.isInPlaylist -> "Добавить в плейлист"
                             state.playlistCount > 1 -> "В плейлистах (${state.playlistCount})"
@@ -1102,7 +1120,7 @@ fun MobileFullPlayerSheet(
                 ) {
                     if (state.isSharing) {
                         Box(
-                            modifier = Modifier.size(actionButtonSize),
+                            modifier = Modifier.size(actionButtonSize).blockPlayerSwipes(),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
@@ -1117,6 +1135,7 @@ fun MobileFullPlayerSheet(
                         GhostIconButton(
                             icon = shareIcon,
                             contentDescription = if (justCopiedShare) "Ссылка скопирована" else "Поделиться треком",
+                            modifier = Modifier.blockPlayerSwipes(),
                             size = actionButtonSize,
                             iconSize = actionIconSize,
                             contentColor = shareTint,
