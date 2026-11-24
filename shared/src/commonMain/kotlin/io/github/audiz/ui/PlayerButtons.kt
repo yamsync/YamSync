@@ -174,6 +174,7 @@ fun GhostIconButton(
     iconSize: Dp? = null,
     shape: Shape = CircleShape,
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -194,13 +195,14 @@ fun GhostIconButton(
             .clip(shape)
             .clickable(
                 interactionSource = interactionSource,
+                enabled = enabled,
                 onClick = onClick
             )
-            .pointerHoverIcon(PointerIcon.Hand),
+            .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = contentColor, modifier = Modifier.size(iconSize ?: (size * 0.55f)))
+        Icon(icon, contentDescription = contentDescription, tint = if (enabled) contentColor else contentColor.copy(alpha = contentColor.alpha * 0.38f), modifier = Modifier.size(iconSize ?: (size * 0.55f)))
     }
 }
 

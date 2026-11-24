@@ -529,27 +529,48 @@ class PlaylistManager(
      * 🗑️ Удалить трек из всех локальных плейлистов при его физическом удалении с диска
      */
     fun removeTrackFileFromAllPlaylists(trackPathOrId: String) {
-        val clean = trackPathOrId.removePrefix("local:")
+        removeTrackFromLocalPlaylists(setOf(trackPathOrId))
+    }
+
+    private fun normalizePlaylistPath(path: String): String =
+        path.removePrefix("local:").removePrefix("file://").replace('\\', '/')
+
+    internal fun localPlaylistsContaining(trackPaths: Set<String>): Set<String> {
+        val keys = trackPaths.mapTo(mutableSetOf(), ::normalizePlaylistPath)
+        return localPlaylists.filter { playlist ->
+            playlist.trackPaths.any { normalizePlaylistPath(it) in keys }
+        }.mapTo(mutableSetOf()) { it.id }
+    }
+
+    internal fun removeTrackFromLocalPlaylists(trackPaths: Set<String>, playlistIds: Set<String>? = null) {
+        val keys = trackPaths.mapTo(mutableSetOf(), ::normalizePlaylistPath)
         var anyModified = false
         for (i in localPlaylists.indices) {
-            val pl = localPlaylists[i]
-            val filtered = pl.trackPaths.filterNot {
-                it == clean || it == trackPathOrId || it.removePrefix("local:") == clean
-            }
-            if (filtered.size != pl.trackPaths.size) {
-                localPlaylists[i] = pl.copy(trackPaths = filtered, updatedAt = currentTimeMillis())
+            val playlist = localPlaylists[i]
+            if (playlistIds != null && playlist.id !in playlistIds) continue
+            val filtered = playlist.trackPaths.filterNot { normalizePlaylistPath(it) in keys }
+            if (filtered.size != playlist.trackPaths.size) {
+                localPlaylists[i] = playlist.copy(trackPaths = filtered, updatedAt = currentTimeMillis())
                 anyModified = true
             }
         }
         if (anyModified) {
             val storagePath = getMusicStoragePath()
-            scope.launch(DispatcherIO) {
-                saveLocalPlaylists(storagePath, localPlaylists.toList())
+            val updatedPlaylists = localPlaylists.toList()
+            launchSafe {
+                withContext(DispatcherIO) { saveLocalPlaylists(storagePath, updatedPlaylists) }
                 notifyLocalPlaylistsChanged()
             }
         }
     }
 
+    internal fun yandexPlaylistsContaining(trackId: String): List<PlaylistInfo> {
+        val cleanId = trackId.substringBefore(':')
+        return userPlaylists.filter { playlist ->
+            val ids = playlist.kind?.let(userPlaylistsTrackIds::get)
+            ids != null && (cleanId in ids || trackId in ids)
+        }
+    }
 
     /**
      * ☁️ Создать новый плейлист в аккаунте Яндекс Музыки
@@ -698,15 +719,15 @@ class PlaylistManager(
         track: FullTrackInfo,
         onTrackRemoved: ((String) -> Unit)? = null,
         onComplete: ((Boolean) -> Unit)? = null
-    ) {
+    ): Job? {
         val kind = playlist.kind
         if (kind == null || kind <= 0L) {
             onStatusMessage("❌ Некорректный идентификатор плейлиста")
             onComplete?.invoke(false)
-            return
+            return null
         }
 
-        launchSafe {
+        return launchSafe {
             onStatusMessage("⏳ Удаление из плейлиста '${playlist.title}': ${track.title}...")
             var cleanTrackId = (track.realId?.ifBlank { null } ?: track.id).removePrefix("local:").substringBefore(":")
 
@@ -720,12 +741,14 @@ class PlaylistManager(
                             cleanTrackId = foundTrack.id
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     println("PlaylistManager: Ошибка сопоставления трека при удалении: ${e.message}")
                 }
             }
 
-            val success = repository.removeTrackFromPlaylist(kind, cleanTrackId)
+            val success = withContext(DispatcherIO) { repository.removeTrackFromPlaylist(kind, cleanTrackId) }
             if (success) {
                 onStatusMessage("✅ Удалено из плейлиста '${playlist.title}': ${track.title}")
                 val rawTrackId = track.id.removePrefix("local:").substringBefore(":")

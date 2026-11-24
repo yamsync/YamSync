@@ -13,6 +13,7 @@ internal class TrackListNavigation<T>(initial: T) {
 
     val displayed: T get() = preview?.list ?: active
     val isPreview: Boolean get() = preview != null
+    val previewSession: LastPlaybackSession? get() = preview?.session
 
     fun browse(list: T, session: LastPlaybackSession) {
         preview = Preview(list, session)

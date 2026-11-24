@@ -77,6 +77,7 @@ data class PlayerBarActions(
     val onAddToPlaylist: (() -> Unit)? = null,
     val onToggleFavorite: (() -> Unit)? = null,
     val onToggleDislike: (() -> Unit)? = null,
+    val onManageTrackRemoval: (() -> Unit)? = null,
     val onOpenEqualizer: (() -> Unit)? = null,
     val onOpenQueue: (() -> Unit)? = null,
     val onOpenArtist: (() -> Unit)? = null,

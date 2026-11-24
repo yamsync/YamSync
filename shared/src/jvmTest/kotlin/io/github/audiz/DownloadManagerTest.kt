@@ -2,8 +2,12 @@ package io.github.audiz
 
 import io.github.audiz.api.MusicRepository
 import io.github.audiz.download.DownloadManager
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +16,46 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DownloadManagerTest {
+
+    @Test
+    fun deletingTheSelectedFileCanKeepPlaylistEntriesAndDoesNotFallBackToAnotherFile() = runBlocking {
+        val directory = Files.createTempDirectory("exact_track_delete").toFile()
+        try {
+            val selected = File(directory, "selected.flac").apply { writeText("selected") }
+            val otherCopy = File(directory, "HQ/Artist/Artist — Track.flac").apply {
+                parentFile.mkdirs()
+                writeText("other")
+            }
+            val deleteNotifications = mutableListOf<Boolean>()
+            var finished = CompletableDeferred<Unit>()
+            val manager = DownloadManager(
+                scope = this,
+                repository = MusicRepository(),
+                getMusicStoragePath = { directory.absolutePath },
+                getSelectedQuality = { "2" },
+                getPlayingTrackId = { null },
+                getPlayingTrackTitle = { "" },
+                getPlayingArtistName = { "" },
+                getPlayingFilePath = { null },
+                onTrackDeleted = { _, _, removePlaylistEntries -> deleteNotifications.add(removePlaylistEntries) },
+                onError = { finished.complete(Unit) }
+            )
+
+            manager.deleteTrack("123", "Track", "Artist", selected.absolutePath, removePlaylistEntries = false)
+            withTimeout(5_000) { finished.await() }
+            assertFalse(selected.exists())
+            assertTrue(otherCopy.exists())
+            assertEquals(listOf(false), deleteNotifications)
+
+            finished = CompletableDeferred()
+            manager.deleteTrack("123", "Track", "Artist", selected.absolutePath, removePlaylistEntries = false)
+            withTimeout(5_000) { finished.await() }
+            assertTrue(otherCopy.exists(), "The confirmed file no longer exists; no other copy should be deleted")
+            assertEquals(listOf(false), deleteNotifications)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 
     private fun createDownloadManager(storagePath: String = "/tmp"): DownloadManager {
         return DownloadManager(

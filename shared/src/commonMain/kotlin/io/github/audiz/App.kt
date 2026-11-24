@@ -59,6 +59,7 @@ import io.github.audiz.ui.AppAccentColor
 import io.github.audiz.ui.buildAppColorScheme
 import io.github.audiz.ui.EqualizerDialog
 import io.github.audiz.ui.MobileFullPlayerSheet
+import io.github.audiz.ui.PlayerTrackRemovalDialog
 import io.github.audiz.ui.BackHandler
 import io.github.audiz.dsp.EqualizerEngine
 import kotlinx.coroutines.flow.collectLatest
@@ -169,6 +170,7 @@ fun App() {
             var trackForPlaylistDialog by remember { mutableStateOf<FullTrackInfo?>(null) }
             var showLogsDialog by remember { mutableStateOf(false) }
             var trackToDelete by remember { mutableStateOf<TrackDeleteConfirmInfo?>(null) }
+            var playerTrackToRemove by remember { mutableStateOf<FullTrackInfo?>(null) }
             val eqState by EqualizerEngine.state.collectAsState()
             val isMobileUi = searchViewModel.isMobileUi
 
@@ -286,6 +288,9 @@ fun App() {
                     }
                 },
                 onToggleFavorite = if (searchViewModel.isCurrentTrackLocal) null else { { searchViewModel.toggleLikeCurrentTrack() } },
+                onManageTrackRemoval = {
+                    playerTrackToRemove = searchViewModel.getCurrentPlayingTrackInfo()
+                },
                 onToggleDislike = {
                     if (isCurrentTrackDownloadedOrLocal) {
                         val trackId = searchViewModel.playerTrackId ?: searchViewModel.currentPlayingFilePath ?: currentWave?.id
@@ -818,6 +823,18 @@ fun App() {
                     track = track,
                     viewModel = searchViewModel,
                     onDismiss = { trackForPlaylistDialog = null }
+                )
+            }
+
+            playerTrackToRemove?.let { track ->
+                PlayerTrackRemovalDialog(
+                    track = track,
+                    loadOptions = { searchViewModel.preparePlayerTrackRemoval(track) },
+                    onDismiss = { playerTrackToRemove = null },
+                    onConfirm = { target, selection ->
+                        playerTrackToRemove = null
+                        searchViewModel.applyPlayerTrackRemoval(target, selection)
+                    }
                 )
             }
 

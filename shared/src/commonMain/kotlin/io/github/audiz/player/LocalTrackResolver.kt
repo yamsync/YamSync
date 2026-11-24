@@ -136,11 +136,11 @@ class LocalTrackResolver(
      * Получить абсолютный путь к скачанному треку, если он существует.
      * Результаты кэшируются в памяти, полностью исключая системные вызовы диска при скролле.
      */
-    fun getDownloadedTrackPath(artist: String, title: String): String? {
+    fun getDownloadedTrackPath(artist: String, title: String, allowTitleOnlyMatch: Boolean = true): String? {
         val cleanArtist = artist.trim()
         val cleanTitle = title.trim()
         if (cleanTitle.isBlank()) return null
-        val cacheKey = "$cleanArtist::$cleanTitle"
+        val cacheKey = if (allowTitleOnlyMatch) "$cleanArtist::$cleanTitle" else "exact:$cleanArtist::$cleanTitle"
 
         synchronized(cacheLock) {
             if (localCacheVersion != globalCacheVersion) {
@@ -154,7 +154,7 @@ class LocalTrackResolver(
             val lowerTitle = cleanTitle.lowercase()
 
             val found = downloadedIndex["$lowerArtist::$lowerTitle"]
-                ?: downloadedIndex[lowerTitle]
+                ?: (if (allowTitleOnlyMatch) downloadedIndex[lowerTitle] else null)
                 ?: downloadedIndex["$lowerArtist — $lowerTitle"]
                 ?: downloadedIndex["$lowerArtist - $lowerTitle"]
 

@@ -23,6 +23,8 @@ import io.github.audiz.player.PlaybackManager
 import io.github.audiz.player.PlaybackQueueSource
 import io.github.audiz.player.PlaybackQueueManager
 import io.github.audiz.player.PlayerUiState
+import io.github.audiz.player.PlayerTrackRemoval
+import io.github.audiz.player.TrackRemovalSelection
 import io.github.audiz.player.resolvePlayerArtist
 import io.github.audiz.playlist.PlaylistManager
 import io.github.audiz.playlist.PlaylistDownloadProgress
@@ -420,6 +422,88 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         playbackManager.systemMediaControls.updateLikedState(isLikedNow)
     }
 
+    internal suspend fun preparePlayerTrackRemoval(track: FullTrackInfo): PlayerTrackRemoval {
+        val playingFilePath = currentPlayingFilePath.takeIf { PlaybackQueueManager.isSameTrack(track, playerTrackId) }
+        val filePath = withContext(DispatcherIO) {
+            sequenceOf(playingFilePath, track.realId, track.id)
+                .filterNotNull()
+                .filter(::isLocalTrackId)
+                .map { resolveLocalPath(it.removePrefix("local:")) }
+                .firstOrNull(::localFileExists)
+                ?: sequenceOf(track.artists.joinToString { it.name }, track.artists.firstOrNull()?.name.orEmpty())
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .firstNotNullOfOrNull { artist ->
+                        localTrackResolver.getDownloadedTrackPath(artist, track.title, allowTitleOnlyMatch = false)
+                    }
+        }
+        val localTrackPaths = setOfNotNull(track.id, track.realId?.takeIf { it.isNotBlank() }, filePath)
+        val recommendationTrackId = sequenceOf(track.id, track.realId)
+            .filterNotNull()
+            .firstOrNull { it.substringBefore(':').toLongOrNull()?.let { id -> id > 0 } == true }
+        return PlayerTrackRemoval(
+            track = track,
+            filePath = filePath,
+            localTrackPaths = localTrackPaths,
+            localPlaylistIds = playlistManager.localPlaylistsContaining(localTrackPaths),
+            yandexPlaylists = recommendationTrackId?.let(playlistManager::yandexPlaylistsContaining).orEmpty(),
+            recommendationTrackId = recommendationTrackId,
+            isHiddenFromRecommendations = playlistManager.isTrackDisliked(recommendationTrackId)
+        )
+    }
+
+    internal fun applyPlayerTrackRemoval(
+        target: PlayerTrackRemoval,
+        selection: TrackRemovalSelection
+    ) {
+        val track = target.track
+        val fileToDelete = target.filePath.takeIf { selection.deleteFile }
+        if (selection.removeFromPlaylists) {
+            playlistManager.removeTrackFromLocalPlaylists(target.localTrackPaths, target.localPlaylistIds)
+            val activeSession = playbackSessionManager.currentSession
+            if (fileToDelete == null && activeSession?.type == LastPlaybackType.LOCAL_PLAYLIST &&
+                activeSession.id in target.localPlaylistIds
+            ) {
+                trackListNavigation.active.removeTrack(track.id)
+            }
+            val previewSession = trackListNavigation.previewSession
+            if (previewSession?.type == LastPlaybackType.LOCAL_PLAYLIST && previewSession.id in target.localPlaylistIds) {
+                trackListCoordinator.removeTrack(track.id)
+            }
+            if (target.yandexPlaylists.isNotEmpty() && target.recommendationTrackId != null) {
+                val yandexTrack = track.copy(id = target.recommendationTrackId, realId = null)
+                launchSafe {
+                    for (playlist in target.yandexPlaylists) {
+                        removeTrackFromYandexPlaylist(playlist, yandexTrack)?.join()
+                    }
+                }
+            }
+        }
+
+        val recommendationId = target.recommendationTrackId
+        if (selection.changeRecommendations && recommendationId != null &&
+            playlistManager.isTrackDisliked(recommendationId) == target.isHiddenFromRecommendations
+        ) {
+            val isStillCurrent = PlaybackQueueManager.isSameTrack(track, playerTrackId ?: currentWaveTrack?.id)
+            playlistManager.toggleDislike(recommendationId, track.albums.firstOrNull()?.id) {
+                if (fileToDelete == null && isStillCurrent) playNextTrack()
+            }
+            if (isStillCurrent) {
+                playbackManager.systemMediaControls.updateLikedState(playlistManager.isTrackLiked(recommendationId))
+            }
+        }
+
+        if (fileToDelete != null) {
+            downloadManager.deleteTrack(
+                trackId = track.id,
+                trackTitle = track.title,
+                artistName = track.artists.joinToString { it.name },
+                exactFilePath = fileToDelete,
+                removePlaylistEntries = false
+            )
+        }
+    }
+
     /** Загрузить и обновить список всех лайкнутых треков пользователя в фоне */
     fun syncLikedTrackIds() {
         playlistManager.syncLikedTrackIds()
@@ -475,7 +559,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         getPlayingFilePath = { currentPlayingFilePath },
         onUpdatePlayingFilePath = { playbackManager.updateCurrentPlayingFilePath(it) },
         onStopPlayback = { playbackManager.stopPlayback() },
-        onTrackDeleted = { trackId, wasPlaying ->
+        onTrackDeleted = { trackId, wasPlaying, removePlaylistEntries ->
             val cleanId = trackId.removePrefix("local:")
             val queueTracks = trackListNavigation.active.loadedTracks
             val removedIndex = queueTracks.indexOfFirst {
@@ -489,7 +573,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             if (trackListNavigation.isPreview) trackListCoordinator.removeTrack(trackId)
 
             // Очищаем трек из локальных плейлистов
-            playlistManager.removeTrackFileFromAllPlaylists(cleanId)
+            if (removePlaylistEntries) playlistManager.removeTrackFileFromAllPlaylists(cleanId)
 
             // Если удаленный трек играл прямо сейчас и в списке еще остались треки —
             // плавно переключаемся на следующий трек в очереди
@@ -1354,7 +1438,11 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     /**
      * 🗑️ Удалить трек из персонального плейлиста Яндекс Музыки
      */
-    fun removeTrackFromYandexPlaylist(playlist: PlaylistInfo, track: FullTrackInfo, onComplete: ((Boolean) -> Unit)? = null) {
+    fun removeTrackFromYandexPlaylist(
+        playlist: PlaylistInfo,
+        track: FullTrackInfo,
+        onComplete: ((Boolean) -> Unit)? = null
+    ): Job? =
         playlistManager.removeTrackFromYandexPlaylist(
             playlist = playlist,
             track = track,
@@ -1366,7 +1454,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             },
             onComplete = onComplete
         )
-    }
 
     /**
      * 📋 Загрузить детали плейлиста Яндекс Музыки (с треками) для отображения в диалоге
