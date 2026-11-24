@@ -1,6 +1,10 @@
 package io.github.audiz
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,7 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -129,6 +136,8 @@ fun App() {
             var isMobilePlayerExpanded by remember {
                 mutableStateOf(loadAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED) == "true")
             }
+            var mobilePlayerDragDistance by remember { mutableFloatStateOf(0f) }
+            var isDraggingMobilePlayerOpen by remember { mutableStateOf(false) }
             fun updateMobilePlayerExpanded(expanded: Boolean) {
                 isMobilePlayerExpanded = expanded
                 saveAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED, expanded.toString())
@@ -311,7 +320,15 @@ fun App() {
                     }
                 } else null,
                 onExpandMobilePlayer = { updateMobilePlayerExpanded(true) },
-                onResetWave = { searchViewModel.resetToDefaultWave() }
+                onResetWave = { searchViewModel.resetToDefaultWave() },
+                onMobilePlayerDrag = { distance ->
+                    isDraggingMobilePlayerOpen = true
+                    mobilePlayerDragDistance = distance
+                },
+                onMobilePlayerDragEnd = { open ->
+                    if (open) updateMobilePlayerExpanded(true)
+                    isDraggingMobilePlayerOpen = false
+                }
             )
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -653,22 +670,52 @@ fun App() {
             // ==================================================
             // 📲 ПОЛНОЭКРАННЫЙ ПЛЕЕР ДЛЯ МОБИЛЬНЫХ (iOS / Android)
             // ==================================================
-            AnimatedVisibility(
-                visible = isMobileUi && isMobilePlayerExpanded,
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = androidx.compose.animation.core.tween(280, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(200)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = androidx.compose.animation.core.tween(250, easing = androidx.compose.animation.core.FastOutLinearInEasing)
-                ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(200))
-            ) {
-                MobileFullPlayerSheet(
-                    state = playerBarState.copy(currentPositionMs = searchViewModel.playerPositionMs),
-                    actions = playerBarActions,
-                    onDismiss = { updateMobilePlayerExpanded(false) }
-                )
+            if (isMobileUi) {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+                    val openingProgress = remember {
+                        Animatable(if (isMobilePlayerExpanded) 1f else 0f)
+                    }
+
+                    LaunchedEffect(isMobilePlayerExpanded, isDraggingMobilePlayerOpen, heightPx) {
+                        if (!isDraggingMobilePlayerOpen) {
+                            if (mobilePlayerDragDistance > 0f && heightPx > 0f) {
+                                openingProgress.snapTo((mobilePlayerDragDistance / heightPx).coerceIn(0f, 1f))
+                                mobilePlayerDragDistance = 0f
+                            }
+                            openingProgress.animateTo(
+                                targetValue = if (isMobilePlayerExpanded) 1f else 0f,
+                                animationSpec = if (isMobilePlayerExpanded) {
+                                    tween(280, easing = FastOutSlowInEasing)
+                                } else {
+                                    tween(250, easing = FastOutLinearInEasing)
+                                }
+                            )
+                        }
+                    }
+
+                    val showFullPlayer by remember {
+                        derivedStateOf {
+                            isMobilePlayerExpanded || mobilePlayerDragDistance > 0f || openingProgress.value > 0f
+                        }
+                    }
+                    if (showFullPlayer) {
+                        MobileFullPlayerSheet(
+                            state = playerBarState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                            actions = playerBarActions,
+                            onDismiss = { updateMobilePlayerExpanded(false) },
+                            modifier = Modifier.offset {
+                                val revealPx = if (isDraggingMobilePlayerOpen || mobilePlayerDragDistance > 0f) {
+                                    mobilePlayerDragDistance.coerceAtMost(heightPx)
+                                } else {
+                                    openingProgress.value * heightPx
+                                }
+                                IntOffset(0, (heightPx - revealPx).roundToInt())
+                            },
+                            backHandlerEnabled = isMobilePlayerExpanded
+                        )
+                    }
+                }
             }
 
             // ==================================================

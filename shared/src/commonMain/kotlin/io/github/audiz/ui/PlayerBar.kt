@@ -82,6 +82,8 @@ data class PlayerBarActions(
     val onOpenArtist: (() -> Unit)? = null,
     val onExpandMobilePlayer: (() -> Unit)? = null,
     val onResetWave: (() -> Unit)? = null,
+    val onMobilePlayerDrag: (Float) -> Unit = {},
+    val onMobilePlayerDragEnd: (Boolean) -> Unit = {},
 )
 
 /**

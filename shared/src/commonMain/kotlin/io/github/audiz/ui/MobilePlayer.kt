@@ -84,6 +84,37 @@ fun MobileMiniPlayerBar(
         (state.currentPositionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
+    val currentActions by rememberUpdatedState(actions)
+    val expandDragModifier = Modifier.pointerInput(Unit) {
+        val openThreshold = 96.dp.toPx()
+        var distance = 0f
+        var dragging = false
+
+        fun finish(open: Boolean) {
+            if (dragging) {
+                dragging = false
+                currentActions.onMobilePlayerDragEnd(open)
+            }
+        }
+
+        try {
+            detectVerticalDragGestures(
+                onDragStart = {
+                    dragging = true
+                    distance = 0f
+                },
+                onVerticalDrag = { _, delta ->
+                    distance = (distance - delta).coerceAtLeast(0f)
+                    currentActions.onMobilePlayerDrag(distance)
+                },
+                onDragEnd = { finish(distance >= openThreshold) },
+                onDragCancel = { finish(false) }
+            )
+        } finally {
+            finish(false)
+        }
+    }
+
     val coverBitmap = rememberCoverBitmap(state.coverUri, 200)
 
     ElevatedCard(
@@ -104,13 +135,7 @@ fun MobileMiniPlayerBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount < -12f) {
-                                onExpand()
-                            }
-                        }
-                    }
+                    .then(expandDragModifier)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -153,13 +178,7 @@ fun MobileMiniPlayerBar(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures { _, dragAmount ->
-                                if (dragAmount < -12f) {
-                                    onExpand()
-                                }
-                            }
-                        }
+                        .then(expandDragModifier)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -360,12 +379,13 @@ fun MobileFullPlayerSheet(
     state: PlayerBarState,
     actions: PlayerBarActions,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backHandlerEnabled: Boolean = true
 ) {
     val coverCornerRadius = 24.dp
 
     // Поддержка системной кнопки "Назад" (Android)
-    BackHandler(enabled = true, onBack = onDismiss)
+    BackHandler(enabled = backHandlerEnabled, onBack = onDismiss)
 
     val coroutineScope = rememberCoroutineScope()
     var dragOffsetY by remember { mutableStateOf(0f) }
