@@ -10,7 +10,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import io.github.audiz.AndroidFilePickerBridge
-import io.github.audiz.App // Импортируем точку входа из вашего модуля :shared
+import io.github.audiz.App
 import io.github.audiz.AppContextHolder
 import io.github.audiz.DeepLinkHandler
 import io.github.audiz.MediaPlaybackBridge
@@ -38,10 +38,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 🔥 Инициализируем контекст для SharedPreferences (сохранение cookie)
         AppContextHolder.appContext = applicationContext
 
-        // 🛑 Обработчик полного закрытия приложения по крестику из системного уведомления/плеера
         MediaPlaybackBridge.closeAppHandler = {
             try {
                 finishAndRemoveTask()
@@ -50,7 +48,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 📁 Связываем ActivityResult контракты с PlatformFilePicker
         AndroidFilePickerBridge.directoryPickerLauncher = { callback ->
             pendingDirectoryCallback = callback
             try {
@@ -73,7 +70,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 🛡️ Глобальный перехватчик необработанных исключений для записи краш-логов на диск
         val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
         val crashFile = java.io.File(applicationContext.filesDir, "crash_log.txt")
         if (crashFile.exists()) {
@@ -115,7 +111,6 @@ class MainActivity : ComponentActivity() {
             DeepLinkHandler.handleUrl(url)
         }
 
-        // 🔔 Запрашиваем необходимые разрешения: медиафайлы, уведомления и микрофон для визуализатора
         val permissionsToRequest = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -142,7 +137,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            App() // Запускаем ваш плеер
+            App()
         }
     }
 

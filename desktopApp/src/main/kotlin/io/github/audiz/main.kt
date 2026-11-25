@@ -35,7 +35,6 @@ fun main(args: Array<String>) {
             val out = PrintWriter(s.getOutputStream(), true)
             out.println(initialLink ?: "PING")
         }
-        // Экземпляр уже запущен — отправляем аргумент и завершаем этот процесс
         exitProcess(0)
     } catch (_: Exception) {
         // Запущенных экземпляров нет — этот процесс становится основным
@@ -89,7 +88,6 @@ fun main(args: Array<String>) {
     serverThread.isDaemon = true
     serverThread.start()
 
-    // Автоматическая регистрация протокола yamsync:// в Linux при необходимости
     registerLinuxDesktopSchemeIfNeeded()
 
     // 3. Поддержка системного URI Handler (AWT Desktop для macOS / Linux / Windows)
@@ -107,12 +105,10 @@ fun main(args: Array<String>) {
         }
     } catch (_: Throwable) {}
 
-    // 4. Если приложение запущено впервые с аргументом ссылки
     if (!initialLink.isNullOrBlank()) {
         DeepLinkHandler.handleUrl(initialLink)
     }
 
-    // 5. Запуск оконного Compose UI с сохранением и восстановлением размера окна
     val minWidth = 50.dp
     val minHeight = 50.dp
     val defaultWidth = 330.dp

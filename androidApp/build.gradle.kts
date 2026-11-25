@@ -63,9 +63,6 @@ android {
     }
 }
 
-// 🔥 ИДЕАЛЬНОЕ РЕШЕНИЕ: Настраиваем таргет компилятора Kotlin на уровне всего подмодуля.
-// Этот синтаксис на 100% распознается Kotlin 2.x, не зависит от багов AGP
-// и полностью решает проблему "Inconsistent JVM Target Compatibility" между Java и Котлином!
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)

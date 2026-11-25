@@ -28,12 +28,11 @@ compose.desktop {
             packageName = "yamsync"
             packageVersion = appVersion.let { if (it.count { c -> c == '.' } == 1) "$it.0" else it }
 
-            // Настройки сборки для Windows
             windows {
                 iconFile.set(project.file("icon.ico")) // Для Windows нужна иконка в формате .ico
-                shortcut = true // Создать ярлык на рабочем столе
-                menu = true // Добавить в меню "Пуск"
-                upgradeUuid = "3f3b9c8a-4d2e-4b1a-8c3f-9d8e7f6a5b4c" // Уникальный UUID вашего приложения
+                shortcut = true
+                menu = true
+                upgradeUuid = "3f3b9c8a-4d2e-4b1a-8c3f-9d8e7f6a5b4c"
             }
 
             linux {
