@@ -14,9 +14,6 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.CancellationException
 
-/**
- * 🎧 Клиент загрузки и подготовки аудиопотоков, метаданных воспроизведения и обложек
- */
 class MediaStreamClient(
     private val context: ApiSessionContext
 ) {
@@ -26,9 +23,6 @@ class MediaStreamClient(
         with(context) { applyAuthHeaders() }
     }
 
-    /**
-     * Загрузка аудиоданных трека и подготовка потока
-     */
     suspend fun downloadTrackAudio(
         trackId: String,
         quality: String = "1",
@@ -108,10 +102,6 @@ class MediaStreamClient(
         }
     }
 
-    /**
-     * 🌐 Получение информации о прямом потоке трека для локального стриминг-прокси.
-     * Получает метаданные и размер аудиофайла.
-     */
     suspend fun getTrackStreamMeta(
         trackId: String,
         quality: String = "1",
@@ -184,18 +174,12 @@ class MediaStreamClient(
         )
     }
 
-    /**
-     * 📥 Загрузка фрагмента аудиопотока по HTTP Range
-     */
     suspend fun fetchEncryptedRange(directUrl: String, startByte: Long, endByte: Long): ByteArray {
         return client.get(directUrl) {
             header("Range", "bytes=$startByte-$endByte")
         }.bodyAsBytes()
     }
 
-    /**
-     * 🖼️ Загрузка байтов изображения (обложки альбома, трека или плейлиста)
-     */
     suspend fun fetchImageBytes(url: String): ByteArray? {
         return try {
             val cleanUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) "https://$url" else url
@@ -266,9 +250,6 @@ class MediaStreamClient(
         }
     }
 
-    /**
-     * 📥 Загрузка аудиопотока трека по готовым пакетным метаданным
-     */
     suspend fun downloadTrackAudioFromInfo(info: BatchTrackDownloadInfo): DownloadedTrackAudio {
         val streamBytes: ByteArray = client.get(info.url).bodyAsBytes()
         val processedAudio = decryptAesCtr(streamBytes, io.ktor.util.hex(info.key), ByteArray(16))

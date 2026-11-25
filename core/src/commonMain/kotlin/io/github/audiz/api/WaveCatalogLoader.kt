@@ -14,9 +14,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
-/**
- * Загружает персональные настройки и рекомендованные станции «Моей волны» (Rotor).
- */
 class WaveCatalogLoader(private val fetch: suspend (String) -> String?) {
 
     suspend fun load(): WavePersonalCatalog = coroutineScope {
@@ -57,9 +54,6 @@ class WaveCatalogLoader(private val fetch: suspend (String) -> String?) {
     }
 }
 
-/**
- * Разбирает ответы /rotor/wave/settings, /rotor/stations/dashboard и /rotor/stations/list.
- */
 object WaveCatalogParser {
     private val json = Json {
         ignoreUnknownKeys = true

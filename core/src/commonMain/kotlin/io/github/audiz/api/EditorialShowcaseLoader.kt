@@ -24,9 +24,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 
-/**
- * Загружает редакционную витрину Яндекс Музыки: чарты, новые плейлисты и новые релизы.
- */
 class EditorialShowcaseLoader(private val fetch: suspend (String) -> String?) {
 
     suspend fun load(): EditorialShowcaseData = coroutineScope {
@@ -128,9 +125,6 @@ class EditorialShowcaseLoader(private val fetch: suspend (String) -> String?) {
     }
 }
 
-/**
- * Нормализует ответы /landing3 и /landing3/chart в компактные модели витрины.
- */
 object EditorialShowcaseCatalog {
     private val json = Json {
         ignoreUnknownKeys = true

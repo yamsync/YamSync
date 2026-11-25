@@ -12,9 +12,6 @@ import kotlinx.serialization.json.*
 import kotlin.coroutines.coroutineContext
 import io.github.audiz.core.CoreLogger
 
-/**
- * 📂 Клиент плейлистов, альбомов, отметок мне нравится/не нравится и истории прослушиваний
- */
 class PlaylistsClient(
     private val context: ApiSessionContext,
     private val searchClient: SearchClient? = null
@@ -55,11 +52,6 @@ class PlaylistsClient(
     suspend fun getLikedArtistIds(): Set<Long> =
         getLikedArtists().mapTo(linkedSetOf()) { it.id }
 
-    /**
-     * ❤️ Добавить трек в избранное (лайк)
-     * POST https://api.music.yandex.ru/users/{userId}/likes/tracks/add?track-id={cleanKey}
-     * Фолбэк: POST https://api.music.yandex.ru/users/{userId}/likes/tracks/add-multiple (с track-ids)
-     */
     suspend fun likeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
@@ -95,11 +87,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 💔 Удалить трек из избранного
-     * POST https://api.music.yandex.ru/users/{userId}/likes/tracks/remove?track-ids={cleanTrackId}
-     * Фолбэк: POST https://api.music.yandex.ru/users/{userId}/likes/tracks/{cleanTrackId}/remove
-     */
     suspend fun unlikeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
@@ -141,10 +128,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 💔 Добавить трек в дизлайки
-     * POST https://api.music.yandex.ru/users/{userId}/dislikes/tracks/add?track-id={trackKey}
-     */
     suspend fun dislikeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
@@ -179,11 +162,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 🤍 Снять дизлайк с трека
-     * POST https://api.music.yandex.ru/users/{userId}/dislikes/tracks/remove?track-ids={cleanTrackId}
-     * Фолбэк: POST https://api.music.yandex.ru/users/{userId}/dislikes/tracks/{cleanTrackId}/remove
-     */
     suspend fun undislikeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
@@ -225,9 +203,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 🔥 Получаем playlistUuid из landing-blocks/collection/playlist-with-likes
-     */
     suspend fun getLikesPlaylistUuid(): String {
         val rawText: String = client.get(ApiUrls.LANDING_LIKES_URL) {
             applyAuthHeaders()
@@ -244,10 +219,6 @@ class PlaylistsClient(
         return uuid
     }
 
-    /**
-     * ⚡ Быстрая загрузка плейлиста по UUID с получением полных метаданных треков за один запрос
-     * GET https://api.music.yandex.ru/playlist/{uuid}?richTracks=true
-     */
     suspend fun getPlaylistWithTracksByUuid(uuid: String): Pair<List<String>, List<FullTrackInfo>> {
         val rawText: String = client.get("${ApiUrls.PLAYLIST_BY_UUID_URL}/$uuid") {
             applyAuthHeaders()
@@ -296,9 +267,6 @@ class PlaylistsClient(
         return Pair(finalAllIds, richTracks)
     }
 
-    /**
-     * Получаем список ID треков из /playlist/{uuid}
-     */
     suspend fun getPlaylistTrackIdsByUuid(uuid: String): List<String> {
         val rawText: String = client.get("${ApiUrls.PLAYLIST_BY_UUID_URL}/$uuid") {
             applyAuthHeaders()
@@ -317,10 +285,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * ⚡ Быстрая загрузка плейлиста пользователя с получением полных метаданных треков за один запрос
-     * GET https://api.music.yandex.ru/users/{uid}/playlists/{kind}?richTracks=true
-     */
     suspend fun getPlaylistWithTracksByUidKind(uid: Long, kind: Long): Pair<List<String>, List<FullTrackInfo>> {
         val url = "https://api.music.yandex.ru/users/$uid/playlists/$kind"
         val rawText: String = client.get(url) {
@@ -370,10 +334,6 @@ class PlaylistsClient(
         return Pair(finalAllIds, richTracks)
     }
 
-    /**
-     * 💿 Получение треков альбома
-     * GET https://api.music.yandex.ru/albums/{albumId}/with-tracks
-     */
     suspend fun getAlbumWithTracks(albumId: Long): Pair<List<String>, List<FullTrackInfo>> {
         val url = "https://api.music.yandex.ru/albums/$albumId/with-tracks"
         val rawText: String = client.get(url) {
@@ -421,10 +381,6 @@ class PlaylistsClient(
         return Pair(allIds, richTracks)
     }
 
-    /**
-     * 🎵 Получаем список ID треков плейлиста по uid владельца и kind
-     * GET https://api.music.yandex.ru/users/{uid}/playlists/{kind}
-     */
     suspend fun getPlaylistTrackIds(uid: Long, kind: Long): List<String> {
         val url = "https://api.music.yandex.ru/users/$uid/playlists/$kind"
         val rawText: String = client.get(url) {
@@ -465,7 +421,6 @@ class PlaylistsClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Throwable) {
-                // Пробуем резервный хост
             }
         }
         return null
@@ -487,17 +442,10 @@ class PlaylistsClient(
         fetchJsonTextWithFallback(url, acceptLanguage = EditorialShowcaseCatalog.acceptLanguageForUrl(url))
     }.load()
 
-    /**
-     * 📊 Получаем треки конкретного чарта (например, "russia" или "world")
-     */
     suspend fun getChart(chartId: String = "russia"): ChartCollection? = EditorialShowcaseLoader { url ->
         fetchJsonTextWithFallback(url, acceptLanguage = EditorialShowcaseCatalog.acceptLanguageForUrl(url))
     }.loadChart(chartId)
 
-    /**
-     * 🎵 Получаем пользовательские плейлисты из аккаунта Яндекс Музыки
-     * GET https://api.music.yandex.ru/users/{uid}/playlists/list
-     */
     suspend fun getUserPlaylists(): List<PlaylistInfo> {
         val uid = context.getAccountUid() ?: context.cachedUserId ?: return emptyList()
         val url = "${ApiUrls.USER_PLAYLISTS_BASE_URL}/$uid/playlists/list"
@@ -552,10 +500,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 📋 Получить детальную информацию о плейлисте пользователя (с актуальной ревизией и списком треков)
-     * GET https://api.music.yandex.ru/users/{uid}/playlists/{kind}?richTracks=true
-     */
     suspend fun getPlaylistDetails(uid: Long, kind: Long): YandexPlaylistDetails? {
         val effectiveUid = if (uid > 0L) uid.toString() else (context.getAccountUid() ?: context.cachedUserId ?: uid.toString())
         val url = "${ApiUrls.USER_PLAYLISTS_BASE_URL}/$effectiveUid/playlists/$kind"
@@ -614,10 +558,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * ➕ Добавить трек в персональный плейлист Яндекс Музыки
-     * POST https://api.music.yandex.ru/users/{uid}/playlists/{kind}/change
-     */
     suspend fun addTrackToPlaylist(kind: Long, trackId: String, albumId: Long? = null): Boolean {
         val uid = context.getAccountUid() ?: context.cachedUserId ?: return false
         val numericUid = uid.toLongOrNull() ?: 0L
@@ -702,10 +642,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 🗑️ Удалить трек из персонального плейлиста Яндекс Музыки
-     * POST https://api.music.yandex.ru/users/{uid}/playlists/{kind}/change
-     */
     suspend fun removeTrackFromPlaylist(kind: Long, trackId: String): Boolean {
         val uid = context.getAccountUid() ?: context.cachedUserId ?: return false
         val numericUid = uid.toLongOrNull() ?: 0L
@@ -768,10 +704,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * ➕ Создать новый плейлист в аккаунте Яндекс Музыки
-     * POST https://api.music.yandex.ru/users/{uid}/playlists/create
-     */
     suspend fun createPlaylist(title: String, visibility: String = "public"): PlaylistInfo? {
         val uid = context.getAccountUid() ?: context.cachedUserId ?: return null
         val cleanTitle = title.trim().ifBlank { "Новый плейлист" }
@@ -818,10 +750,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * ✏️ Переименовать персональный плейлист в аккаунте Яндекс Музыки
-     * POST https://api.music.yandex.ru/users/{uid}/playlists/{kind}/name?value={new_title}
-     */
     suspend fun renamePlaylist(kind: Long, newTitle: String, uid: Long? = null): PlaylistInfo? {
         val targetUid = (if (uid != null && uid > 0L) uid.toString() else null)
             ?: context.getAccountUid() ?: context.cachedUserId ?: return null
@@ -872,9 +800,6 @@ class PlaylistsClient(
         }
     }
 
-    /**
-     * 🔥 Получаем историю прослушивания (уникальные ID треков)
-     */
     suspend fun getHistoryTrackIds(): List<String> {
         val rawText: String = client.get(ApiUrls.HISTORY_URL) {
             applyAuthHeaders()

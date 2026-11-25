@@ -8,7 +8,6 @@ plugins {
     id("com.android.library")
 }
 
-// 🔒 Считывание ключа доступа из ENV (CI) или local.properties (локально)
 val localPropsFile = rootProject.file("local.properties")
 val localProps = Properties().apply {
     if (localPropsFile.exists()) {

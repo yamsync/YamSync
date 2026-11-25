@@ -2,29 +2,22 @@ package io.github.audiz.models
 
 import kotlinx.serialization.Serializable
 
-/**
- * 🎵 Тип последней активной сессии воспроизведения.
- */
 @Serializable
 enum class LastPlaybackType {
-    WAVE,                  // «Моя Волна» (персональная или тематическая)
-    DOWNLOADED,            // Сохраненная на диске музыка («Загруженная музыка»)
-    LOCAL_PLAYLIST,        // Персональный оффлайн-плейлист из вкладки «💾 Локальные»
+    WAVE,
+    DOWNLOADED,
+    LOCAL_PLAYLIST,
     CUSTOM_SOURCE,         // Добавленный пользователем источник (папка/файл/M3U)
     CUSTOM_FOLDER,         // Подпапка, запущенная через встроенный проводник папок
-    YANDEX_USER_PLAYLIST,  // Пользовательский плейлист из Яндекс Музыки
+    YANDEX_USER_PLAYLIST,
     YANDEX_UUID,           // Персональный или кураторский плейлист Яндекс по UUID
-    YANDEX_CHART,          // Чарт Яндекс Музыки (Россия, Мир и т.д.)
-    YANDEX_LIKES,          // Плейлист «Мне нравится»
-    YANDEX_HISTORY,        // Плейлист «История прослушиваний»
+    YANDEX_CHART,
+    YANDEX_LIKES,
+    YANDEX_HISTORY,
     ALBUM,
-    ARTIST                 // Популярные треки артиста
+    ARTIST
 }
 
-/**
- * 💾 Модель сохраненной последней сессии воспроизведения.
- * Позволяет восстановить экран плейлиста или Мою волну при перезапуске приложения.
- */
 @Serializable
 data class LastPlaybackSession(
     val type: LastPlaybackType,

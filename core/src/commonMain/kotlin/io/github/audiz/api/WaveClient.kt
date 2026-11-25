@@ -10,9 +10,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import io.github.audiz.core.CoreLogger
 
-/**
- * 🌊 Клиент «Моей Волны» (Rotor API и сессии Ynison)
- */
 class WaveClient(
     private val context: ApiSessionContext,
     val ynisonService: YnisonService = YnisonService(context.client)
@@ -46,23 +43,16 @@ class WaveClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Throwable) {
-                // Пробуем резервный хост
             }
         }
         return null
     }
 
-    /**
-     * 🌊 Получить персональные настройки и рекомендованные станции Моей волны
-     */
     suspend fun getWavePersonalCatalog(): WavePersonalCatalog = WaveCatalogLoader { url ->
         val path = "/" + url.substringAfter("yandex.ru/").substringAfter("yandex.net/")
         getRotorWithFallback(path, acceptLanguage = ApiSessionContext.ACCEPT_LANGUAGE_RU)
     }.load()
 
-    /**
-     * 🌊 Получить session_id Моей волны через Ynison WebSocket
-     */
     suspend fun fetchYnisonWaveSessionId(): String? {
         val token = context.accessToken
         if (token.isBlank()) {
@@ -103,9 +93,6 @@ class WaveClient(
         throw IllegalStateException("Все серверы Яндекс Музыки временно недоступны")
     }
 
-    /**
-     * 🔄 Клонировать Rotor-сессию по waveSessionId
-     */
     suspend fun cloneRotorSessionRaw(waveSessionId: String): String {
         val safeSid = waveSessionId.encodeURLPathPart()
         CoreLogger.d("WaveClient", "POST /rotor/session/$safeSid/clone")
@@ -132,17 +119,11 @@ class WaveClient(
         return json.decodeFromJsonElement(RotorSessionResponse.serializer(), targetObj)
     }
 
-    /**
-     * 🔄 Клонировать Rotor-сессию и получить начальные 5 треков
-     */
     suspend fun cloneRotorSession(waveSessionId: String): RotorSessionResponse {
         val raw = cloneRotorSessionRaw(waveSessionId)
         return parseRotorResponse(raw)
     }
 
-    /**
-     * 🌊 Создать Rotor-сессию по списку seeds (например, для жанровой Волны: ["genre:metal"])
-     */
     suspend fun createRotorSessionRaw(seeds: List<String>): String {
         CoreLogger.d("WaveClient", "Создание Rotor-сессии with seeds: $seeds")
         val seedsJson = JsonArray(seeds.map(::JsonPrimitive)).toString()
@@ -165,9 +146,6 @@ class WaveClient(
         return text
     }
 
-    /**
-     * 🌊 Создать Rotor-сессию с треками по списку seeds
-     */
     suspend fun createRotorSession(seeds: List<String>): RotorSessionResponse {
         val raw = createRotorSessionRaw(seeds)
         var parsed = parseRotorResponse(raw)
@@ -220,9 +198,6 @@ class WaveClient(
         )
     }
 
-    /**
-     * ⏭ Получить следующие треки / отправить фидбеки (сырой JSON)
-     */
     suspend fun getRotorNextTracksRaw(
         radioSessionId: String,
         feedbacks: List<RotorFeedbackItem>,
@@ -251,10 +226,6 @@ class WaveClient(
         return text
     }
 
-    /**
-     * 🚀 Отправить фидбек trackStarted при старте трека в Моей волне
-     * POST https://api.music.yandex.ru/rotor/session/{radioSessionId}/feedback/
-     */
     suspend fun sendRotorFeedbackTrackStarted(
         radioSessionId: String,
         batchId: String,
@@ -277,10 +248,6 @@ class WaveClient(
         }
     }
 
-    /**
-     * 📊 Отправить отчет о прослушивании трека в Яндекс Музыку
-     * POST https://api.music.yandex.ru/plays?clientNow={ISO}
-     */
     suspend fun sendPlayReport(
         trackId: String,
         albumId: String,
@@ -311,9 +278,6 @@ class WaveClient(
     }
 }
 
-/**
- * 🕒 Получить текущую дату-время в формате ISO-8601 UTC с миллисекундами
- */
 fun currentIsoUtcTimestamp(): String {
     val date = io.ktor.util.date.GMTDate()
     val millis = (io.ktor.util.date.getTimeMillis() % 1000).toString().padStart(3, '0')
@@ -326,9 +290,6 @@ fun currentIsoUtcTimestamp(): String {
     return "${y}-${m}-${d}T${h}:${min}:${s}.${millis}Z"
 }
 
-/**
- * 🔑 Сгенерировать случайный UUID v4
- */
 fun generatePlayUuid(): String {
     val chars = "0123456789abcdef"
     val randomBytes = kotlin.random.Random.nextBytes(16)
@@ -344,9 +305,6 @@ fun generatePlayUuid(): String {
     }
 }
 
-/**
- * 🎵 Элемент отзыва (фидбека) для Моей Волны (Rotor)
- */
 data class RotorFeedbackItem(
     val batchId: String,
     val trackId: String,

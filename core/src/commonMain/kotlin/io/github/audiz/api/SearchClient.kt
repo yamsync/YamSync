@@ -9,9 +9,6 @@ import io.ktor.http.*
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.CancellationException
 
-/**
- * 🔍 Клиент поиска, артистов и пакетного получения информации о треках
- */
 class SearchClient(
     private val context: ApiSessionContext
 ) {
@@ -65,7 +62,6 @@ class SearchClient(
             throw IllegalStateException("Ничего не найдено по запросу '$query'")
         }
 
-        // Преобразуем bestResults (главный артист, волна по артисту и т.д.) в TypedResult и добавляем в начало выдачи
         val bestTypedResults = parsed.result.bestResults.mapNotNull { parseBestResultItem(it) }
         val allResults = if (bestTypedResults.isNotEmpty()) {
             val enrichedBestResults = bestTypedResults.map { item ->

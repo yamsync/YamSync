@@ -2,9 +2,6 @@ package io.github.audiz.models
 
 import kotlinx.serialization.Serializable
 
-/**
- * 📱 Описание устройства-участника P2P-синхронизации YamSync
- */
 @Serializable
 data class YamSyncDevice(
     val id: String,
@@ -26,7 +23,7 @@ data class YamSyncTrack(
     val album: String = "",
     val durationMs: Long = 0L,
     val fileSize: Long = 0L,
-    val checksum: String = "" // Хеш для сопоставления идентичности файлов
+    val checksum: String = ""
 ) {
     /** Уникальный ключ трека для надежной дедупликации без привязки к наличию файла на диске */
     val matchKey: String
@@ -42,9 +39,6 @@ data class YamSyncTrack(
         }
 }
 
-/**
- * 📋 Плейлист в формате обмена YamSync
- */
 @Serializable
 data class YamSyncPlaylist(
     val id: String,
@@ -57,9 +51,6 @@ data class YamSyncPlaylist(
     val trackCount: Int get() = tracks.size
 }
 
-/**
- * 📦 Манифест медиатеки устройства для обмена при синхронизации
- */
 @Serializable
 data class YamSyncManifest(
     val device: YamSyncDevice,
@@ -68,30 +59,21 @@ data class YamSyncManifest(
     val generatedAt: Long = 0L
 )
 
-/**
- * 🔀 Стратегия разрешения конфликтов при слиянии плейлиста
- */
 @Serializable
 enum class YamSyncResolution {
-    KEEP_LOCAL,   // Оставить свои (локальная версия)
-    TAKE_REMOTE,  // Принять чужие (заменить версией с удаленного устройства)
+    KEEP_LOCAL,
+    TAKE_REMOTE,
     MERGE_ALL     // Объединить всё (слияние уникальных треков с сохранением порядка)
 }
 
-/**
- * 🔍 Статус различий между локальной и удаленной версией плейлиста
- */
 @Serializable
 enum class YamSyncDiffState {
-    IDENTICAL,   // Идентичны на обоих устройствах
-    NEW_LOCAL,   // Есть только на локальном устройстве
-    NEW_REMOTE,  // Есть только на удаленном устройстве
+    IDENTICAL,
+    NEW_LOCAL,
+    NEW_REMOTE,
     MODIFIED     // Есть на обоих, но список треков или метаданные различаются
 }
 
-/**
- * 📊 Результат сравнения конкретного плейлиста
- */
 @Serializable
 data class YamSyncPlaylistDiff(
     val playlistId: String,
@@ -105,9 +87,6 @@ data class YamSyncPlaylistDiff(
     val resolution: YamSyncResolution = YamSyncResolution.MERGE_ALL
 )
 
-/**
- * 🚀 Прогресс передачи аудиофайла по сети
- */
 @Serializable
 data class YamSyncTransferProgress(
     val fileName: String,
@@ -125,9 +104,6 @@ data class YamSyncTransferProgress(
         get() = (progressFraction * 100).toInt()
 }
 
-/**
- * 📥 Пакет применения слияния плейлистов
- */
 @Serializable
 data class YamSyncMergePayload(
     val playlists: List<YamSyncPlaylist>

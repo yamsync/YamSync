@@ -9,7 +9,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.*
 
-/** Объединяет витрину и доступные аккаунту дополнительные персональные подборки. */
 class PersonalPlaylistLoader(private val fetch: suspend (String) -> String?) {
     suspend fun load(): List<PersonalPlaylistItemData> = coroutineScope {
         val sources = listOf(
@@ -37,7 +36,6 @@ class PersonalPlaylistLoader(private val fetch: suspend (String) -> String?) {
         }
 }
 
-/** Нормализует разные ответы API в общую модель карточки и убирает заглушки. */
 object PersonalPlaylistCatalog {
     private val json = Json { ignoreUnknownKeys = true }
     private val generatedTypes = setOf("playlistOfTheDay", "recentTracks", "neverHeard", "missedLikes", "podcasts", "origin")

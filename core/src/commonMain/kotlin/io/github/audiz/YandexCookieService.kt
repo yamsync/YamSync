@@ -7,9 +7,6 @@ import io.ktor.http.*
 import io.github.audiz.core.CoreLogger
 import kotlinx.coroutines.CancellationException
 
-/**
- * 🔑 Сервис авторизации и извлечения OAuth access_token для Яндекс Музыки
- */
 class YandexCookieService {
 
     companion object {
@@ -38,9 +35,6 @@ class YandexCookieService {
 
     fun extractAccessToken(input: String): String = Companion.extractAccessToken(input)
 
-    /**
-     * Обменять access_token на Session_id cookie через паспорт Яндекса (fallback)
-     */
     suspend fun getSessionCookieFromToken(rawTokenOrUrl: String): String? {
         val token = extractAccessToken(rawTokenOrUrl)
         if (token.isBlank()) return null

@@ -3,7 +3,6 @@ package io.github.audiz.core
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-// Общая кроссплатформенная модель для распарсенных параметров трека
 data class ParsedTrackInfo(val url: String, val hex: String, val type: String)
 
 @Serializable

@@ -2,15 +2,6 @@ package io.github.audiz.api
 
 import io.github.audiz.models.*
 
-/**
- * 🏛️ Фасад репозитория Яндекс Музыки (MusicRepository).
- * Делегирует выполнение специализированным API-клиентам:
- * - [ApiSessionContext]: управление Ktor-клиентом, токеном авторизации и заголовками
- * - [SearchClient]: поиск, получение треков артиста, детализация треков
- * - [PlaylistsClient]: плейлисты, альбомы, лайки/дизлайки, история
- * - [MediaStreamClient]: загрузка аудиопотоков, получение метаданных потоков, обложек
- * - [WaveClient]: сессии «Моей Волны», Rotor API, фидбеки и отчеты о прослушивании
- */
 class MusicRepository(
     val context: ApiSessionContext = ApiSessionContext(),
     val searchClient: SearchClient = SearchClient(context),
@@ -19,8 +10,6 @@ class MusicRepository(
     val ynisonService: YnisonService = YnisonService(context.client),
     val waveClient: WaveClient = WaveClient(context, ynisonService)
 ) {
-    // === Авторизация и сессия ===
-
     fun getAccessToken(): String = context.accessToken
 
     fun getSessionToken(): String = context.accessToken
@@ -39,8 +28,6 @@ class MusicRepository(
 
     suspend fun getAccountPlusInfo(): Boolean = context.getAccountPlusInfo()
 
-    // === Отметки «Мне нравится» / «Не нравится» ===
-
     suspend fun getLikedArtists(): List<FullArtistInfo> = playlistsClient.getLikedArtists()
 
     suspend fun getLikedArtistIds(): Set<Long> = playlistsClient.getLikedArtistIds()
@@ -57,8 +44,6 @@ class MusicRepository(
     suspend fun undislikeTrack(trackIdWithAlbum: String): Boolean =
         playlistsClient.undislikeTrack(trackIdWithAlbum)
 
-    // === Поиск и информация о треках ===
-
     suspend fun searchInstant(query: String): YandexMusicResponse =
         searchClient.searchInstant(query)
 
@@ -70,8 +55,6 @@ class MusicRepository(
 
     suspend fun getTracksDetails(trackIds: List<String>): YandexTracksDetailsResponse =
         searchClient.getTracksDetails(trackIds)
-
-    // === Плейлисты, альбомы и история ===
 
     suspend fun getLikesPlaylistUuid(): String =
         playlistsClient.getLikesPlaylistUuid()
@@ -121,8 +104,6 @@ class MusicRepository(
     suspend fun getHistoryTrackIds(): List<String> =
         playlistsClient.getHistoryTrackIds()
 
-    // === Потоки и медиа ===
-
     suspend fun downloadTrackAudio(
         trackId: String,
         quality: String = "1",
@@ -152,8 +133,6 @@ class MusicRepository(
 
     suspend fun fetchImageBytes(url: String): ByteArray? =
         mediaStreamClient.fetchImageBytes(url)
-
-    // === Моя Волна (Rotor & Ynison) ===
 
     suspend fun fetchYnisonWaveSessionId(): String? =
         waveClient.fetchYnisonWaveSessionId()

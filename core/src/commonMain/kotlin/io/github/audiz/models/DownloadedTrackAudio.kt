@@ -1,8 +1,5 @@
 package io.github.audiz.models
 
-/**
- * Модель аудиоданных трека.
- */
 data class DownloadedTrackAudio(
     val result: ByteArray,
     val type: String,
@@ -28,9 +25,6 @@ data class DownloadedTrackAudio(
     }
 }
 
-/**
- * Метаданные прямого аудиопотока трека из пакетного запроса
- */
 @kotlinx.serialization.Serializable
 data class BatchTrackDownloadInfo(
     val trackId: String,

@@ -121,7 +121,6 @@ data class TrackInfo(
     )
 }
 
-// 🔥 ДОБАВЛЕНО: Специальная модель для артистов внутри быстрого поиска треков
 @Serializable
 data class TrackArtistInfo(
     val id: Long, // 🔥 Здесь строго Long, чтобы парсинг не падал на числах без кавычек
@@ -133,7 +132,7 @@ data class TrackArtistInfo(
 data class YandexArtistTrackIdsResponse(
     val invocationInfo: InvocationInfo? = null,
     val error: YandexError? = null,
-    val result: List<String> = emptyList() // Массив ID треков
+    val result: List<String> = emptyList()
 )
 
 @Serializable
@@ -163,10 +162,6 @@ data class FullTrackInfo(
     val coverUri: String? = null
 )
 
-/**
- * Проверяет, является ли идентификатор трека ссылкой на локальный файл на устройстве
- * (а не облачным треком Яндекс Музыки).
- */
 fun isLocalTrackId(id: String?): Boolean {
     if (id.isNullOrBlank()) return false
     val trimmed = id.trim()
@@ -433,9 +428,6 @@ data class WavePersonalCatalog(
         get() = personalStations.isEmpty() && categories.isEmpty()
 }
 
-/**
- * Метаданные прямого аудиопотока для потокового воспроизведения и чанковой загрузки
- */
 data class TrackStreamMeta(
     val directUrl: String,
     val aesKey: ByteArray,

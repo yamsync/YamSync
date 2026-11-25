@@ -10,9 +10,6 @@ import kotlin.random.Random
 import io.github.audiz.core.CoreLogger
 import kotlinx.coroutines.CancellationException
 
-/**
- * ⚡ Сервис для работы с Yandex Music Ynison WebSocket API (Моя Волна / синхронизация очереди)
- */
 class YnisonService(private val client: HttpClient) {
 
     var lastYnisonHost: String? = null
@@ -147,7 +144,6 @@ class YnisonService(private val client: HttpClient) {
         deviceId: String = generateUuid(),
         initialSessionId: String = (Random.nextLong(1_000_000_000_000_000_000L, 8_999_999_999_999_999_999L)).toString()
     ): String? {
-        // Шаг 1: Получаем тикет редиректора
         val redirect = getRedirect(token, userId, deviceId, initialSessionId)
         if (redirect == null) {
             if (lastYnisonError == null) {
@@ -177,7 +173,6 @@ class YnisonService(private val client: HttpClient) {
         val rid = generateUuid()
         val versionLong = 5898445453701648000L
 
-        // Запрос initial full state
         val updateStatePayload = """{"update_full_state":{"player_state":{"player_queue":{"current_playable_index":-1,"entity_id":"","entity_type":"VARIOUS","playable_list":[],"options":{"repeat_mode":"NONE"},"shuffle_optional":null,"entity_context":"BASED_ON_ENTITY_BY_DEFAULT","version":{"device_id":"$deviceId","version":$versionLong,"timestamp_ms":0},"from_optional":"","initial_entity_optional":null,"adding_options_optional":null,"queue":null},"status":{"duration_ms":0,"paused":true,"playback_speed":1,"progress_ms":0,"version":{"device_id":"$deviceId","version":$versionLong,"timestamp_ms":0}},"player_queue_inject_optional":null},"device":{"volume":0.5399999999999998,"capabilities":{"can_be_player":true,"can_be_remote_controller":false,"volume_granularity":20},"info":{"app_name":"Chrome","app_version":"131.0.0.0","title":"Browser Chrome","device_id":"$deviceId","type":"WEB"},"volume_info":{"volume":0.5399999999999998,"version":null},"is_shadow":true},"is_currently_active":false,"sync_state_from_eov_optional":null},"rid":"$rid","player_action_timestamp_ms":0,"activity_interception_type":"DO_NOT_INTERCEPT_BY_DEFAULT"}"""
 
         try {
@@ -199,7 +194,6 @@ class YnisonService(private val client: HttpClient) {
                             val text = frame.readText()
                             CoreLogger.d("YnisonService", "Получен ответ от PutYnisonState (длина ${text.length})")
                             
-                            // 1. Попытка распарсить через Json
                             try {
                                 val json = Json { ignoreUnknownKeys = true }
                                 val root = json.parseToJsonElement(text).jsonObject
@@ -232,7 +226,6 @@ class YnisonService(private val client: HttpClient) {
                                 CoreLogger.e("YnisonService", "Ошибка парсинга JSON ответа: ${e.message}", e)
                             }
 
-                            // 2. Fallback через регулярное выражение
                             val regexRadio = Regex(""""radio_options"\s*:\s*\{\s*"session_id"\s*:\s*"([^"]+)"""")
                             val matchRadio = regexRadio.find(text)
                             if (matchRadio != null) {

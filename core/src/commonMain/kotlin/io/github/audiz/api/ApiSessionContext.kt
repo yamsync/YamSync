@@ -15,12 +15,6 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.CancellationException
 
-/**
- * 🌐 Сетевой контекст и сессия для API клиентов:
- * - Общий Ktor HttpClient с таймаутами и WebSockets
- * - Управление токеном авторизации и кэширование ID пользователя
- * - Формирование заголовков устройств и клиента
- */
 class ApiSessionContext(
     val client: HttpClient = createDefaultHttpClient()
 ) {
@@ -71,9 +65,6 @@ class ApiSessionContext(
         header(HttpHeaders.AcceptLanguage, acceptLanguage)
     }
 
-    /**
-     * 👤 Получить ID пользователя (кэшируется)
-     */
     suspend fun getUserId(): String? {
         cachedUserId?.let { return it }
         val uid = getAccountUid()
@@ -83,9 +74,6 @@ class ApiSessionContext(
         return uid
     }
 
-    /**
-     * 👤 Получить UID аккаунта из эндпоинта /account/status
-     */
     suspend fun getAccountUid(): String? {
         getAuthHeader() ?: return null
         return try {
@@ -108,9 +96,6 @@ class ApiSessionContext(
         }
     }
 
-    /**
-     * 👑 Проверить наличие подписки Плюс
-     */
     suspend fun getAccountPlusInfo(): Boolean {
         getAuthHeader() ?: return false
         return try {
