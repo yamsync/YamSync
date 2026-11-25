@@ -42,7 +42,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.ui.text.font.FontWeight
-import io.github.audiz.models.FullTrackInfo
+import io.github.audiz.ui.AppDialog
+import io.github.audiz.ui.rememberAppNavigationState
 import io.github.audiz.ui.SearchInputField
 import io.github.audiz.ui.SearchResultsList
 import io.github.audiz.ui.ArtistTracksList
@@ -70,12 +71,6 @@ import io.github.audiz.dsp.EqualizerEngine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-private data class TrackDeleteConfirmInfo(
-    val trackId: String,
-    val title: String,
-    val artist: String
-)
 
 @Composable
 fun App() {
@@ -145,30 +140,12 @@ fun App() {
             val showTracksScreen = searchViewModel.isTracksListVisible &&
                 (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
             val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
-            var showCollections by remember { mutableStateOf(false) }
+            val nav = rememberAppNavigationState()
             val homeScrollState = rememberScrollState()
             val collectionsGridState = rememberLazyGridState()
-            var settingsExpanded by remember { mutableStateOf(false) }
-            var isMobilePlayerExpanded by remember {
-                mutableStateOf(loadAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED) == "true")
-            }
-            var mobilePlayerDragTop by remember { mutableStateOf<Float?>(null) }
-            var isDraggingMobilePlayerOpen by remember { mutableStateOf(false) }
-            fun updateMobilePlayerExpanded(expanded: Boolean) {
-                isMobilePlayerExpanded = expanded
-                saveAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED, expanded.toString())
-            }
 
-            var showUpNextDialog by remember { mutableStateOf(false) }
-            // Окно «Далее» открыто из полноэкранного мобильного плеера: при закрытии возвращаемся в него.
-            var upNextOpenedFromPlayer by remember { mutableStateOf(false) }
-            var showEqualizerDialog by remember { mutableStateOf(false) }
-            var equalizerInitialTab by remember { mutableStateOf(0) }
-            var showPlaylistsDialog by remember { mutableStateOf(false) }
-            var mediaLibraryTab by remember { mutableIntStateOf(0) }
-            fun updateShowPlaylistsDialog(show: Boolean) {
-                showPlaylistsDialog = show
-            }
+            var dialog by remember { mutableStateOf<AppDialog?>(null) }
+            // Не входит в [dialog]: открывается и по входящей ссылке поверх любого открытого окна.
             var showYamSyncDialog by remember { mutableStateOf(false) }
 
             // 🔗 Обработка глубоких ссылок синхронизации YamSync (сканирование QR-кода камерой)
@@ -181,10 +158,6 @@ fun App() {
                     }
                 }
             }
-            var trackForPlaylistDialog by remember { mutableStateOf<FullTrackInfo?>(null) }
-            var showLogsDialog by remember { mutableStateOf(false) }
-            var trackToDelete by remember { mutableStateOf<TrackDeleteConfirmInfo?>(null) }
-            var playerTrackToRemove by remember { mutableStateOf<FullTrackInfo?>(null) }
             val eqState by EqualizerEngine.state.collectAsState()
             val isMobileUi = searchViewModel.isMobileUi
 
@@ -245,7 +218,7 @@ fun App() {
                 isDisliked = if (searchViewModel.isCurrentTrackLocal) false else searchViewModel.isCurrentTrackDisliked,
                 isInPlaylist = isCurrentTrackInPlaylist,
                 playlistCount = currentTrackPlaylistsCount,
-                isConfigActive = settingsExpanded,
+                isConfigActive = nav.settingsExpanded,
                 isEqualizerActive = eqState.isEnabled,
                 hasTrackCandidate = hasTrackCandidate,
                 isWave = isWaveActiveOrPreloaded,
@@ -254,18 +227,18 @@ fun App() {
                 } else null,
                 coverUri = searchViewModel.playerCoverUri ?: if (isWaveActiveOrPreloaded) currentWave?.coverUri else null,
                 isMobile = isMobileUi,
-                isQueueOpen = showUpNextDialog || (showTracksScreen && !searchViewModel.isPreviewingTrackList),
+                isQueueOpen = dialog is AppDialog.UpNext || (showTracksScreen && !searchViewModel.isPreviewingTrackList),
                 upNextCount = searchViewModel.upNextState.pending.size,
                 isDownloadedOrLocal = isCurrentTrackDownloadedOrLocal
             )
 
             val openPlayingPlaylist: () -> Unit = {
-                val fromPlayer = if (showUpNextDialog) upNextOpenedFromPlayer else isMobilePlayerExpanded
-                showUpNextDialog = false
-                upNextOpenedFromPlayer = false
+                val upNext = dialog as? AppDialog.UpNext
+                val fromPlayer = upNext?.openedFromPlayer ?: nav.isMobilePlayerExpanded
+                if (upNext != null) dialog = null
                 if (isMobileUi && fromPlayer) {
                     searchViewModel.openQueueView(TracksListOrigin.MOBILE_PLAYER)
-                    updateMobilePlayerExpanded(false)
+                    nav.updateMobilePlayerExpanded(false)
                 } else {
                     searchViewModel.openQueueView(TracksListOrigin.HOME)
                 }
@@ -279,7 +252,7 @@ fun App() {
                 onToggleShuffle = { searchViewModel.toggleShuffle() },
                 onNext = { searchViewModel.playNextTrack() },
                 onPrev = { searchViewModel.playPrevTrack() },
-                onConfigClick = { settingsExpanded = !settingsExpanded },
+                onConfigClick = { nav.settingsExpanded = !nav.settingsExpanded },
                 onToggleRecordToDisk = if (searchViewModel.isCurrentTrackLocal) null else {
                     {
                         if (searchViewModel.isCurrentTrackSavedToDisk) {
@@ -287,7 +260,7 @@ fun App() {
                             val title = searchViewModel.playerTrackTitle.ifBlank { currentWave?.title ?: "" }
                             val artist = searchViewModel.playerArtistName.ifBlank { currentWave?.artists?.joinToString { it.name } ?: "" }
                             if (trackId != null) {
-                                trackToDelete = TrackDeleteConfirmInfo(
+                                dialog = AppDialog.DeleteTrack(
                                     trackId = trackId,
                                     title = title,
                                     artist = artist
@@ -304,12 +277,12 @@ fun App() {
                         ?: currentWave
                         ?: searchViewModel.plannedNextTrack
                     if (track != null) {
-                        trackForPlaylistDialog = track
+                        dialog = AppDialog.AddToPlaylist(track)
                     }
                 },
                 onToggleFavorite = if (searchViewModel.isCurrentTrackLocal) null else { { searchViewModel.toggleLikeCurrentTrack() } },
                 onManageTrackRemoval = {
-                    playerTrackToRemove = searchViewModel.getCurrentPlayingTrackInfo()
+                    searchViewModel.getCurrentPlayingTrackInfo()?.let { dialog = AppDialog.PlayerTrackRemoval(it) }
                 },
                 onToggleDislike = {
                     if (isCurrentTrackDownloadedOrLocal) {
@@ -317,7 +290,7 @@ fun App() {
                         val title = searchViewModel.playerTrackTitle.ifBlank { currentWave?.title ?: "" }
                         val artist = searchViewModel.playerArtistName.ifBlank { currentWave?.artists?.joinToString { it.name } ?: "" }
                         if (trackId != null) {
-                            trackToDelete = TrackDeleteConfirmInfo(
+                            dialog = AppDialog.DeleteTrack(
                                 trackId = trackId,
                                 title = title,
                                 artist = artist
@@ -328,33 +301,31 @@ fun App() {
                     }
                 },
                 onOpenEqualizer = {
-                    equalizerInitialTab = 0
-                    showEqualizerDialog = true
+                    dialog = AppDialog.Equalizer(initialTab = 0)
                 },
                 onOpenQueue = {
                     if (searchViewModel.upNextState.pending.isEmpty()) {
                         openPlayingPlaylist()
                     } else {
-                        upNextOpenedFromPlayer = isMobileUi && isMobilePlayerExpanded
-                        showUpNextDialog = true
+                        dialog = AppDialog.UpNext(openedFromPlayer = isMobileUi && nav.isMobilePlayerExpanded)
                     }
                 },
                 onOpenArtist = if (displayArtist.isNotBlank()) {
                     {
                         searchViewModel.openCurrentTrackArtist {
-                            updateMobilePlayerExpanded(false)
+                            nav.updateMobilePlayerExpanded(false)
                         }
                     }
                 } else null,
-                onExpandMobilePlayer = { updateMobilePlayerExpanded(true) },
+                onExpandMobilePlayer = { nav.updateMobilePlayerExpanded(true) },
                 onResetWave = { searchViewModel.resetToDefaultWave() },
                 onMobilePlayerDrag = { top ->
-                    isDraggingMobilePlayerOpen = true
-                    mobilePlayerDragTop = top
+                    nav.isDraggingMobilePlayerOpen = true
+                    nav.mobilePlayerDragTop = top
                 },
                 onMobilePlayerDragEnd = { open ->
-                    if (open) updateMobilePlayerExpanded(true)
-                    isDraggingMobilePlayerOpen = false
+                    if (open) nav.updateMobilePlayerExpanded(true)
+                    nav.isDraggingMobilePlayerOpen = false
                 }
             )
 
@@ -370,9 +341,10 @@ fun App() {
                     ) {
                         io.github.audiz.support.StarSupportPrompt(
                             manager = starPromptManager,
-                            canShow = !settingsExpanded && !showEqualizerDialog && !showPlaylistsDialog &&
-                                !showYamSyncDialog && !showLogsDialog && trackForPlaylistDialog == null &&
-                                trackToDelete == null && !(isMobileUi && isMobilePlayerExpanded) &&
+                            // Окна «Далее» и удаления трека из плеера подсказку не скрывают.
+                            canShow = !nav.settingsExpanded &&
+                                (dialog == null || dialog is AppDialog.UpNext || dialog is AppDialog.PlayerTrackRemoval) &&
+                                !showYamSyncDialog && !(isMobileUi && nav.isMobilePlayerExpanded) &&
                                 searchViewModel.errorMessage == null && !searchViewModel.isLoading &&
                                 !searchViewModel.isPlayTrackLoading,
                             isPlaying = searchViewModel.playerIsPlaying && !searchViewModel.playerIsPaused &&
@@ -391,8 +363,8 @@ fun App() {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).padding(top = 16.dp)) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         if (!showTracksScreen) {
-                            BackHandler(enabled = isSearchVisible || showCollections) {
-                                if (isSearchVisible) searchViewModel.clearSearch() else showCollections = false
+                            BackHandler(enabled = isSearchVisible || nav.showCollections) {
+                                if (isSearchVisible) searchViewModel.clearSearch() else nav.showCollections = false
                             }
                             // ==================================================
                             // 👤 ЭКРАН А: ПОИСК И ВЫДАЧА
@@ -416,7 +388,7 @@ fun App() {
                                             onSearchClick = { searchViewModel.performSearch() },
                                             onClear = { searchViewModel.clearSearch() },
                                             isLoading = searchViewModel.activeSearchQuery == searchViewModel.searchQuery.trim(),
-                                            onSettingsClick = { settingsExpanded = true },
+                                            onSettingsClick = { nav.settingsExpanded = true },
                                             loadSuggestions = searchViewModel::getSearchSuggestions,
                                             onSuggestionClick = searchViewModel::selectSearchSuggestion
                                         )
@@ -438,7 +410,7 @@ fun App() {
                                 exit = shrinkVertically() + fadeOut()
                             ) {
                                 Column(Modifier.padding(top = 12.dp)) {
-                                    if (showCollections) {
+                                    if (nav.showCollections) {
                                         CollectionsShowcaseScreen(
                                             personalPlaylists = searchViewModel.personalPlaylists,
                                             charts = searchViewModel.editorialCharts,
@@ -446,7 +418,7 @@ fun App() {
                                             newReleases = searchViewModel.editorialNewReleases,
                                             isLoading = searchViewModel.isPersonalPlaylistsLoading || searchViewModel.isEditorialShowcaseLoading,
                                             gridState = collectionsGridState,
-                                            onBack = { showCollections = false },
+                                            onBack = { nav.showCollections = false },
                                             onRefresh = {
                                                 searchViewModel.loadPersonalPlaylists()
                                                 searchViewModel.loadEditorialShowcase(forceRefresh = true)
@@ -482,11 +454,11 @@ fun App() {
                                             scrollState = homeScrollState,
                                             onOpenMediaLibrary = {
                                                 searchViewModel.resetBrowsedFolder()
-                                                updateShowPlaylistsDialog(true)
+                                                dialog = AppDialog.MediaLibrary
                                             },
                                             onOpenDevices = { showYamSyncDialog = true },
                                             onOpenCollections = {
-                                                showCollections = true
+                                                nav.showCollections = true
                                                 if (searchViewModel.editorialCharts.isEmpty() &&
                                                     searchViewModel.editorialPlaylists.isEmpty() &&
                                                     searchViewModel.editorialNewReleases.isEmpty()
@@ -530,7 +502,7 @@ fun App() {
                                                 text = displayText,
                                                 color = MaterialTheme.colorScheme.error,
                                                 style = MaterialTheme.typography.bodyMedium,
-                                                modifier = Modifier.weight(1f).clickable { showLogsDialog = true }
+                                                modifier = Modifier.weight(1f).clickable { dialog = AppDialog.Logs }
                                             )
                                             IconButton(
                                                 onClick = { searchViewModel.errorMessage = null },
@@ -555,7 +527,7 @@ fun App() {
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontSize = 11.sp,
-                                                modifier = Modifier.clickable { showLogsDialog = true }
+                                                modifier = Modifier.clickable { dialog = AppDialog.Logs }
                                             )
                                             if (isMissingFilesError) {
                                                 TextButton(
@@ -611,9 +583,9 @@ fun App() {
                                     isTrackDownloaded = { artist, title -> searchViewModel.isTrackDownloaded(artist, title) },
                                     isTrackInPlaylist = { searchViewModel.isTrackInAnyPlaylist(it) },
                                     onDeleteTrack = { trackId, trackTitle, artistName ->
-                                        trackToDelete = TrackDeleteConfirmInfo(trackId, trackTitle, artistName)
+                                        dialog = AppDialog.DeleteTrack(trackId, trackTitle, artistName)
                                     },
-                                    onAddToPlaylist = { track -> trackForPlaylistDialog = track }
+                                    onAddToPlaylist = { track -> dialog = AppDialog.AddToPlaylist(track) }
                                 )
                             }
                         }
@@ -631,15 +603,15 @@ fun App() {
                                     searchViewModel.closeArtistTracks()
                                     searchViewModel.activeBrowsedFolderSource = targetSource
                                     searchViewModel.activeBrowsedFolderPath = targetPath
-                                    updateShowPlaylistsDialog(true)
+                                    dialog = AppDialog.MediaLibrary
                                 }
                                 isBackGoingToMediaLibrary -> {
                                     searchViewModel.closeArtistTracks()
-                                    updateShowPlaylistsDialog(true)
+                                    dialog = AppDialog.MediaLibrary
                                 }
                                 isBackGoingToMobilePlayer -> {
                                     searchViewModel.closeArtistTracks()
-                                    updateMobilePlayerExpanded(true)
+                                    nav.updateMobilePlayerExpanded(true)
                                 }
                                 else -> searchViewModel.closeArtistTracks()
                             }
@@ -659,7 +631,7 @@ fun App() {
                             canLoadMore = searchViewModel.canLoadMore,
                             onLoadMore = { searchViewModel.loadNextPage() },
                             onHomeClick = {
-                                showCollections = false
+                                nav.showCollections = false
                                 searchViewModel.clearSearch()
                                 searchViewModel.closeArtistTracks()
                             },
@@ -712,9 +684,9 @@ fun App() {
                                 }
                             } else null,
                             onDeleteTrack = { trackId, trackTitle, artistName ->
-                                trackToDelete = TrackDeleteConfirmInfo(trackId, trackTitle, artistName)
+                                dialog = AppDialog.DeleteTrack(trackId, trackTitle, artistName)
                             },
-                            onAddToPlaylist = { track -> trackForPlaylistDialog = track },
+                            onAddToPlaylist = { track -> dialog = AppDialog.AddToPlaylist(track) },
                             onRemoveFromPlaylist = if (searchViewModel.isDownloadedTracksScreen) {
                                 val currentLocal = searchViewModel.localPlaylists.firstOrNull { it.title == searchViewModel.currentScreenTitle }
                                 if (currentLocal != null) {
@@ -748,19 +720,19 @@ fun App() {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
                     val openingProgress = remember {
-                        Animatable(if (isMobilePlayerExpanded) 1f else 0f)
+                        Animatable(if (nav.isMobilePlayerExpanded) 1f else 0f)
                     }
 
-                    LaunchedEffect(isMobilePlayerExpanded, isDraggingMobilePlayerOpen, heightPx) {
-                        if (!isDraggingMobilePlayerOpen) {
-                            val draggedTop = mobilePlayerDragTop
+                    LaunchedEffect(nav.isMobilePlayerExpanded, nav.isDraggingMobilePlayerOpen, heightPx) {
+                        if (!nav.isDraggingMobilePlayerOpen) {
+                            val draggedTop = nav.mobilePlayerDragTop
                             if (draggedTop != null && heightPx > 0f) {
                                 openingProgress.snapTo((1f - draggedTop / heightPx).coerceIn(0f, 1f))
-                                mobilePlayerDragTop = null
+                                nav.mobilePlayerDragTop = null
                             }
                             openingProgress.animateTo(
-                                targetValue = if (isMobilePlayerExpanded) 1f else 0f,
-                                animationSpec = if (isMobilePlayerExpanded) {
+                                targetValue = if (nav.isMobilePlayerExpanded) 1f else 0f,
+                                animationSpec = if (nav.isMobilePlayerExpanded) {
                                     tween(280, easing = FastOutSlowInEasing)
                                 } else {
                                     tween(250, easing = FastOutLinearInEasing)
@@ -771,23 +743,23 @@ fun App() {
 
                     val showFullPlayer by remember {
                         derivedStateOf {
-                            isMobilePlayerExpanded || mobilePlayerDragTop != null || openingProgress.value > 0f
+                            nav.isMobilePlayerExpanded || nav.mobilePlayerDragTop != null || openingProgress.value > 0f
                         }
                     }
                     if (showFullPlayer) {
                         MobileFullPlayerSheet(
                             state = playerBarState.copy(currentPositionMs = searchViewModel.playerPositionMs),
                             actions = playerBarActions,
-                            onDismiss = { updateMobilePlayerExpanded(false) },
+                            onDismiss = { nav.updateMobilePlayerExpanded(false) },
                             modifier = Modifier.offset {
-                                val top = mobilePlayerDragTop ?: if (isDraggingMobilePlayerOpen) {
+                                val top = nav.mobilePlayerDragTop ?: if (nav.isDraggingMobilePlayerOpen) {
                                     heightPx
                                 } else {
                                     (1f - openingProgress.value) * heightPx
                                 }
                                 IntOffset(0, top.coerceIn(0f, heightPx).roundToInt())
                             },
-                            backHandlerEnabled = isMobilePlayerExpanded
+                            backHandlerEnabled = nav.isMobilePlayerExpanded
                         )
                     }
                 }
@@ -797,7 +769,7 @@ fun App() {
             // ⚙️ НАСТРОЙКИ (Оверлей поверх Scaffold и плеера)
             // ==================================================
             SettingsDialog(
-                visible = settingsExpanded,
+                visible = nav.settingsExpanded,
                 state = SettingsState(
                     isRecordToDiskActive = searchViewModel.isRecordToDiskActive,
                     selectedQuality = searchViewModel.selectedQuality,
@@ -821,7 +793,7 @@ fun App() {
                     waveLoopHistoryLimit = searchViewModel.waveLoopHistoryLimit,
                 ),
                 actions = SettingsActions(
-                    onClose = { settingsExpanded = false },
+                    onClose = { nav.settingsExpanded = false },
                     onToggleRecordToDisk = { searchViewModel.toggleRecordToDisk(it) },
                     onSaveQuality = { searchViewModel.saveQuality(it) },
                     onSaveTheme = { searchViewModel.saveTheme(it) },
@@ -833,13 +805,12 @@ fun App() {
                     onClearPlaylistsCache = { searchViewModel.clearPlaylistsCache() },
                     onClearAllDownloadedMusic = { searchViewModel.clearAllDownloadedMusic() },
                     onOpenEqualizer = { tab ->
-                        settingsExpanded = false
-                        equalizerInitialTab = tab
-                        showEqualizerDialog = true
+                        nav.settingsExpanded = false
+                        dialog = AppDialog.Equalizer(initialTab = tab)
                     },
                     onOpenLogs = {
-                        settingsExpanded = false
-                        showLogsDialog = true
+                        nav.settingsExpanded = false
+                        dialog = AppDialog.Logs
                     },
                     onSaveUiMode = { searchViewModel.saveUiMode(it) },
                     onSaveCrossfade = { searchViewModel.changeCrossfade(it) },
@@ -852,34 +823,67 @@ fun App() {
                 )
             )
 
-            if (showEqualizerDialog) {
-                EqualizerDialog(
-                    initialTab = equalizerInitialTab,
-                    onDismissRequest = { showEqualizerDialog = false }
-                )
-            }
+            when (val current = dialog) {
+                null -> Unit
 
-            if (showUpNextDialog) {
-                UpNextDialog(
+                is AppDialog.Equalizer -> EqualizerDialog(
+                    initialTab = current.initialTab,
+                    onDismissRequest = { dialog = null }
+                )
+
+                is AppDialog.UpNext -> UpNextDialog(
                     viewModel = searchViewModel,
                     onDismiss = {
-                        showUpNextDialog = false
-                        if (upNextOpenedFromPlayer) updateMobilePlayerExpanded(true)
-                        upNextOpenedFromPlayer = false
+                        dialog = null
+                        if (current.openedFromPlayer) nav.updateMobilePlayerExpanded(true)
                     },
                     onOpenPlaylist = openPlayingPlaylist
                 )
-            }
 
-            if (showPlaylistsDialog) {
-                PlaylistsDialog(
+                AppDialog.MediaLibrary -> PlaylistsDialog(
                     viewModel = searchViewModel,
-                    onDismiss = { updateShowPlaylistsDialog(false) },
-                    selectedTab = mediaLibraryTab,
-                    onTabSelected = { mediaLibraryTab = it },
+                    onDismiss = { dialog = null },
+                    selectedTab = nav.mediaLibraryTab,
+                    onTabSelected = { nav.mediaLibraryTab = it },
                     onOpenSync = {
-                        updateShowPlaylistsDialog(false)
+                        dialog = null
                         showYamSyncDialog = true
+                    }
+                )
+
+                AppDialog.Logs -> LogsDialog(
+                    onDismiss = { dialog = null }
+                )
+
+                is AppDialog.AddToPlaylist -> AddToPlaylistDialog(
+                    track = current.track,
+                    viewModel = searchViewModel,
+                    onDismiss = { dialog = null }
+                )
+
+                is AppDialog.PlayerTrackRemoval -> PlayerTrackRemovalDialog(
+                    track = current.track,
+                    loadOptions = { searchViewModel.preparePlayerTrackRemoval(current.track) },
+                    onDismiss = { dialog = null },
+                    onConfirm = { target, selection ->
+                        dialog = null
+                        searchViewModel.applyPlayerTrackRemoval(target, selection)
+                    }
+                )
+
+                // ==================================================
+                // 🗑️ ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ФАЙЛА С ДИСКА
+                // ==================================================
+                is AppDialog.DeleteTrack -> DeleteTrackConfirmDialog(
+                    target = current,
+                    onDismiss = { dialog = null },
+                    onConfirm = {
+                        dialog = null
+                        searchViewModel.deleteTrack(
+                            trackId = current.trackId,
+                            trackTitle = current.title,
+                            artistName = current.artist
+                        )
                     }
                 )
             }
@@ -890,95 +894,61 @@ fun App() {
                     onDismiss = { showYamSyncDialog = false }
                 )
             }
-
-            if (showLogsDialog) {
-                LogsDialog(
-                    onDismiss = { showLogsDialog = false }
-                )
-            }
-
-            trackForPlaylistDialog?.let { track ->
-                AddToPlaylistDialog(
-                    track = track,
-                    viewModel = searchViewModel,
-                    onDismiss = { trackForPlaylistDialog = null }
-                )
-            }
-
-            playerTrackToRemove?.let { track ->
-                PlayerTrackRemovalDialog(
-                    track = track,
-                    loadOptions = { searchViewModel.preparePlayerTrackRemoval(track) },
-                    onDismiss = { playerTrackToRemove = null },
-                    onConfirm = { target, selection ->
-                        playerTrackToRemove = null
-                        searchViewModel.applyPlayerTrackRemoval(target, selection)
-                    }
-                )
-            }
-
-            // ==================================================
-            // 🗑️ ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ФАЙЛА С ДИСКА
-            // ==================================================
-            trackToDelete?.let { target ->
-                val trackDesc = buildString {
-                    append("«${target.title.ifBlank { "Без названия" }}»")
-                    if (target.artist.isNotBlank()) {
-                        append(" (${target.artist})")
-                    }
-                }
-                AlertDialog(
-                    onDismissRequest = { trackToDelete = null },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.DeleteOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    title = {
-                        Text(
-                            text = "Удаление файла с диска",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "Вы действительно хотите удалить аудиофайл $trackDesc из памяти устройства? Это действие нельзя отменить.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                val toDelete = target
-                                trackToDelete = null
-                                searchViewModel.deleteTrack(
-                                    trackId = toDelete.trackId,
-                                    trackTitle = toDelete.title,
-                                    artistName = toDelete.artist
-                                )
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
-                            )
-                        ) {
-                            Text("Удалить")
-                        }
-                    },
-                    dismissButton = {
-                        OutlinedButton(
-                            onClick = { trackToDelete = null }
-                        ) {
-                            Text("Отмена")
-                        }
-                    }
-                )
-            }
             } // closes outer Box
         }
     }
 }
+}
+
+@Composable
+private fun DeleteTrackConfirmDialog(
+    target: AppDialog.DeleteTrack,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val trackDesc = buildString {
+        append("«${target.title.ifBlank { "Без названия" }}»")
+        if (target.artist.isNotBlank()) {
+            append(" (${target.artist})")
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.DeleteOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text(
+                text = "Удаление файла с диска",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Text(
+                text = "Вы действительно хотите удалить аудиофайл $trackDesc из памяти устройства? Это действие нельзя отменить.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("Удалить")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
 }
