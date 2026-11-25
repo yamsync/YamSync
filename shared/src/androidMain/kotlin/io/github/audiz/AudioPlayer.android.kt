@@ -33,6 +33,8 @@ import kotlin.math.roundToInt
 import io.github.audiz.stream.AndroidStreamMediaDataSource
 import io.github.audiz.stream.LocalStreamProxy
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import io.github.audiz.dsp.VisualizerConstants
 
 /**
  * 🎵 Android-реализация аудиоплеера на основе MediaPlayer
@@ -285,7 +287,7 @@ actual class AudioPlayer actual constructor() {
 
             crossfadeJob = playerScope.launch {
                 for (step in 1..steps) {
-                    kotlinx.coroutines.delay(stepIntervalMs)
+                    delay(stepIntervalMs)
                     val t = step.toFloat() / steps
                     val outFactor = kotlin.math.cos(t * (kotlin.math.PI / 2)).toFloat().coerceIn(0f, 1f)
                     val inFactor = kotlin.math.sin(t * (kotlin.math.PI / 2)).toFloat().coerceIn(0f, 1f)
@@ -566,7 +568,7 @@ actual class AudioPlayer actual constructor() {
 
             // Таймаут на асинхронную буферизацию (12 секунд)
             prepareTimeoutJob = playerScope.launch {
-                kotlinx.coroutines.delay(12000L)
+                delay(12000L)
                 if (sessionId == currentSessionId && preparingMediaPlayer === newPlayer) {
                     AppLogger.w("AudioPlayer", "Таймаут буферизации для сессии $sessionId")
                     preparingMediaPlayer = null
@@ -944,6 +946,6 @@ actual class AudioPlayer actual constructor() {
 
     companion object {
         // 🎛️ 25 частотных полос из единого источника VisualizerConstants
-        private val FREQ_RANGES_25 get() = io.github.audiz.dsp.VisualizerConstants.FREQ_RANGES_25
+        private val FREQ_RANGES_25 get() = VisualizerConstants.FREQ_RANGES_25
     }
 }

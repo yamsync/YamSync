@@ -129,7 +129,7 @@ class YnisonService(private val client: HttpClient) {
                 lastYnisonError = "Таймаут подключения к редиректору ynison.music.yandex.ru"
             }
         } catch (e: Throwable) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
+            if (e is CancellationException) throw e
             val msg = e.message ?: "Сбой соединения"
             lastYnisonError = "Ошибка редиректора ynison.music.yandex.ru: $msg"
             CoreLogger.w("YnisonService", "Ошибка WebSocket редиректора: ${e.message}")
@@ -260,7 +260,7 @@ class YnisonService(private val client: HttpClient) {
                 lastYnisonError = "Хост ${redirect.host} не прислал сессию Волны"
             }
         } catch (e: Throwable) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
+            if (e is CancellationException) throw e
             val msg = e.message ?: "Сбой соединения"
             lastYnisonError = "Ошибка хоста ${redirect.host}: $msg"
             CoreLogger.w("YnisonService", "Ошибка при работе с PutYnisonState: ${e.message}")

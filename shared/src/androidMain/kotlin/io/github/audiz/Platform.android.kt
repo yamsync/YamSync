@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.os.Environment
 import io.github.audiz.util.AppLogger
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 
 // 🔥 Контекст для доступа к SharedPreferences (инициализируется при старте приложения)
 object AppContextHolder {
@@ -52,7 +54,7 @@ actual fun getPlatform(): Platform = AndroidPlatform()
 
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()
 
-actual val DispatcherIO: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO
+actual val DispatcherIO: CoroutineDispatcher = Dispatchers.IO
 
 actual inline fun <R> synchronized(lock: Any, block: () -> R): R = kotlin.synchronized(lock, block)
 

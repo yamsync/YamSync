@@ -30,6 +30,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.audiz.util.AppLogger
+import io.github.audiz.dsp.AudioVisualizer
 
 /**
  * 🎵 iOS-реализация аудиоплеера на основе AVFoundation (AVPlayer)
@@ -432,7 +433,7 @@ actual class AudioPlayer actual constructor() {
         currentResourceLoaderDelegate?.cancelAll()
         currentResourceLoaderDelegate = null
         IosSpectrumFeed.reset()
-        io.github.audiz.dsp.AudioVisualizer.reset()
+        AudioVisualizer.reset()
         tempFilePath?.let {
             platform.Foundation.NSFileManager.defaultManager.removeItemAtPath(it, null)
             tempFilePath = null
@@ -462,7 +463,7 @@ actual class AudioPlayer actual constructor() {
         val seconds = positionMs / 1000.0
         val targetTime = CMTimeMakeWithSeconds(seconds, 1000)
         IosSpectrumFeed.reset()
-        io.github.audiz.dsp.AudioVisualizer.clearDelayQueue()
+        AudioVisualizer.clearDelayQueue()
         avPlayer?.seekToTime(targetTime)
     }
 
