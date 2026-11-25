@@ -125,8 +125,7 @@ internal fun CompactTrackRow(
     modifier: Modifier = Modifier
 ) {
     val artists = track.artists.joinToString { it.name }
-    val album = track.albums.firstOrNull()?.title
-    val subtitle = listOfNotNull(artists.takeIf { it.isNotBlank() }, album).joinToString(" · ")
+    val album = track.albums.firstOrNull()?.title?.takeIf { it.isNotBlank() }
 
     val cardShape = RoundedCornerShape(12.dp)
     Column(
@@ -152,7 +151,6 @@ internal fun CompactTrackRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            AiTrackBadge(track.id, track.artists, Modifier.padding(start = 6.dp))
             if (track.durationMs > 0) {
                 val sec = track.durationMs / 1000
                 Text(
@@ -167,14 +165,38 @@ internal fun CompactTrackRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f).padding(end = 8.dp)
-            )
+            ) {
+                if (artists.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.weight(2f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = artists,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        AiArtistBadge(track.artists)
+                    }
+                }
+                if (album != null) {
+                    Text(
+                        text = if (artists.isNotBlank()) " · $album" else album,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (state.isActive) {
                     FilledIconButton(

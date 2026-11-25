@@ -104,7 +104,6 @@ fun TrackItemCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    AiTrackBadge(track.id, track.artists)
                 }
 
                 // ⏱ Длительность трека
@@ -142,8 +141,10 @@ fun TrackItemCard(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
+                            AiArtistBadge(track.artists)
                         }
                     }
                     if (showAlbum && track.albums.isNotEmpty()) {
