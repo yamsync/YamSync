@@ -16,20 +16,12 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
-import kotlinx.serialization.json.Json
 import platform.AVFoundation.*
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.Foundation.*
 import platform.posix.memcpy
 
 private const val STORAGE_PATH_KEY = "music_storage_path"
-
-private val playlistJson = Json {
-    ignoreUnknownKeys = true
-    encodeDefaults = true
-    isLenient = true
-}
-
 
 actual fun getDefaultMusicDir(): String {
     val paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true)
@@ -99,6 +91,36 @@ fun resolveIosLocalPath(path: String): String {
 }
 
 actual fun resolveLocalPath(path: String): String = resolveIosLocalPath(path)
+
+internal actual fun writeTextFileAtomic(path: String, text: String): Boolean {
+    val dir = path.substringBeforeLast('/', "")
+    val fileManager = NSFileManager.defaultManager
+    if (dir.isNotEmpty() && !fileManager.fileExistsAtPath(dir)) {
+        fileManager.createDirectoryAtPath(dir, withIntermediateDirectories = true, attributes = null, error = null)
+    }
+    return NSString.create(string = text).writeToFile(path, atomically = true, encoding = NSUTF8StringEncoding, error = null)
+}
+
+internal actual fun fileLastModifiedMs(path: String): Long? {
+    val attrs = NSFileManager.defaultManager.attributesOfItemAtPath(path, error = null) ?: return null
+    if (attrs[NSFileType] != NSFileTypeRegular) return null
+    val modDate = attrs[NSFileModificationDate] as? NSDate ?: return null
+    return (modDate.timeIntervalSince1970 * 1000.0).toLong()
+}
+
+internal actual fun listFileNames(dirPath: String): List<String> {
+    val fileManager = NSFileManager.defaultManager
+    val items = fileManager.contentsOfDirectoryAtPath(dirPath, error = null) ?: return emptyList()
+    return items.filterIsInstance<String>().filter { name ->
+        fileManager.attributesOfItemAtPath("$dirPath/$name", error = null)?.get(NSFileType) == NSFileTypeRegular
+    }
+}
+
+internal actual fun deleteRegularFile(path: String): Boolean =
+    fileLastModifiedMs(path) != null && NSFileManager.defaultManager.removeItemAtPath(path, error = null)
+
+/** Контейнер приложения на iOS может смениться, поэтому плейлисты ищутся и в папке по умолчанию. */
+internal actual fun localPlaylistsFallbackDir(): String? = getDefaultMusicDir()
 
 @OptIn(ExperimentalForeignApi::class)
 actual fun openTrackFileWriter(basePath: String, artist: String, fileName: String): TrackFileWriter {
@@ -399,316 +421,6 @@ actual fun scanDownloadedTracks(basePath: String): List<FullTrackInfo> {
 }
 
 @OptIn(BetaInteropApi::class)
-actual fun savePlaylistTracksCache(basePath: String, cacheKey: String, tracks: List<FullTrackInfo>) {
-    if (basePath.isBlank() || tracks.isEmpty() || cacheKey.isBlank()) return
-    try {
-        val cacheDir = "$basePath/playlists_cache"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(cacheDir)) {
-            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
-        }
-        val cleanKey = sanitizeDirName(cacheKey)
-        val filePath = "$cacheDir/$cleanKey.json"
-        val jsonStr = playlistJson.encodeToString(
-            kotlinx.serialization.builtins.ListSerializer(FullTrackInfo.serializer()),
-            tracks
-        )
-        val nsStr = NSString.create(string = jsonStr)
-        nsStr.writeToFile(filePath, atomically = true, encoding = NSUTF8StringEncoding, error = null)
-        cleanExpiredPlaylistCaches(basePath)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка сохранения кеша плейлиста: ${e.message}")
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun loadPlaylistTracksCache(basePath: String, cacheKey: String): List<FullTrackInfo> {
-    if (basePath.isBlank() || cacheKey.isBlank()) return emptyList()
-    try {
-        val cleanKey = sanitizeDirName(cacheKey)
-        val filePath = "$basePath/playlists_cache/$cleanKey.json"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(filePath)) return emptyList()
-
-        // Проверяем срок жизни кеша: кеши старше 7 дней удаляются
-        val attrs = fileManager.attributesOfItemAtPath(filePath, error = null)
-        val modDate = attrs?.get(NSFileModificationDate) as? NSDate
-        if (modDate != null) {
-            val nowMs = NSDate().timeIntervalSince1970 * 1000.0
-            val fileTimeMs = modDate.timeIntervalSince1970 * 1000.0
-            if ((nowMs - fileTimeMs) > PLAYLIST_CACHE_MAX_AGE_MS) {
-                fileManager.removeItemAtPath(filePath, error = null)
-                return emptyList()
-            }
-        }
-
-        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return emptyList()
-        return playlistJson.decodeFromString(
-            kotlinx.serialization.builtins.ListSerializer(FullTrackInfo.serializer()),
-            nsStr
-        )
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка чтения кеша плейлиста: ${e.message}")
-        return emptyList()
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun cleanExpiredPlaylistCaches(basePath: String, maxAgeMs: Long): Int {
-    if (basePath.isBlank()) return 0
-    val cacheDir = "$basePath/playlists_cache"
-    val fileManager = NSFileManager.defaultManager
-    if (!fileManager.fileExistsAtPath(cacheDir)) return 0
-    val items = fileManager.contentsOfDirectoryAtPath(cacheDir, error = null) as? List<String> ?: return 0
-    val nowMs = NSDate().timeIntervalSince1970 * 1000.0
-    var count = 0
-    for (item in items) {
-        if (!item.endsWith(".json")) continue
-        val filePath = "$cacheDir/$item"
-        val attrs = fileManager.attributesOfItemAtPath(filePath, error = null)
-        val modDate = attrs?.get(NSFileModificationDate) as? NSDate
-        if (modDate != null) {
-            val fileTimeMs = modDate.timeIntervalSince1970 * 1000.0
-            if ((nowMs - fileTimeMs) > maxAgeMs) {
-                if (fileManager.removeItemAtPath(filePath, error = null)) {
-                    count++
-                }
-            }
-        }
-    }
-    return count
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun savePersonalPlaylistsCache(basePath: String, items: List<PersonalPlaylistItemData>) {
-    if (basePath.isBlank() || items.isEmpty()) return
-    try {
-        val cacheDir = "$basePath/playlists_cache"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(cacheDir)) {
-            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
-        }
-        val filePath = "$cacheDir/_personal_playlists.json"
-        val jsonStr = playlistJson.encodeToString(
-            kotlinx.serialization.builtins.ListSerializer(PersonalPlaylistItemData.serializer()),
-            items
-        )
-        val nsStr = NSString.create(string = jsonStr)
-        nsStr.writeToFile(filePath, atomically = true, encoding = NSUTF8StringEncoding, error = null)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка сохранения кеша персональных плейлистов: ${e.message}")
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun loadPersonalPlaylistsCache(basePath: String): List<PersonalPlaylistItemData> {
-    if (basePath.isBlank()) return emptyList()
-    try {
-        val filePath = "$basePath/playlists_cache/_personal_playlists.json"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(filePath)) return emptyList()
-        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return emptyList()
-        return playlistJson.decodeFromString(
-            kotlinx.serialization.builtins.ListSerializer(PersonalPlaylistItemData.serializer()),
-            nsStr
-        )
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка чтения кеша персональных плейлистов: ${e.message}")
-        return emptyList()
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun saveUserPlaylistsCache(basePath: String, items: List<PlaylistInfo>) {
-    if (basePath.isBlank() || items.isEmpty()) return
-    try {
-        val cacheDir = "$basePath/playlists_cache"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(cacheDir)) {
-            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
-        }
-        val jsonStr = playlistJson.encodeToString(
-            kotlinx.serialization.builtins.ListSerializer(PlaylistInfo.serializer()),
-            items
-        )
-        val nsStr = jsonStr as NSString
-        nsStr.writeToFile("$cacheDir/_user_playlists.json", atomically = true, encoding = NSUTF8StringEncoding, error = null)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка сохранения кеша пользовательских плейлистов: ${e.message}")
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun loadUserPlaylistsCache(basePath: String): List<PlaylistInfo> {
-    if (basePath.isBlank()) return emptyList()
-    try {
-        val filePath = "$basePath/playlists_cache/_user_playlists.json"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(filePath)) return emptyList()
-        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return emptyList()
-        return playlistJson.decodeFromString(
-            kotlinx.serialization.builtins.ListSerializer(PlaylistInfo.serializer()),
-            nsStr
-        )
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка чтения кеша пользовательских плейлистов: ${e.message}")
-        return emptyList()
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun saveEditorialShowcaseCache(basePath: String, showcase: EditorialShowcaseData) {
-    if (basePath.isBlank() || showcase.isEmpty) return
-    try {
-        val cacheDir = "$basePath/playlists_cache"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(cacheDir)) {
-            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
-        }
-        val jsonStr = playlistJson.encodeToString(EditorialShowcaseData.serializer(), showcase)
-        val nsStr = jsonStr as NSString
-        nsStr.writeToFile("$cacheDir/_editorial_showcase.json", atomically = true, encoding = NSUTF8StringEncoding, error = null)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка сохранения кеша витрины: ${e.message}")
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? {
-    if (basePath.isBlank()) return null
-    return try {
-        val filePath = "$basePath/playlists_cache/_editorial_showcase.json"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(filePath)) return null
-        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return null
-        playlistJson.decodeFromString(EditorialShowcaseData.serializer(), nsStr)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка чтения кеша витрины: ${e.message}")
-        null
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun saveWaveCatalogCache(basePath: String, catalog: WavePersonalCatalog) {
-    if (basePath.isBlank() || catalog.isEmpty) return
-    try {
-        val cacheDir = "$basePath/playlists_cache"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(cacheDir)) {
-            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
-        }
-        val jsonStr = playlistJson.encodeToString(WavePersonalCatalog.serializer(), catalog)
-        val nsStr = jsonStr as NSString
-        nsStr.writeToFile("$cacheDir/_wave_catalog.json", atomically = true, encoding = NSUTF8StringEncoding, error = null)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка сохранения кеша каталога волны: ${e.message}")
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun loadWaveCatalogCache(basePath: String): WavePersonalCatalog? {
-    if (basePath.isBlank()) return null
-    return try {
-        val filePath = "$basePath/playlists_cache/_wave_catalog.json"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(filePath)) return null
-        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return null
-        playlistJson.decodeFromString(WavePersonalCatalog.serializer(), nsStr)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка чтения кеша каталога волны: ${e.message}")
-        null
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun saveLocalPlaylists(basePath: String, playlists: List<LocalPlaylist>) {
-    if (basePath.isBlank()) return
-    try {
-        val dir = "$basePath/playlists"
-        val fileManager = NSFileManager.defaultManager
-        if (!fileManager.fileExistsAtPath(dir)) {
-            fileManager.createDirectoryAtPath(dir, withIntermediateDirectories = true, attributes = null, error = null)
-        }
-        val jsonStr = playlistJson.encodeToString(
-            kotlinx.serialization.builtins.ListSerializer(LocalPlaylist.serializer()),
-            playlists
-        )
-        val nsStr = jsonStr as NSString
-        nsStr.writeToFile("$dir/local_playlists.json", atomically = true, encoding = NSUTF8StringEncoding, error = null)
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка сохранения локальных плейлистов: ${e.message}")
-    }
-}
-
-@OptIn(BetaInteropApi::class)
-actual fun loadLocalPlaylists(basePath: String): List<LocalPlaylist> {
-    val fileManager = NSFileManager.defaultManager
-    val resolvedBasePath = if (basePath.isBlank() || !fileManager.fileExistsAtPath(basePath)) {
-        getDefaultMusicDir()
-    } else {
-        basePath
-    }
-    try {
-        var filePath = "$resolvedBasePath/playlists/local_playlists.json"
-        if (!fileManager.fileExistsAtPath(filePath)) {
-            val fallbackPath = "${getDefaultMusicDir()}/playlists/local_playlists.json"
-            if (fileManager.fileExistsAtPath(fallbackPath)) {
-                filePath = fallbackPath
-            } else {
-                return emptyList()
-            }
-        }
-        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return emptyList()
-        val loaded = playlistJson.decodeFromString(
-            kotlinx.serialization.builtins.ListSerializer(LocalPlaylist.serializer()),
-            nsStr
-        )
-
-        // 🔥 Авто-миграция: обновляем устаревшие пути со старыми UUID контейнера и устраняем дубликаты
-        var anyMigrated = false
-        val migratedList = loaded.map { playlist ->
-            var plChanged = false
-            val updatedPaths = playlist.trackPaths.map { originalPath ->
-                val resolved = resolveIosLocalPath(originalPath)
-                if (resolved != originalPath && fileManager.fileExistsAtPath(resolved)) {
-                    plChanged = true
-                    resolved
-                } else {
-                    originalPath
-                }
-            }
-            val seenNames = mutableSetOf<String>()
-            val distinctPaths = mutableListOf<String>()
-            for (p in updatedPaths) {
-                val normName = p.substringAfterLast('/').substringAfterLast('\\').trim().lowercase()
-                if (normName.isNotBlank() && seenNames.add(normName)) {
-                    distinctPaths.add(p)
-                } else if (normName.isBlank() && !distinctPaths.contains(p)) {
-                    distinctPaths.add(p)
-                }
-            }
-            if (distinctPaths.size != playlist.trackPaths.size) {
-                plChanged = true
-            }
-            if (plChanged) {
-                anyMigrated = true
-                playlist.copy(trackPaths = distinctPaths)
-            } else {
-                playlist
-            }
-        }
-        if (anyMigrated) {
-            println("iOS Storage: 🔄 Авто-миграция путей плейлистов на новый UUID контейнера успешно выполнена")
-            saveLocalPlaylists(resolvedBasePath, migratedList)
-        }
-        return migratedList
-    } catch (e: Throwable) {
-        println("iOS Storage: Ошибка чтения локальных плейлистов: ${e.message}")
-        return emptyList()
-    }
-}
-
-@OptIn(BetaInteropApi::class)
 actual fun exportPlaylistToM3u8(basePath: String, playlist: LocalPlaylist, tracks: List<FullTrackInfo>): String {
     if (basePath.isBlank()) return ""
     try {
@@ -873,21 +585,6 @@ actual fun deleteTrackFile(basePath: String, artist: String, trackTitle: String,
         println("iOS Storage: Ошибка при удалении файла: ${e.message}")
     }
     return false
-}
-
-actual fun clearPlaylistsCache(basePath: String): Int {
-    if (basePath.isBlank()) return 0
-    val cacheDir = "$basePath/playlists_cache"
-    val fileManager = NSFileManager.defaultManager
-    if (!fileManager.fileExistsAtPath(cacheDir)) return 0
-    val items = fileManager.contentsOfDirectoryAtPath(cacheDir, error = null) as? List<String> ?: return 0
-    var count = 0
-    for (item in items) {
-        if (fileManager.removeItemAtPath("$cacheDir/$item", error = null)) {
-            count++
-        }
-    }
-    return count
 }
 
 actual fun clearAllDownloadedMusic(basePath: String): Int {

@@ -11,30 +11,39 @@ import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.PersonalPlaylistItemData
 import io.github.audiz.models.PlaylistInfo
 import io.github.audiz.util.AppLogger
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.RandomAccessFile
 
-private val playlistJson = Json {
-    ignoreUnknownKeys = true
-    prettyPrint = true
-    isLenient = true
-}
-
-
-private fun sanitizePlaylistFileName(title: String): String {
-    val clean = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
-    return clean.ifBlank { "Playlist" }
-}
-
-private fun getPlaylistCacheDir(basePath: String): File {
-    val dir = File(basePath, "playlists_cache")
-    if (!dir.exists()) {
-        dir.mkdirs()
+internal actual fun writeTextFileAtomic(path: String, text: String): Boolean {
+    val target = File(path)
+    target.parentFile?.mkdirs()
+    val tmp = File(target.parentFile, ".${target.name}.tmp")
+    return try {
+        tmp.writeText(text)
+        // renameTo атомарен в пределах одного раздела; на Windows он не перезаписывает существующий файл
+        tmp.renameTo(target) || (target.delete() && tmp.renameTo(target))
+    } catch (e: Exception) {
+        AppLogger.e("MusicStorage", "Ошибка записи файла $path: ${e.message}", e)
+        false
+    } finally {
+        if (tmp.exists()) tmp.delete()
     }
-    return dir
 }
+
+internal actual fun fileLastModifiedMs(path: String): Long? {
+    val file = File(path)
+    return if (file.isFile) file.lastModified() else null
+}
+
+internal actual fun listFileNames(dirPath: String): List<String> =
+    File(dirPath).listFiles()?.filter { it.isFile }?.map { it.name }.orEmpty()
+
+internal actual fun deleteRegularFile(path: String): Boolean {
+    val file = File(path)
+    return file.isFile && file.delete()
+}
+
+internal actual fun localPlaylistsFallbackDir(): String? = null
 
 private fun cleanUpEmptyDir(dir: File?, basePath: String) {
     if (dir == null || !dir.isDirectory) return
@@ -413,280 +422,6 @@ private fun extractAudioDuration(file: File): Long {
     return io.github.audiz.util.AudioHeaderParser.extractAudioDuration(file)
 }
 
-/** Сохранить список треков плейлиста в локальный кеш на диске: {basePath}/playlists_cache/{cacheKey}.json */
-actual fun savePlaylistTracksCache(basePath: String, cacheKey: String, tracks: List<FullTrackInfo>) {
-    if (basePath.isBlank() || tracks.isEmpty() || cacheKey.isBlank()) return
-    try {
-        val cacheDir = getPlaylistCacheDir(basePath)
-        val file = File(cacheDir, "${sanitizePlaylistFileName(cacheKey)}.json")
-        val jsonStr = playlistJson.encodeToString(
-            ListSerializer(FullTrackInfo.serializer()),
-            tracks
-        )
-        file.writeText(jsonStr)
-        println("MusicStorage: Кеш плейлиста сохранен (${tracks.size} треков): ${file.absolutePath}")
-        cleanExpiredPlaylistCaches(basePath)
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка сохранения кеша плейлиста '$cacheKey': ${e.message}")
-    }
-}
-
-/** Загрузить список треков плейлиста из локального кеша на диске */
-actual fun loadPlaylistTracksCache(basePath: String, cacheKey: String): List<FullTrackInfo> {
-    if (basePath.isBlank() || cacheKey.isBlank()) return emptyList()
-    try {
-        val cacheDir = File(basePath, "playlists_cache")
-        val file = File(cacheDir, "${sanitizePlaylistFileName(cacheKey)}.json")
-        if (!file.exists() || file.length() == 0L) return emptyList()
-
-        // Проверяем срок жизни кеша: кеши старше 7 дней удаляются
-        val now = System.currentTimeMillis()
-        if ((now - file.lastModified()) > PLAYLIST_CACHE_MAX_AGE_MS) {
-            println("MusicStorage: Кеш плейлиста '$cacheKey' устарел (> 7 дней) и удален")
-            file.delete()
-            return emptyList()
-        }
-
-        val jsonStr = file.readText()
-        val list = playlistJson.decodeFromString(
-            ListSerializer(FullTrackInfo.serializer()),
-            jsonStr
-        )
-        println("MusicStorage: Загружен кеш плейлиста '$cacheKey' (${list.size} треков)")
-        return list
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка чтения кеша плейлиста '$cacheKey': ${e.message}")
-        return emptyList()
-    }
-}
-
-/** Удалить устаревшие файлы кеша плейлистов старше maxAgeMs (по умолчанию 7 дней) */
-actual fun cleanExpiredPlaylistCaches(basePath: String, maxAgeMs: Long): Int {
-    if (basePath.isBlank()) return 0
-    var count = 0
-    try {
-        val cacheDir = File(basePath, "playlists_cache")
-        if (cacheDir.exists() && cacheDir.isDirectory) {
-            val now = System.currentTimeMillis()
-            val files = cacheDir.listFiles() ?: return 0
-            for (file in files) {
-                if (file.isFile && file.name.endsWith(".json") && (now - file.lastModified()) > maxAgeMs) {
-                    if (file.delete()) {
-                        count++
-                    }
-                }
-            }
-            if (count > 0) {
-                println("MusicStorage: Удалено $count устаревших файлов кеша плейлистов (> 7 дней)")
-            }
-        }
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка очистки устаревшего кеша плейлистов: ${e.message}")
-    }
-    return count
-}
-
-/** Сохранить список персональных плейлистов в кеш для бокового меню */
-actual fun savePersonalPlaylistsCache(basePath: String, items: List<PersonalPlaylistItemData>) {
-    if (basePath.isBlank() || items.isEmpty()) return
-    try {
-        val cacheDir = getPlaylistCacheDir(basePath)
-        val file = File(cacheDir, "_personal_playlists.json")
-        val jsonStr = playlistJson.encodeToString(
-            ListSerializer(PersonalPlaylistItemData.serializer()),
-            items
-        )
-        file.writeText(jsonStr)
-        println("MusicStorage: Сохранен кеш персональных плейлистов (${items.size} шт)")
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка сохранения кеша персональных плейлистов: ${e.message}")
-    }
-}
-
-/** Загрузить список персональных плейлистов из кеша */
-actual fun loadPersonalPlaylistsCache(basePath: String): List<PersonalPlaylistItemData> {
-    if (basePath.isBlank()) return emptyList()
-    try {
-        val cacheDir = File(basePath, "playlists_cache")
-        val file = File(cacheDir, "_personal_playlists.json")
-        if (!file.exists() || file.length() == 0L) return emptyList()
-        val jsonStr = file.readText()
-        val list = playlistJson.decodeFromString(
-            ListSerializer(PersonalPlaylistItemData.serializer()),
-            jsonStr
-        )
-        println("MusicStorage: Загружен кеш персональных плейлистов (${list.size} шт)")
-        return list
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка чтения кеша персональных плейлистов: ${e.message}")
-        return emptyList()
-    }
-}
-
-/** Сохранить список пользовательских плейлистов из Яндекса в кеш */
-actual fun saveUserPlaylistsCache(basePath: String, items: List<PlaylistInfo>) {
-    if (basePath.isBlank() || items.isEmpty()) return
-    try {
-        val cacheDir = getPlaylistCacheDir(basePath)
-        val file = File(cacheDir, "_user_playlists.json")
-        val jsonStr = playlistJson.encodeToString(
-            ListSerializer(PlaylistInfo.serializer()),
-            items
-        )
-        file.writeText(jsonStr)
-        println("MusicStorage: Сохранен кеш пользовательских плейлистов Яндекса (${items.size} шт)")
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка сохранения кеша пользовательских плейлистов: ${e.message}")
-    }
-}
-
-/** Загрузить список пользовательских плейлистов из Яндекса из кеша */
-actual fun loadUserPlaylistsCache(basePath: String): List<PlaylistInfo> {
-    if (basePath.isBlank()) return emptyList()
-    try {
-        val cacheDir = File(basePath, "playlists_cache")
-        val file = File(cacheDir, "_user_playlists.json")
-        if (!file.exists() || file.length() == 0L) return emptyList()
-        val jsonStr = file.readText()
-        val list = playlistJson.decodeFromString(
-            ListSerializer(PlaylistInfo.serializer()),
-            jsonStr
-        )
-        println("MusicStorage: Загружен кеш пользовательских плейлистов Яндекса (${list.size} шт)")
-        return list
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка чтения кеша пользовательских плейлистов: ${e.message}")
-        return emptyList()
-    }
-}
-
-/** Сохранить редакционную витрину (чарты, новые плейлисты и релизы) в локальный кеш */
-actual fun saveEditorialShowcaseCache(basePath: String, showcase: EditorialShowcaseData) {
-    if (basePath.isBlank() || showcase.isEmpty) return
-    try {
-        val cacheDir = getPlaylistCacheDir(basePath)
-        val file = File(cacheDir, "_editorial_showcase.json")
-        file.writeText(playlistJson.encodeToString(EditorialShowcaseData.serializer(), showcase))
-        println("MusicStorage: Сохранен кеш витрины (чартов: ${showcase.charts.size}, плейлистов: ${showcase.newPlaylists.size}, релизов: ${showcase.newReleases.size})")
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка сохранения кеша витрины: ${e.message}")
-    }
-}
-
-/** Загрузить редакционную витрину из локального кеша */
-actual fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? {
-    if (basePath.isBlank()) return null
-    return try {
-        val file = File(File(basePath, "playlists_cache"), "_editorial_showcase.json")
-        if (!file.exists() || file.length() == 0L) return null
-        playlistJson.decodeFromString(EditorialShowcaseData.serializer(), file.readText())
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка чтения кеша витрины: ${e.message}")
-        null
-    }
-}
-
-/** Сохранить персональный каталог тем Моей волны в локальный кеш */
-actual fun saveWaveCatalogCache(basePath: String, catalog: WavePersonalCatalog) {
-    if (basePath.isBlank() || catalog.isEmpty) return
-    try {
-        val cacheDir = getPlaylistCacheDir(basePath)
-        val file = File(cacheDir, "_wave_catalog.json")
-        file.writeText(playlistJson.encodeToString(WavePersonalCatalog.serializer(), catalog))
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка сохранения кеша каталога волны: ${e.message}")
-    }
-}
-
-/** Загрузить персональный каталог тем Моей волны из локального кеша */
-actual fun loadWaveCatalogCache(basePath: String): WavePersonalCatalog? {
-    if (basePath.isBlank()) return null
-    return try {
-        val file = File(File(basePath, "playlists_cache"), "_wave_catalog.json")
-        if (!file.exists() || file.length() == 0L) return null
-        playlistJson.decodeFromString(WavePersonalCatalog.serializer(), file.readText())
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка чтения кеша каталога волны: ${e.message}")
-        null
-    }
-}
-
-/** Сохранить список локальных оффлайн-плейлистов на диск */
-actual fun saveLocalPlaylists(basePath: String, playlists: List<LocalPlaylist>) {
-    if (basePath.isBlank()) return
-    try {
-        val dir = File(basePath, "playlists")
-        if (!dir.exists()) dir.mkdirs()
-        val file = File(dir, "local_playlists.json")
-        val jsonStr = playlistJson.encodeToString(
-            ListSerializer(LocalPlaylist.serializer()),
-            playlists
-        )
-        file.writeText(jsonStr)
-        println("MusicStorage: Сохранено ${playlists.size} локальных плейлистов в ${file.absolutePath}")
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка сохранения локальных плейлистов: ${e.message}")
-    }
-}
-
-/** Загрузить список локальных оффлайн-плейлистов из {basePath}/playlists/local_playlists.json */
-actual fun loadLocalPlaylists(basePath: String): List<LocalPlaylist> {
-    if (basePath.isBlank()) return emptyList()
-    try {
-        val dir = File(basePath, "playlists")
-        val file = File(dir, "local_playlists.json")
-        if (!file.exists() || file.length() == 0L) return emptyList()
-        val jsonStr = file.readText()
-        val list = playlistJson.decodeFromString(
-            ListSerializer(LocalPlaylist.serializer()),
-            jsonStr
-        )
-        var anyMigrated = false
-        val migratedList = list.map { playlist ->
-            var changed = false
-            // 1. Однократное разрешение путей с сохранением только реально существующих новых путей
-            val updatedTracks = playlist.trackPaths.map { originalPath ->
-                val resolved = resolveLocalPath(originalPath)
-                if (resolved != originalPath && File(resolved).exists()) {
-                    changed = true
-                    resolved
-                } else {
-                    originalPath
-                }
-            }
-            // 2. Строгая дедупликация по нормализованному имени файла / пути
-            val seenNames = mutableSetOf<String>()
-            val distinctTracks = mutableListOf<String>()
-            for (p in updatedTracks) {
-                val normName = p.substringAfterLast('/').substringAfterLast('\\').trim().lowercase()
-                if (normName.isNotBlank() && seenNames.add(normName)) {
-                    distinctTracks.add(p)
-                } else if (normName.isBlank() && !distinctTracks.contains(p)) {
-                    distinctTracks.add(p)
-                }
-            }
-            if (distinctTracks.size != playlist.trackPaths.size) {
-                changed = true
-            }
-            if (changed) {
-                anyMigrated = true
-                playlist.copy(trackPaths = distinctTracks)
-            } else {
-                playlist
-            }
-        }
-        if (anyMigrated) {
-            saveLocalPlaylists(basePath, migratedList)
-            println("MusicStorage: Локальные плейлисты успешно обновлены с новыми путями и дедупликацией")
-        }
-        println("MusicStorage: Загружено ${migratedList.size} локальных плейлистов")
-        return migratedList
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка чтения локальных плейлистов: ${e.message}")
-        return emptyList()
-    }
-}
-
 /** Экспортировать локальный плейлист в формат M3U8 */
 actual fun exportPlaylistToM3u8(basePath: String, playlist: LocalPlaylist, tracks: List<FullTrackInfo>): String {
     if (basePath.isBlank()) return ""
@@ -971,29 +706,6 @@ actual fun deleteTrackFile(basePath: String, artist: String, trackTitle: String,
         println("MusicStorage: Ошибка при удалении трека '$artist - $trackTitle': ${e.message}")
         return false
     }
-}
-
-/** Очистить весь кеш плейлистов: удаляет все файлы из {basePath}/playlists_cache/ */
-actual fun clearPlaylistsCache(basePath: String): Int {
-    if (basePath.isBlank()) return 0
-    var count = 0
-    try {
-        val cacheDir = File(basePath, "playlists_cache")
-        if (cacheDir.exists() && cacheDir.isDirectory) {
-            val files = cacheDir.listFiles()
-            if (files != null) {
-                for (file in files) {
-                    if (file.isFile && file.delete()) {
-                        count++
-                    }
-                }
-            }
-            println("MusicStorage: Очищен кеш плейлистов ($count файлов удалено)")
-        }
-    } catch (e: Exception) {
-        println("MusicStorage: Ошибка при очистке кеша плейлистов: ${e.message}")
-    }
-    return count
 }
 
 /** Удалить все скачанные треки из папок HQ, LQ и корневой директории */

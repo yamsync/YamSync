@@ -60,46 +60,25 @@ expect fun scanDownloadedTracks(basePath: String): List<io.github.audiz.models.F
 /** Быстро получить список всех существующих путей к скачанным аудиофайлам (без чтения метаданных и длительности) */
 expect fun scanDownloadedTrackPaths(basePath: String): List<String>
 
-const val PLAYLIST_CACHE_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000L // 7 дней
+/**
+ * Примитивы файлового ввода-вывода для общего кода (кеши, локальные плейлисты).
+ * Сериализация и раскладка файлов живут в [PlaylistCacheStorage.kt], здесь — только платформенная запись/чтение.
+ */
 
-/** Сохранить список треков плейлиста в локальный кеш на диске: {basePath}/playlists_cache/{cacheKey}.json */
-expect fun savePlaylistTracksCache(basePath: String, cacheKey: String, tracks: List<io.github.audiz.models.FullTrackInfo>)
+/** Записать текст в файл атомарно (через временный файл), создав родительские папки. */
+internal expect fun writeTextFileAtomic(path: String, text: String): Boolean
 
-/** Загрузить список треков плейлиста из локального кеша на диске */
-expect fun loadPlaylistTracksCache(basePath: String, cacheKey: String): List<io.github.audiz.models.FullTrackInfo>
+/** Время последнего изменения файла в миллисекундах с эпохи или null, если файла нет. */
+internal expect fun fileLastModifiedMs(path: String): Long?
 
-/** Удалить устаревшие файлы кеша плейлистов старше maxAgeMs (по умолчанию 7 дней) */
-expect fun cleanExpiredPlaylistCaches(basePath: String, maxAgeMs: Long = PLAYLIST_CACHE_MAX_AGE_MS): Int
+/** Имена обычных файлов (без подпапок) в директории; пустой список, если директории нет. */
+internal expect fun listFileNames(dirPath: String): List<String>
 
-/** Сохранить список персональных плейлистов в кеш для бокового меню */
-expect fun savePersonalPlaylistsCache(basePath: String, items: List<io.github.audiz.models.PersonalPlaylistItemData>)
+/** Удалить обычный файл. */
+internal expect fun deleteRegularFile(path: String): Boolean
 
-/** Загрузить список персональных плейлистов из кеша */
-expect fun loadPersonalPlaylistsCache(basePath: String): List<io.github.audiz.models.PersonalPlaylistItemData>
-
-/** Сохранить список пользовательских плейлистов из Яндекса в кеш */
-expect fun saveUserPlaylistsCache(basePath: String, items: List<io.github.audiz.models.PlaylistInfo>)
-
-/** Загрузить список пользовательских плейлистов из Яндекса из кеша */
-expect fun loadUserPlaylistsCache(basePath: String): List<io.github.audiz.models.PlaylistInfo>
-
-/** Сохранить редакционную витрину (чарты, новые плейлисты и релизы) в локальный кеш */
-expect fun saveEditorialShowcaseCache(basePath: String, showcase: io.github.audiz.models.EditorialShowcaseData)
-
-/** Загрузить редакционную витрину из локального кеша */
-expect fun loadEditorialShowcaseCache(basePath: String): io.github.audiz.models.EditorialShowcaseData?
-
-/** Сохранить персональный каталог тем Моей волны в локальный кеш */
-expect fun saveWaveCatalogCache(basePath: String, catalog: io.github.audiz.models.WavePersonalCatalog)
-
-/** Загрузить персональный каталог тем Моей волны из локального кеша */
-expect fun loadWaveCatalogCache(basePath: String): io.github.audiz.models.WavePersonalCatalog?
-
-/** Сохранить список локальных оффлайн-плейлистов на диск: {basePath}/playlists/local_playlists.json */
-expect fun saveLocalPlaylists(basePath: String, playlists: List<io.github.audiz.models.LocalPlaylist>)
-
-/** Загрузить список локальных оффлайн-плейлистов из {basePath}/playlists/local_playlists.json */
-expect fun loadLocalPlaylists(basePath: String): List<io.github.audiz.models.LocalPlaylist>
+/** Резервная папка для поиска локальных плейлистов, если основная недоступна (например, сменился контейнер приложения). */
+internal expect fun localPlaylistsFallbackDir(): String?
 
 /** Экспортировать локальный плейлист в формат M3U8: {basePath}/playlists/{title}.m3u8 */
 expect fun exportPlaylistToM3u8(basePath: String, playlist: io.github.audiz.models.LocalPlaylist, tracks: List<io.github.audiz.models.FullTrackInfo>): String
@@ -109,9 +88,6 @@ expect fun getTracksFromLocalPaths(paths: List<String>): List<io.github.audiz.mo
 
 /** Удалить аудиофайл трека с диска (и пустую папку артиста, если файлов больше нет) */
 expect fun deleteTrackFile(basePath: String, artist: String, trackTitle: String, localFilePath: String? = null): Boolean
-
-/** Очистить весь кеш плейлистов: удаляет все файлы из {basePath}/playlists_cache/ */
-expect fun clearPlaylistsCache(basePath: String): Int
 
 /** Удалить все скачанные треки из папок HQ, LQ и корневой директории */
 expect fun clearAllDownloadedMusic(basePath: String): Int
