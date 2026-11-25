@@ -8,6 +8,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 import io.github.audiz.core.CoreLogger
+import kotlinx.coroutines.CancellationException
 
 /**
  * ⚡ Сервис для работы с Yandex Music Ynison WebSocket API (Моя Волна / синхронизация очереди)
@@ -115,6 +116,7 @@ class YnisonService(private val client: HttpClient) {
                                     lastYnisonHost = host
                                 }
                             } catch (e: Exception) {
+                                if (e is CancellationException) throw e
                                 CoreLogger.e("YnisonService", "Ошибка парсинга редиректора: ${e.message}", e)
                                 lastYnisonError = "Ошибка парсинга ответа редиректора: ${e.message}"
                             }
@@ -226,6 +228,7 @@ class YnisonService(private val client: HttpClient) {
                                     break
                                 }
                             } catch (e: Exception) {
+                                if (e is CancellationException) throw e
                                 CoreLogger.e("YnisonService", "Ошибка парсинга JSON ответа: ${e.message}", e)
                             }
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import io.github.audiz.util.AppLogger
+import kotlinx.coroutines.CancellationException
 
 actual class SystemMediaControls {
     private var mediaSession: MediaSession? = null
@@ -174,7 +175,7 @@ actual class SystemMediaControls {
                             .build()
                         mediaSession?.setMetadata(updatedMeta)
                         MediaPlaybackServiceManager.updateNotification(context)
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
             }
         } catch (_: Exception) {}
@@ -192,7 +193,8 @@ actual class SystemMediaControls {
                     if (art != null) {
                         return@withContext BitmapFactory.decodeByteArray(art, 0, art.size)
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                 } finally {
                     try { retriever.release() } catch (_: Exception) {}
                 }
@@ -211,6 +213,7 @@ actual class SystemMediaControls {
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             AppLogger.e("SystemMediaControls", "Ошибка загрузки обложки: ${e.message}", e)
         }
         null

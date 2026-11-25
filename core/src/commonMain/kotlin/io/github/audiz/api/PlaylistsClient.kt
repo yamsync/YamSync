@@ -89,6 +89,7 @@ class PlaylistsClient(
                 fallbackResponse.status.value in 200..299
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка при отправке лайка: ${e.message}", e)
             false
         }
@@ -125,6 +126,7 @@ class PlaylistsClient(
                 pathResponse.status.value in 200..299
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка при снятии лайка: ${e.message}", e)
             try {
                 val pathUrl = "https://api.music.yandex.ru/users/$userId/likes/tracks/$cleanTrackId/remove"
@@ -132,7 +134,8 @@ class PlaylistsClient(
                     applyAuthHeaders()
                 }
                 pathResponse.status.value in 200..299
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 false
             }
         }
@@ -170,6 +173,7 @@ class PlaylistsClient(
                 fallbackResponse.status.value in 200..299
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка при отправке дизлайка: ${e.message}", e)
             false
         }
@@ -206,6 +210,7 @@ class PlaylistsClient(
                 pathResponse.status.value in 200..299
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка при снятии дизлайка: ${e.message}", e)
             try {
                 val pathUrl = "https://api.music.yandex.ru/users/$userId/dislikes/tracks/$cleanTrackId/remove"
@@ -213,7 +218,8 @@ class PlaylistsClient(
                     applyAuthHeaders()
                 }
                 pathResponse.status.value in 200..299
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 false
             }
         }
@@ -273,6 +279,7 @@ class PlaylistsClient(
                         richTracks.add(if (fullTrack.id.isBlank()) fullTrack.copy(id = effectiveId) else fullTrack)
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     CoreLogger.e("PlaylistsClient", "Не удалось распарсить rich-трек: ${e.message}", e)
                 }
             }
@@ -346,6 +353,7 @@ class PlaylistsClient(
                         richTracks.add(if (fullTrack.id.isBlank()) fullTrack.copy(id = effectiveId) else fullTrack)
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     CoreLogger.e("PlaylistsClient", "Не удалось распарсить rich-трек: ${e.message}", e)
                 }
             }
@@ -406,6 +414,7 @@ class PlaylistsClient(
                     richTracks.add(if (fullTrack.id.isBlank()) fullTrack.copy(id = effectiveId) else fullTrack)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 CoreLogger.e("PlaylistsClient", "Не удалось распарсить трек альбома: ${e.message}", e)
             }
         }
@@ -531,11 +540,13 @@ class PlaylistsClient(
                         revision = revision
                     )
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     CoreLogger.e("PlaylistsClient", "Ошибка разбора плейлиста: ${e.message}", e)
                     null
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Исключение при получении плейлистов пользователя: ${e.message}", e)
             emptyList()
         }
@@ -584,6 +595,7 @@ class PlaylistsClient(
                         artist = artistName
                     )
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     null
                 }
             }
@@ -596,6 +608,7 @@ class PlaylistsClient(
                 tracks = items
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка getPlaylistDetails: ${e.message}", e)
             null
         }
@@ -626,6 +639,7 @@ class PlaylistsClient(
                 val firstTrack = details.result.firstOrNull()
                 resolvedAlbumId = firstTrack?.albums?.firstOrNull()?.id
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 CoreLogger.e("PlaylistsClient", "Не удалось получить albumId для трека $cleanTrackId: ${e.message}", e)
             }
         }
@@ -682,6 +696,7 @@ class PlaylistsClient(
             }
             status
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка добавления трека в плейлист: ${e.message}", e)
             false
         }
@@ -747,6 +762,7 @@ class PlaylistsClient(
             }
             status
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка удаления трека из плейлиста: ${e.message}", e)
             false
         }
@@ -796,6 +812,7 @@ class PlaylistsClient(
                 revision = revision
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка создания плейлиста: ${e.message}", e)
             null
         }
@@ -849,6 +866,7 @@ class PlaylistsClient(
                 revision = revision
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.e("PlaylistsClient", "Ошибка переименования плейлиста: ${e.message}", e)
             null
         }

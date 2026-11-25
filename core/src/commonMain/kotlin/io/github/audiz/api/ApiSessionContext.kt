@@ -13,6 +13,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.CancellationException
 
 /**
  * 🌐 Сетевой контекст и сессия для API клиентов:
@@ -101,7 +102,8 @@ class ApiSessionContext(
             } else {
                 null
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
             null
         }
     }
@@ -125,7 +127,8 @@ class ApiSessionContext(
             } else {
                 false
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
             false
         }
     }

@@ -5,6 +5,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.github.audiz.core.CoreLogger
+import kotlinx.coroutines.CancellationException
 
 /**
  * 🔑 Сервис авторизации и извлечения OAuth access_token для Яндекс Музыки
@@ -64,7 +65,7 @@ class YandexCookieService {
                     if (parsed.name == "Session_id" && parsed.value.isNotBlank()) {
                         return "Session_id=${parsed.value}"
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) { if (e is CancellationException) throw e }
             }
 
             for (header in setCookieHeaders) {
@@ -80,6 +81,7 @@ class YandexCookieService {
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             CoreLogger.w("YandexCookieService", "Ошибка получения Session_id: ${e.message}")
         } finally {
             client.close()

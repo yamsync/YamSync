@@ -73,6 +73,7 @@ class WaveClient(
             val uid = context.getAccountUid() ?: ""
             ynisonService.getWaveSessionId(token, uid)
         } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             CoreLogger.e("WaveClient", "Не удалось получить сессию Ynison: ${t.message}", t)
             null
         }
@@ -155,7 +156,7 @@ class WaveClient(
                 val root = json.parseToJsonElement(text).jsonObject
                 root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                     ?: root["result"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-            } catch (_: Exception) { null }
+            } catch (e: Exception) { if (e is CancellationException) throw e; null }
             if (response.status == HttpStatusCode.Forbidden || response.status == HttpStatusCode.Unauthorized) {
                 throw IllegalStateException(errMsg ?: "Для выбранной волны требуется активная подписка Яндекс Плюс")
             }

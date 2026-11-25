@@ -859,7 +859,7 @@ class YamSyncManager(
             scope.launch(DispatcherIO) {
                 try {
                     client.notifyDisconnect(pair.ip, pair.port, token)
-                } catch (_: Exception) {}
+                } catch (e: Exception) { if (e is CancellationException) throw e }
             }
         }
         handleRemotePeerDisconnected("Связь разорвана")

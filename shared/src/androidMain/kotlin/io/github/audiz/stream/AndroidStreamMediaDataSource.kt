@@ -177,7 +177,8 @@ class AndroidStreamMediaDataSource(
                     val dec = decryptAesCtrChunk(enc, m.aesKey, startByte)
                     chunkCache[chunkIndex] = dec
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
             } finally {
                 prefetchJobs.remove(chunkIndex)
             }

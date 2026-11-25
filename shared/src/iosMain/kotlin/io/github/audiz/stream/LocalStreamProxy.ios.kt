@@ -71,7 +71,8 @@ actual object LocalStreamProxy {
             val rawExt = meta.codec.substringBefore("-")
             val ext = if (rawExt.equals("aac", ignoreCase = true)) "m4a" else rawExt
             "yamusic-stream://stream/$cleanTrackId.$ext?quality=$quality"
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
             ""
         }
     }

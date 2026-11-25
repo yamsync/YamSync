@@ -7,6 +7,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.CancellationException
 
 /**
  * 🔍 Клиент поиска, артистов и пакетного получения информации о треках
@@ -46,7 +47,12 @@ class SearchClient(
         }
 
         if (response.status.value !in 200..299) {
-            val body = runCatching { response.bodyAsText() }.getOrDefault("")
+            val body = try {
+                response.bodyAsText()
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                ""
+            }
             throw IllegalStateException("Ошибка сервера Яндекс Музыки (HTTP ${response.status.value}): $body")
         }
 

@@ -41,6 +41,7 @@ class AudioResourceLoaderDelegate(
             }
             meta
         } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             CoreLogger.e("ResourceLoader", "Ошибка получения метаданных трека $trackId: ${e.message}")
             null
         }

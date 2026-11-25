@@ -3,6 +3,7 @@ package io.github.audiz.sync
 import io.github.audiz.TrackFileWriter
 import io.github.audiz.currentTimeMillis
 import io.github.audiz.models.*
+import io.github.audiz.util.runCatchingCancellable
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -40,7 +41,7 @@ private fun createYamSyncHttpClient(): HttpClient {
 /** HTTP-клиент YamSync для взаимодействия с удалённым сервером по Wi-Fi. */
 class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient()) {
     /** Проверить доступность удаленного устройства */
-    suspend fun ping(ip: String, port: Int): Result<YamSyncDevice> = runCatching {
+    suspend fun ping(ip: String, port: Int): Result<YamSyncDevice> = runCatchingCancellable {
         val response = httpClient.get("http://$ip:$port/yamsync/v1/ping")
         if (response.status.isSuccess()) {
             response.body<YamSyncDevice>()
@@ -50,7 +51,7 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
     }
 
     /** Выполнить рукопожатие (Pairing) и авторизацию по токену */
-    suspend fun pair(ip: String, port: Int, token: String, localDevice: YamSyncDevice): Result<YamSyncDevice> = runCatching {
+    suspend fun pair(ip: String, port: Int, token: String, localDevice: YamSyncDevice): Result<YamSyncDevice> = runCatchingCancellable {
         val response = httpClient.post("http://$ip:$port/yamsync/v1/pair") {
             timeout { requestTimeoutMillis = 15_000 }
             header("X-YamSync-Token", token)
@@ -65,7 +66,7 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
     }
 
     /** Запросить манифест медиатеки с удаленного устройства */
-    suspend fun fetchManifest(ip: String, port: Int, token: String): Result<YamSyncManifest> = runCatching {
+    suspend fun fetchManifest(ip: String, port: Int, token: String): Result<YamSyncManifest> = runCatchingCancellable {
         val response = httpClient.get("http://$ip:$port/yamsync/v1/manifest") {
             header("X-YamSync-Token", token)
         }
@@ -79,7 +80,7 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
     /**
      * Отправить свой манифест на удаленный хост (POST) и одновременно получить свежий манифест хоста в ответе
      */
-    suspend fun exchangeManifests(ip: String, port: Int, token: String, localManifest: YamSyncManifest): Result<YamSyncManifest> = runCatching {
+    suspend fun exchangeManifests(ip: String, port: Int, token: String, localManifest: YamSyncManifest): Result<YamSyncManifest> = runCatchingCancellable {
         val response = httpClient.post("http://$ip:$port/yamsync/v1/manifest") {
             header("X-YamSync-Token", token)
             contentType(ContentType.Application.Json)
@@ -103,7 +104,7 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
         track: YamSyncTrack,
         writer: TrackFileWriter,
         onProgress: (YamSyncTransferProgress) -> Unit
-    ): Result<Long> = runCatching {
+    ): Result<Long> = runCatchingCancellable {
         var downloaded = 0L
         val startedAt = currentTimeMillis()
         YamSyncDiagnostics.record("http_file_request", "file" to track.fileName, "manifestBytes" to track.fileSize)
@@ -191,7 +192,7 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
     }
 
     /** Отправить результат слияния плейлистов обратно на хост */
-    suspend fun sendMerge(ip: String, port: Int, token: String, payload: YamSyncMergePayload): Result<Unit> = runCatching {
+    suspend fun sendMerge(ip: String, port: Int, token: String, payload: YamSyncMergePayload): Result<Unit> = runCatchingCancellable {
         val response = httpClient.post("http://$ip:$port/yamsync/v1/merge") {
             header("X-YamSync-Token", token)
             contentType(ContentType.Application.Json)
@@ -203,8 +204,8 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
     }
 
     /** Уведомить удаленное устройство о разрыве соединения */
-    suspend fun notifyDisconnect(ip: String, port: Int, token: String): Result<Unit> = runCatching {
-        if (port <= 0 || ip.isBlank()) return@runCatching
+    suspend fun notifyDisconnect(ip: String, port: Int, token: String): Result<Unit> = runCatchingCancellable {
+        if (port <= 0 || ip.isBlank()) return@runCatchingCancellable
         withTimeout(1500) {
             httpClient.post("http://$ip:$port/yamsync/v1/disconnect") {
                 header("X-YamSync-Token", token)

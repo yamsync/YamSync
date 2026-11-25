@@ -88,6 +88,7 @@ class MediaStreamClient(
                         ?: resultObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull()
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 CoreLogger.e("MediaStreamClient", "Не удалось распарсить битрейт: ${e.message}", e)
             }
 
@@ -101,6 +102,7 @@ class MediaStreamClient(
             return DownloadedTrackAudio(processedAudio, parsedInfo.type, bitrate)
 
         } catch (networkException: Throwable) {
+            if (networkException is CancellationException) throw networkException
             CoreLogger.e("MediaStreamClient", "Сетевая ошибка при загрузке аудиопотока: ${networkException.message}")
             throw networkException
         }
@@ -153,7 +155,7 @@ class MediaStreamClient(
                 bitrate = resultObj["bitrateInKbps"]?.jsonPrimitive?.content?.toIntOrNull()
                     ?: resultObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull()
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { if (e is CancellationException) throw e }
 
         if (bitrate == null && parsedInfo.type.contains("-")) {
             val candidate = parsedInfo.type.substringAfter("-").substringBefore("-").toIntOrNull()
@@ -258,6 +260,7 @@ class MediaStreamClient(
             }
             resultMap
         } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             CoreLogger.e("MediaStreamClient", "Исключение при пакетном запросе ссылок: ${e.message}")
             emptyMap()
         }

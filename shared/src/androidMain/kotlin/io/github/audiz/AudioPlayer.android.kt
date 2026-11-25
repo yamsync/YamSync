@@ -32,6 +32,7 @@ import kotlin.math.log10
 import kotlin.math.roundToInt
 import io.github.audiz.stream.AndroidStreamMediaDataSource
 import io.github.audiz.stream.LocalStreamProxy
+import kotlinx.coroutines.CancellationException
 
 /**
  * 🎵 Android-реализация аудиоплеера на основе MediaPlayer
@@ -302,7 +303,7 @@ actual class AudioPlayer actual constructor() {
                 try {
                     fadingMediaPlayer?.stop()
                     fadingMediaPlayer?.release()
-                } catch (_: Exception) {}
+                } catch (e: Exception) { if (e is CancellationException) throw e }
                 fadingMediaPlayer = null
                 releaseFadingEqualizer()
                 fadingMediaDataSource?.close()

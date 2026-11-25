@@ -226,6 +226,7 @@ class DownloadManager(
                     onUpdatePlayingFilePath("$basePath/${sanitizeKeepSpaces(cleanArtist)}/$fullFileName")
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 val msg = e.message ?: e.toString()
                 val userMsg = if (msg.contains("connect", ignoreCase = true) || msg.contains("host", ignoreCase = true) || msg.contains("socket", ignoreCase = true)) {
                     "Не удалось скачать трек: нет подключения к интернету"
@@ -468,6 +469,7 @@ class DownloadManager(
             }
             targetPath
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             AppLogger.e("DownloadManager", "Ошибка при подготовке файла трека: ${e.message}", e)
             null
         }
@@ -574,6 +576,7 @@ class DownloadManager(
                     onComplete?.invoke(null)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 onStatusMessage("❌ Ошибка: ${e.message ?: e.toString()}")
                 onComplete?.invoke(null)
             }
@@ -672,6 +675,7 @@ class DownloadManager(
                     onComplete?.invoke(null)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 onStatusMessage("❌ Ошибка: ${e.message ?: e.toString()}")
                 onComplete?.invoke(null)
             }
@@ -706,7 +710,7 @@ class DownloadManager(
                     if (effectiveAlbum == null) effectiveAlbum = fetched.albums.firstOrNull()?.title
                     if (effectiveYear == null) effectiveYear = fetched.albums.firstOrNull()?.year?.toString()
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { if (e is CancellationException) throw e }
         }
 
         val coverBytes = effectiveCoverUri?.let { uri ->

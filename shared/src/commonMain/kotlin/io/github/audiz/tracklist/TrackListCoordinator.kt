@@ -285,7 +285,7 @@ class TrackListCoordinator(
                             if (detail != null) {
                                 playbackManager.setInitialTrack(detail)
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) { if (e is CancellationException) throw e }
                     }
                 }
             } catch (e: Exception) {
@@ -295,7 +295,8 @@ class TrackListCoordinator(
                     val fallbackCached = withContext(DispatcherIO) {
                         try {
                             loadPlaylistTracksCache(getMusicStoragePath(), resolvedCacheKey)
-                        } catch (_: Throwable) {
+                        } catch (e: Throwable) {
+                            if (e is CancellationException) throw e
                             emptyList()
                         }
                     }
@@ -946,6 +947,7 @@ class TrackListCoordinator(
                     onError("В папке '$folderName' нет аудиофайлов.")
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 onError("Ошибка чтения папки: ${e.message}")
             } finally {
                 setLoading(false)
@@ -1115,6 +1117,7 @@ class TrackListCoordinator(
                     onError("Трек не найден: $trackId")
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 onError("Не удалось загрузить трек: ${e.message}")
             }
         }

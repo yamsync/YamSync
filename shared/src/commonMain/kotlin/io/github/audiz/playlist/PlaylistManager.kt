@@ -306,7 +306,8 @@ class PlaylistManager(
                                             notifyPlaylistsChanged()
                                         }
                                         delay(250L)
-                                    } catch (_: Throwable) {
+                                    } catch (e: Throwable) {
+                                        if (e is CancellationException) throw e
                                         // Игнорируем сбои отдельных плейлистов
                                     }
                                 }
@@ -314,6 +315,7 @@ class PlaylistManager(
                         }
                     }
                 } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
                     AppLogger.e("PlaylistManager", "Ошибка загрузки пользовательских плейлистов: ${e.message}", e)
                 }
             }
@@ -328,6 +330,7 @@ class PlaylistManager(
                         AppLogger.d("PlaylistManager", "Загружено пользовательских плейлистов из кеша: ${cached.size}")
                     }
                 } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
                     AppLogger.e("PlaylistManager", "Ошибка загрузки пользовательских плейлистов из кеша: ${e.message}", e)
                 }
             }
@@ -351,6 +354,7 @@ class PlaylistManager(
                 notifyPlaylistsChanged()
                 AppLogger.d("PlaylistManager", "Загружено локальных плейлистов: ${list.size}")
             } catch (e: Throwable) {
+                if (e is CancellationException) throw e
                 AppLogger.e("PlaylistManager", "Ошибка загрузки локальных плейлистов: ${e.message}", e)
             } finally {
                 isLocalPlaylistsLoading = false
@@ -479,6 +483,7 @@ class PlaylistManager(
                                 }
                             }
                         } catch (e: Exception) {
+                            if (e is CancellationException) throw e
                             AppLogger.e("PlaylistManager", "Ошибка при удалении трека плейлиста: ${e.message}")
                         }
                     }
@@ -1164,6 +1169,7 @@ class PlaylistManager(
                 likedTrackIds.addAll(ids.map { it.removePrefix("local:").substringBefore(":") })
                 AppLogger.d("PlaylistManager", "Синхронизировано ${likedTrackIds.size} лайкнутых треков")
             } catch (e: Throwable) {
+                if (e is CancellationException) throw e
                 AppLogger.e("PlaylistManager", "Ошибка синхронизации лайкнутых треков: ${e.message}", e)
             }
         }

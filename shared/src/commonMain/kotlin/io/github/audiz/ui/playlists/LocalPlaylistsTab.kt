@@ -26,6 +26,7 @@ import io.github.audiz.models.CustomMediaSource
 import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.LocalSourceType
 import io.github.audiz.resolveLocalPath
+import kotlinx.coroutines.CancellationException
 
 /**
  * 💾 Вкладка 1: Локальные источники (папки, файлы, M3U) и оффлайн-плейлисты
@@ -257,7 +258,8 @@ internal fun LocalPlaylistsTab(
                                     fn.isNotBlank() && localFileExists(resolveLocalPath(fn))
                                 }
                             }
-                        } catch (_: Throwable) {
+                        } catch (e: Throwable) {
+                            if (e is CancellationException) throw e
                             0
                         }
                     }

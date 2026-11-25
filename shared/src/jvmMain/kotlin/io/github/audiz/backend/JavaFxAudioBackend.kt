@@ -198,7 +198,7 @@ class JavaFxAudioBackend(
                 try {
                     fadingFxPlayer?.stop()
                     fadingFxPlayer?.dispose()
-                } catch (_: Exception) {}
+                } catch (e: Exception) { if (e is CancellationException) throw e }
                 fadingFxPlayer = null
                 newPlayer.volume = volumeToGain(currentVolume).toDouble()
             }

@@ -142,8 +142,9 @@ actual object LocalStreamProxy {
                     } else {
                         deferred.complete(null)
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     deferred.complete(null)
+                    if (e is CancellationException) throw e
                 } finally {
                     inFlightChunks.remove(nextChunkIndex)
                 }
@@ -261,6 +262,7 @@ actual object LocalStreamProxy {
                     saveSessionToDisk(session)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 AppLogger.e("LocalStreamProxy", "💾 [StreamProxy] Ошибка сохранения прослушанного трека: ${e.message}", e)
             }
         }
