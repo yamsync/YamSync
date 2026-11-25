@@ -8,6 +8,7 @@ import io.github.audiz.wave.WaveManager
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -45,9 +46,8 @@ class AiBlacklistTest {
     }
 
     @Test
-    fun parsesDeltaEncodedSchema3Bundle() {
-        val json = """{"version":36,"schema":3,"encoding":"delta","artists":[10,5,85],"tracks":[1000,1],"suspectArtists":[7]}"""
-        val blacklist = AiBlacklist.parse(json.encodeToByteArray())
+    fun parsesBinarySortedArrayBundle() {
+        val blacklist = AiBlacklist.parse(bundle(version = 36, artists = intArrayOf(10, 15, 100), tracks = intArrayOf(1000, 1001), suspects = intArrayOf(7)))
 
         assertEquals(36, blacklist.version)
         assertTrue(blacklist.containsArtist(10))
@@ -61,26 +61,34 @@ class AiBlacklistTest {
     }
 
     @Test
-    fun parsesPlainListsWithoutDeltaEncoding() {
-        val blacklist = AiBlacklist.parse("""{"version":5,"artists":[10,15],"tracks":[]}""".encodeToByteArray())
-
-        assertEquals(5, blacklist.version)
-        assertTrue(blacklist.containsArtist(15))
-        assertFalse(blacklist.containsTrack("10"))
-        assertFalse(blacklist.isSuspectArtist(10))
+    fun rejectsUnknownOrTruncatedBundles() {
+        assertFailsWith<IllegalArgumentException> { AiBlacklist.parse("{\"version\":1}".encodeToByteArray()) }
+        val full = bundle(version = 1, artists = intArrayOf(1, 2, 3), tracks = intArrayOf(), suspects = intArrayOf())
+        assertFailsWith<IllegalArgumentException> { AiBlacklist.parse(full.copyOf(full.size - 6)) }
     }
 
     @Test
-    fun intIdSetHandlesCollisionsAndOutOfRangeIds() {
-        val ids = IntArray(100_000) { it * 64 + 1 }
-        val set = IntIdSet.of(ids)
+    fun sortedIdsBinarySearchHandlesBoundsAndOutOfRangeIds() {
+        val ids = SortedIntIds(IntArray(100_000) { it * 64 + 1 })
 
-        assertEquals(100_000, set.size)
-        assertTrue(ids.all { it.toLong() in set })
-        assertFalse(2L in set)
-        assertFalse(0L in set)
-        assertFalse(-1L in set)
-        assertFalse((Int.MAX_VALUE.toLong() + 1) in set)
+        assertEquals(100_000, ids.size)
+        assertTrue((0 until 100_000).all { (it * 64 + 1).toLong() in ids })
+        assertTrue(1L in ids)
+        assertTrue((99_999L * 64 + 1) in ids)
+        assertFalse(2L in ids)
+        assertFalse(0L in ids)
+        assertFalse(-1L in ids)
+        assertFalse((Int.MAX_VALUE.toLong() + 1) in ids)
+        assertFalse(5L in SortedIntIds.EMPTY)
+    }
+
+    private fun bundle(version: Int, artists: IntArray, tracks: IntArray, suspects: IntArray): ByteArray {
+        val ints = mutableListOf(version)
+        for (section in listOf(artists, tracks, suspects)) { ints += section.size; ints += section.toList() }
+        val out = ByteArray(4 + ints.size * 4)
+        "YAB".encodeToByteArray().copyInto(out); out[3] = 1
+        ints.forEachIndexed { k, v -> for (b in 0 until 4) out[4 + k * 4 + b] = (v ushr (8 * b)).toByte() }
+        return out
     }
 
     @Test

@@ -16,61 +16,42 @@ enum class AiFilterMode(val title: String) {
 internal enum class AiMatch { TRACK, ARTIST, SUSPECT_ARTIST }
 
 /**
- * Set of positive Int IDs on a primitive open-addressing table: O(1) lookups,
- * 4 bytes per slot (load factor <= 0.75), no boxing and no per-entry objects.
+ * Sorted array of positive Int IDs: lookups by binary search, O(log n) (~19 steps for 316k IDs),
+ * exactly 4 bytes per ID, no boxing, no per-entry objects and no build step after loading.
  */
-internal class IntIdSet private constructor(private val table: IntArray, val size: Int) {
-    private val mask = table.size - 1
+internal class SortedIntIds(private val ids: IntArray) {
+    val size: Int get() = ids.size
 
     operator fun contains(id: Long): Boolean {
         if (id <= 0L || id > Int.MAX_VALUE) return false
         val key = id.toInt()
-        var i = mix(key) and mask
-        while (true) {
-            val v = table[i]
-            if (v == key) return true
-            if (v == 0) return false
-            i = (i + 1) and mask
+        var lo = 0
+        var hi = ids.size - 1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val v = ids[mid]
+            when {
+                v < key -> lo = mid + 1
+                v > key -> hi = mid - 1
+                else -> return true
+            }
         }
+        return false
     }
 
     companion object {
-        val EMPTY: IntIdSet = of(IntArray(0))
+        val EMPTY = SortedIntIds(IntArray(0))
 
-        private fun mix(x: Int): Int {
-            val h = x * -0x61c88647 // Fibonacci hashing
-            return h xor (h ushr 16)
-        }
-
-        fun of(ids: IntArray, count: Int = ids.size): IntIdSet {
-            var cap = 16
-            while (cap.toLong() * 3 < count.toLong() * 4) cap = cap shl 1
-            val table = IntArray(cap)
-            val mask = cap - 1
-            var size = 0
-            for (k in 0 until count) {
-                val id = ids[k]
-                if (id <= 0) continue
-                var i = mix(id) and mask
-                while (table[i] != 0 && table[i] != id) i = (i + 1) and mask
-                if (table[i] == 0) {
-                    table[i] = id
-                    size++
-                }
-            }
-            return IntIdSet(table, size)
-        }
-
-        fun of(ids: Collection<Long>): IntIdSet =
-            of(ids.filter { it in 1..Int.MAX_VALUE.toLong() }.map { it.toInt() }.toIntArray())
+        fun of(ids: Collection<Long>): SortedIntIds =
+            SortedIntIds(ids.filter { it in 1..Int.MAX_VALUE.toLong() }.map { it.toInt() }.distinct().sorted().toIntArray())
     }
 }
 
 internal class AiBlacklist(
     val version: Int,
-    private val artists: IntIdSet,
-    private val tracks: IntIdSet,
-    private val suspectArtists: IntIdSet = IntIdSet.EMPTY,
+    private val artists: SortedIntIds,
+    private val tracks: SortedIntIds,
+    private val suspectArtists: SortedIntIds = SortedIntIds.EMPTY,
 ) {
     fun containsArtist(artistId: Long): Boolean = artistId in artists
 
@@ -103,86 +84,45 @@ internal class AiBlacklist(
 
     companion object {
         fun of(version: Int, artists: Set<Long>, tracks: Set<Long>, suspectArtists: Set<Long> = emptySet()) =
-            AiBlacklist(version, IntIdSet.of(artists), IntIdSet.of(tracks), IntIdSet.of(suspectArtists))
+            AiBlacklist(version, SortedIntIds.of(artists), SortedIntIds.of(tracks), SortedIntIds.of(suspectArtists))
 
         /**
-         * Parses the bundle produced by yam-ai-blacklist `export-client` (schema 3):
-         * {"version":36,"schema":3,"encoding":"delta","artists":[...],"tracks":[...],"suspectArtists":[...]}
-         * Each list is sorted and delta-encoded: the first number is an ID, every next one is the
-         * difference to the previous ID. Parsed in one pass straight into IntArrays, without a JSON
-         * tree or boxed numbers. Plain (non-delta) lists are accepted as well.
+         * Reads the binary bundle produced by yam-ai-blacklist `export-client` (little-endian):
+         *   "YAB" + format version 0x01 | int32 database version |
+         *   3 sections: int32 count, then count x int32 sorted IDs (artists, tracks, suspect artists)
+         * Loading is a straight copy into IntArrays: no text parsing, no hashing, no sorting.
          */
         fun parse(bytes: ByteArray): AiBlacklist {
-            val delta = indexOf(bytes, "\"encoding\":\"delta\"") >= 0
+            require(bytes.size >= 8 && bytes[0] == 'Y'.code.toByte() && bytes[1] == 'A'.code.toByte() &&
+                bytes[2] == 'B'.code.toByte() && bytes[3] == FORMAT_VERSION) { "Unsupported AI blacklist format" }
+            var offset = 8
+            fun section(): SortedIntIds {
+                require(offset + 4 <= bytes.size) { "Truncated AI blacklist" }
+                val count = readIntLe(bytes, offset)
+                require(count >= 0 && offset + 4 + count.toLong() * 4 <= bytes.size) { "Truncated AI blacklist" }
+                offset += 4
+                val ids = IntArray(count) { readIntLe(bytes, offset + it * 4) }
+                offset += count * 4
+                return SortedIntIds(ids)
+            }
             return AiBlacklist(
-                version = readNumber(bytes, "version") ?: 0,
-                artists = IntIdSet.of(readIdArray(bytes, "artists", delta)),
-                tracks = IntIdSet.of(readIdArray(bytes, "tracks", delta)),
-                suspectArtists = IntIdSet.of(readIdArray(bytes, "suspectArtists", delta)),
+                version = readIntLe(bytes, 4),
+                artists = section(),
+                tracks = section(),
+                suspectArtists = section(),
             )
         }
 
-        private fun indexOf(bytes: ByteArray, text: String): Int {
-            val pattern = text.encodeToByteArray()
-            outer@ for (i in 0..bytes.size - pattern.size) {
-                for (j in pattern.indices) if (bytes[i + j] != pattern[j]) continue@outer
-                return i
-            }
-            return -1
-        }
+        private fun readIntLe(b: ByteArray, i: Int): Int =
+            (b[i].toInt() and 0xFF) or
+                ((b[i + 1].toInt() and 0xFF) shl 8) or
+                ((b[i + 2].toInt() and 0xFF) shl 16) or
+                (b[i + 3].toInt() shl 24)
 
-        private fun readNumber(bytes: ByteArray, key: String): Int? {
-            var i = indexOf(bytes, "\"$key\":")
-            if (i < 0) return null
-            i += key.length + 3
-            var value = 0
-            while (i < bytes.size && bytes[i] in DIGIT_0..DIGIT_9) value = value * 10 + (bytes[i++] - DIGIT_0)
-            return value
-        }
-
-        private fun readIdArray(bytes: ByteArray, key: String, delta: Boolean): IntArray {
-            var start = indexOf(bytes, "\"$key\":[")
-            if (start < 0) return IntArray(0)
-            start += key.length + 4
-            // First pass: count numbers to allocate the exact array size
-            var count = 0
-            var inNumber = false
-            var i = start
-            while (i < bytes.size && bytes[i] != CLOSE) {
-                val digit = bytes[i] in DIGIT_0..DIGIT_9
-                if (digit && !inNumber) count++
-                inNumber = digit
-                i++
-            }
-            // Second pass: parse (and accumulate deltas) into the array
-            val out = IntArray(count)
-            var n = 0
-            var acc = 0L
-            var cur = 0L
-            inNumber = false
-            i = start
-            while (n < count && i <= bytes.size) {
-                val b = if (i < bytes.size) bytes[i] else CLOSE
-                if (b in DIGIT_0..DIGIT_9) {
-                    cur = cur * 10 + (b - DIGIT_0)
-                    inNumber = true
-                } else if (inNumber) {
-                    acc = if (delta) acc + cur else cur
-                    out[n++] = acc.toInt()
-                    cur = 0L
-                    inNumber = false
-                }
-                i++
-            }
-            return out
-        }
-
-        private const val DIGIT_0: Byte = 48 // '0'
-        private const val DIGIT_9: Byte = 57 // '9'
-        private const val CLOSE: Byte = 93 // ']'
+        private const val FORMAT_VERSION: Byte = 1
     }
 }
 
 internal suspend fun loadBundledAiBlacklist(): AiBlacklist = withContext(DispatcherIO) {
-    AiBlacklist.parse(Res.readBytes("files/ai_blacklist.json"))
+    AiBlacklist.parse(Res.readBytes("files/ai_blacklist.bin"))
 }
