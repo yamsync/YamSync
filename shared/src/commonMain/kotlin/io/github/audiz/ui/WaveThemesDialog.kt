@@ -61,6 +61,7 @@ import io.github.audiz.models.WaveThemeOption
 import io.github.audiz.wave.WaveCatalogOrganizer
 import io.github.audiz.wave.WaveGenreFamilyGroup
 import io.github.audiz.wave.WaveManager
+import io.github.audiz.wave.WaveTitleFormatter
 
 @Composable
 internal fun WaveThemesDialog(viewModel: SearchViewModel, onDismiss: () -> Unit) {
@@ -166,7 +167,7 @@ internal fun WaveThemesDialog(viewModel: SearchViewModel, onDismiss: () -> Unit)
         matchingGenres.isNotEmpty()
 
     val selectedOptions = remember(categories, selectedByCategory.toMap()) {
-        categories.mapNotNull { selectedByCategory[it.id] }
+        WaveTitleFormatter.sortOptionsSemantically(categories.mapNotNull { selectedByCategory[it.id] })
     }
     val combinedSeeds = remember(selectedOptions) {
         selectedOptions.flatMap { it.seeds }.distinct()
@@ -270,7 +271,14 @@ internal fun WaveThemesDialog(viewModel: SearchViewModel, onDismiss: () -> Unit)
                                 if (visibleRecent.isNotEmpty()) {
                                     item(key = "recent_header") { WaveThemesHeading("Недавно слушали") }
                                     items(visibleRecent, key = { "recent_${it.seeds.joinToString()}" }) { theme ->
-                                        WaveThemeItem(title = theme.title, theme = theme, viewModel = viewModel, onDismiss = onDismiss)
+                                        val display = WaveTitleFormatter.format(theme.title, theme.seeds, categories)
+                                        WaveThemeItem(
+                                            title = display.compactTitle,
+                                            subtitle = display.fullTitle.takeIf { display.tags.size > 1 },
+                                            theme = theme,
+                                            viewModel = viewModel,
+                                            onDismiss = onDismiss
+                                        )
                                     }
                                 }
 
@@ -361,20 +369,58 @@ internal fun WaveThemesDialog(viewModel: SearchViewModel, onDismiss: () -> Unit)
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(Modifier.weight(1f)) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(
                                         text = "Выбранная комбинация",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1
                                     )
-                                    Text(
-                                        text = combinedTitle,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        selectedOptions.forEach { option ->
+                                            Surface(
+                                                onClick = {
+                                                    val mapKey = selectedByCategory.entries
+                                                        .firstOrNull { it.value.id == option.id }
+                                                        ?.key
+                                                        ?: option.categoryId
+                                                    selectedByCategory.remove(mapKey)
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                                ),
+                                                modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = option.title,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Icon(
+                                                        Icons.Filled.Close,
+                                                        contentDescription = "Убрать фильтр",
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 IconButton(
                                     onClick = { selectedByCategory.clear() },

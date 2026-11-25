@@ -66,6 +66,7 @@ import io.github.audiz.ui.buildAppColorScheme
 import io.github.audiz.ui.EqualizerDialog
 import io.github.audiz.ui.MobileFullPlayerSheet
 import io.github.audiz.ui.PlayerTrackRemovalDialog
+import io.github.audiz.ui.WaveThemesDialog
 import io.github.audiz.ui.BackHandler
 import io.github.audiz.dsp.EqualizerEngine
 import kotlinx.coroutines.flow.collectLatest
@@ -162,6 +163,7 @@ fun App() {
             val currentWave = searchViewModel.currentWaveTrack
             val hasTrackCandidate = searchViewModel.playerTrackId != null || currentWave != null || searchViewModel.plannedNextTrack != null
             val isWaveActiveOrPreloaded = searchViewModel.isWaveMode || (isFirstPage && searchViewModel.playerTrackId == null && currentWave != null)
+            val activeWaveDisplay = if (isWaveActiveOrPreloaded) searchViewModel.currentWaveDisplay else null
 
             val displayTitle = when {
                 searchViewModel.playerTrackTitle.isNotEmpty() -> searchViewModel.playerTrackTitle
@@ -219,9 +221,9 @@ fun App() {
                 isEqualizerActive = eqState.isEnabled,
                 hasTrackCandidate = hasTrackCandidate,
                 isWave = isWaveActiveOrPreloaded,
-                waveTitle = if (isWaveActiveOrPreloaded) {
-                    searchViewModel.currentWaveTitle?.takeIf { it.isNotBlank() && !it.equals("Моя Волна", ignoreCase = true) }
-                } else null,
+                waveTitle = activeWaveDisplay?.fullTitle,
+                waveCompactTitle = activeWaveDisplay?.compactTitle,
+                waveTags = activeWaveDisplay?.tags.orEmpty(),
                 coverUri = searchViewModel.playerCoverUri ?: if (isWaveActiveOrPreloaded) currentWave?.coverUri else null,
                 isMobile = isMobileUi,
                 isQueueOpen = dialog is AppDialog.UpNext || (showTracksScreen && !searchViewModel.isPreviewingTrackList),
@@ -316,6 +318,7 @@ fun App() {
                 } else null,
                 onExpandMobilePlayer = { nav.updateMobilePlayerExpanded(true) },
                 onResetWave = { searchViewModel.resetToDefaultWave() },
+                onOpenWaveThemes = { dialog = AppDialog.WaveThemes },
                 onMobilePlayerDrag = { top ->
                     nav.isDraggingMobilePlayerOpen = true
                     nav.mobilePlayerDragTop = top
@@ -832,6 +835,11 @@ fun App() {
                 )
 
                 AppDialog.Logs -> LogsDialog(
+                    onDismiss = { dialog = null }
+                )
+
+                AppDialog.WaveThemes -> WaveThemesDialog(
+                    viewModel = searchViewModel,
                     onDismiss = { dialog = null }
                 )
 

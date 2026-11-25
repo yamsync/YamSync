@@ -51,6 +51,8 @@ data class PlayerBarState(
     val hasTrackCandidate: Boolean = false,
     val isWave: Boolean = false,
     val waveTitle: String? = null,
+    val waveCompactTitle: String? = null,
+    val waveTags: List<String> = emptyList(),
     val coverUri: String? = null,
     val isMobile: Boolean = false,
     val isQueueOpen: Boolean = false,
@@ -80,6 +82,7 @@ data class PlayerBarActions(
     val onOpenArtist: (() -> Unit)? = null,
     val onExpandMobilePlayer: (() -> Unit)? = null,
     val onResetWave: (() -> Unit)? = null,
+    val onOpenWaveThemes: (() -> Unit)? = null,
     val onMobilePlayerDrag: (Float?) -> Unit = {},
     val onMobilePlayerDragEnd: (Boolean) -> Unit = {},
 )
@@ -174,15 +177,44 @@ fun DesktopPlayerBar(
                             barSpacing = 1.dp,
                             maxHeight = 14.dp
                         )
-                        Text(
-                            text = if (state.isWave) state.waveTitle?.let { "Моя Волна • $it" } ?: "Моя Волна" else "Сейчас играет",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (state.isWave) primary else tint,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (state.isWave && !state.waveTitle.isNullOrBlank()) {
+                        val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() &&
+                            !state.waveTitle.equals("Моя Волна", ignoreCase = true)
+                        val waveText = when {
+                            isThematicWave -> state.waveCompactTitle?.takeIf { it.isNotBlank() } ?: state.waveTitle.orEmpty()
+                            state.isWave -> "Моя Волна"
+                            else -> "Сейчас играет"
+                        }
+                        val waveRowModifier = if (state.isWave && actions.onOpenWaveThemes != null) {
+                            Modifier.weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable(onClick = { actions.onOpenWaveThemes.invoke() })
+                                .pointerHoverIcon(PointerIcon.Hand)
+                                .padding(horizontal = 2.dp, vertical = 1.dp)
+                        } else {
+                            Modifier.weight(1f)
+                        }
+                        Row(
+                            modifier = waveRowModifier,
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (isThematicWave) {
+                                Icon(
+                                    imageVector = Icons.Filled.Waves,
+                                    contentDescription = "Моя Волна",
+                                    tint = primary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                            Text(
+                                text = waveText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (state.isWave) primary else tint,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (isThematicWave) {
                             CompactPlayerAction(
                                 icon = Icons.Filled.Close,
                                 description = "Сбросить к персональной Волне",

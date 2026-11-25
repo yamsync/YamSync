@@ -109,8 +109,11 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
     val isWavePaused = isCurrentTrackFromWave && viewModel.playerIsPaused
     val personalWaveTitle = "Персональная"
     val hasThematicWave = viewModel.currentWaveSeeds.isNotEmpty()
-    val themeTitle = viewModel.currentWaveTitle?.takeIf { hasThematicWave && it.isNotBlank() }
+    val activeWaveDisplay = if (hasThematicWave) viewModel.currentWaveDisplay else null
+    val themeTitle = activeWaveDisplay?.compactTitle?.takeIf { it.isNotBlank() }
+        ?: viewModel.currentWaveTitle?.takeIf { hasThematicWave && it.isNotBlank() }
         ?: personalWaveTitle
+    val activeTags = activeWaveDisplay?.tags.orEmpty()
     val status = when {
         isWavePlaying -> "Сейчас играет"
         isWavePaused -> "На паузе"
@@ -151,18 +154,48 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
                     }
                 }
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 13.dp, vertical = 8.dp),
+                    Modifier.fillMaxWidth()
+                        .heightIn(min = 52.dp)
+                        .clickable(role = Role.Button) { showThemes = true }
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .padding(horizontal = 13.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(status, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
-                        Text(
-                            themeTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        if (activeTags.size > 1) {
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                activeTags.forEach { tag ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = lerp(colors.surfaceContainerLow, accent, 0.14f),
+                                        border = BorderStroke(1.dp, accent.copy(alpha = 0.35f))
+                                    ) {
+                                        Text(
+                                            text = tag,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = accent,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                themeTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                     if (isWavePlaying) {
                         Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
@@ -183,6 +216,8 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
             ) {
                 quickThemes.forEach { theme ->
                     val selected = viewModel.isWaveMode && viewModel.currentWaveSeeds == theme?.seeds.orEmpty()
+                    val chipTitle = theme?.let { viewModel.formatWavePresetDisplay(it.title, it.seeds).compactTitle }
+                        ?: personalWaveTitle
                     Surface(
                         onClick = { viewModel.selectWaveTheme(theme) },
                         enabled = !viewModel.isWaveLoading,
@@ -193,7 +228,7 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
                     ) {
                         Box(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
                             Text(
-                                theme?.title ?: personalWaveTitle,
+                                chipTitle,
                                 color = if (selected) accent else colors.onSurface,
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,

@@ -36,7 +36,9 @@ import io.github.audiz.player.resolvePlayerArtist
 import io.github.audiz.playlist.PlaylistManager
 import io.github.audiz.playlist.PlaylistDownloadProgress
 import io.github.audiz.settings.SettingsManager
+import io.github.audiz.wave.WaveDisplayInfo
 import io.github.audiz.wave.WaveManager
+import io.github.audiz.wave.WaveTitleFormatter
 import io.github.audiz.local.LocalMediaManager
 import io.github.audiz.models.CustomMediaSource
 import io.github.audiz.models.FolderListing
@@ -243,6 +245,18 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() = waveManager.buildQuickWaveChips(artistWaves = suggestedWaveArtists, limit = 4)
     val currentWaveTrackCandidate: WaveThemeOption?
         get() = buildCurrentTrackWaveCandidate()
+    val currentWaveDisplay: WaveDisplayInfo?
+        get() {
+            val title = currentWaveTitle
+            val seeds = currentWaveSeeds
+            if (seeds.isEmpty() && (title.isNullOrBlank() || title.equals("Моя Волна", ignoreCase = true))) {
+                return null
+            }
+            return WaveTitleFormatter.format(title, seeds, waveCategories)
+        }
+
+    fun formatWavePresetDisplay(title: String?, seeds: List<String>): WaveDisplayInfo =
+        WaveTitleFormatter.format(title, seeds, waveCategories)
 
     val cookieService: YandexCookieService get() = settingsManager.cookieService
     val isExchangingToken: Boolean get() = settingsManager.isExchangingToken
@@ -941,7 +955,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             isSavedToDisk = isCurrentTrackSavedToDisk,
             isSavingToDisk = isCurrentTrackSavingToDisk,
             isWaveMode = isWaveMode,
-            currentWaveTitle = currentWaveTitle
+            currentWaveTitle = currentWaveDisplay?.compactTitle ?: currentWaveTitle
         )
 
     init {
@@ -1899,7 +1913,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         trackListCoordinator.toggleQueueView(
             isWaveMode = isWaveMode,
             waveTracks = waveTracks,
-            waveTitle = waveManager.currentWaveTitle,
+            waveTitle = currentWaveDisplay?.compactTitle ?: waveManager.currentWaveTitle,
             isTracksListVisible = isTracksListVisible,
             setTracksListVisible = { isTracksListVisible = it }
         )
@@ -1913,7 +1927,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             origin = origin,
             isWaveMode = isWaveMode,
             waveTracks = waveTracks,
-            waveTitle = waveManager.currentWaveTitle
+            waveTitle = currentWaveDisplay?.compactTitle ?: waveManager.currentWaveTitle
         )
         if (isTracksListVisible) requestScrollToPlayingTrack()
     }
@@ -1992,8 +2006,11 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     fun seekPlayer(positionMs: Long) = playbackManager.seekTo(positionMs)
 
     val upNextState get() = playbackManager.upNextQueue.state
-    val upNextContinuationTitle get() = if (isWaveMode) currentWaveTitle ?: "Моя Волна"
-        else trackListNavigation.active.currentScreenTitle
+    val upNextContinuationTitle get() = if (isWaveMode) {
+        currentWaveDisplay?.compactTitle?.takeIf { it.isNotBlank() } ?: "Моя Волна"
+    } else {
+        trackListNavigation.active.currentScreenTitle
+    }
 
     fun addToUpNext(track: FullTrackInfo, first: Boolean = false) {
         playbackManager.addToUpNext(track, first)

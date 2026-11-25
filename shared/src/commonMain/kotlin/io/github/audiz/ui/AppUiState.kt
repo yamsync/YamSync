@@ -39,6 +39,9 @@ sealed interface AppDialog {
         val title: String,
         val artist: String
     ) : AppDialog
+
+    /** Конструктор тем и фильтров «Моей волны». */
+    data object WaveThemes : AppDialog
 }
 
 @Stable

@@ -1206,7 +1206,7 @@ class TrackListCoordinator(
             loadedTracks.addAll(waveTracks)
             chartTrackPositions = emptyMap()
             currentScreenTitle = if (!waveTitle.isNullOrBlank()) {
-                "Моя Волна • $waveTitle"
+                waveTitle
             } else {
                 "Очередь Моей Волны"
             }

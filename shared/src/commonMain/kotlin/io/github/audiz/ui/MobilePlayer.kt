@@ -273,7 +273,19 @@ fun MobileMiniPlayerBar(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val waveLabel = if (isThematicWave) "Моя Волна • ${state.waveTitle}" else "Моя Волна"
+                                if (isThematicWave) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Waves,
+                                        contentDescription = "Моя Волна",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                                val waveLabel = if (isThematicWave) {
+                                    state.waveCompactTitle?.takeIf { it.isNotBlank() } ?: state.waveTitle.orEmpty()
+                                } else {
+                                    "Моя Волна"
+                                }
                                 Text(
                                     text = waveLabel,
                                     style = MaterialTheme.typography.labelSmall,
@@ -619,7 +631,7 @@ fun MobileFullPlayerSheet(
 
                     val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() && !state.waveTitle.equals("Моя Волна", ignoreCase = true)
                     val contextLabel = when {
-                        isThematicWave -> "${state.waveTitle} • МОЯ ВОЛНА"
+                        isThematicWave -> state.waveCompactTitle?.takeIf { it.isNotBlank() } ?: state.waveTitle.orEmpty()
                         state.isWave -> "МОЯ ВОЛНА"
                         else -> "СЕЙЧАС ИГРАЕТ"
                     }
@@ -628,17 +640,45 @@ fun MobileFullPlayerSheet(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        Text(
-                            text = contextLabel.uppercase(),
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp
-                            ),
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
+                        val labelModifier = if (state.isWave && actions.onOpenWaveThemes != null) {
+                            Modifier.weight(1f, fill = false)
+                                .clip(RoundedCornerShape(8.dp))
+                                .then(controlModifier)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { actions.onOpenWaveThemes.invoke() }
+                                )
+                                .pointerHoverIcon(PointerIcon.Hand)
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        } else {
+                            Modifier.weight(1f, fill = false)
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = labelModifier
+                        ) {
+                            if (isThematicWave) {
+                                Icon(
+                                    imageVector = Icons.Filled.Waves,
+                                    contentDescription = "Моя Волна",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                            Text(
+                                text = contextLabel.uppercase(),
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.2.sp
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                        }
                         if (isThematicWave && actions.onResetWave != null) {
                             Box(
                                 modifier = Modifier
