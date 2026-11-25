@@ -212,7 +212,7 @@ object WaveCatalogParser {
         for (cat in categories) {
             val normId = normalizeCategoryId(cat.id).ifBlank { cat.title.lowercase() }
             if (cat.items.isEmpty()) continue
-            titles.putIfAbsent(normId, cat.title.ifBlank { defaultCategoryTitle(normId) })
+            titles.getOrPut(normId) { cat.title.ifBlank { defaultCategoryTitle(normId) } }
             val target = merged.getOrPut(normId) { mutableListOf() }
             target.addAll(cat.items)
         }
