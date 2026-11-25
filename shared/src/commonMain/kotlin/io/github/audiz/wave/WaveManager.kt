@@ -38,14 +38,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/**
- * 🌊 Менеджер режима «Моя Волна» (Ynison WebSocket + Rotor Radio REST API).
- * Инкапсулирует:
- * - Управление сессиями волны (Ynison session ID, Rotor radio session ID, batch ID).
- * - Очередь треков текущей пачки и историю переходов (до 5 треков назад/вперед).
- * - Буфер накопления фидбеков (skip, trackFinished) и запрос следующих пачек.
- * - Взаимодействие с PlaybackManager для запуска воспроизведения треков волны.
- */
 class WaveManager(
     private val scope: CoroutineScope,
     private val repository: MusicRepository,
@@ -67,7 +59,6 @@ class WaveManager(
         this.playbackManager = playback
     }
 
-    // 🌊 Ynison Моя Волна session_id:
     var ynisonWaveSessionId by mutableStateOf<String?>(null)
         private set
     var isFetchingYnison by mutableStateOf(false)
@@ -77,7 +68,6 @@ class WaveManager(
     var ynisonError by mutableStateOf<String?>(null)
         private set
 
-    // 🌊 Состояния «Моя Волна» (Rotor Radio):
     var waveRadioSessionId by mutableStateOf<String?>(null)
         private set
     var waveBatchId by mutableStateOf<String?>(null)
@@ -90,7 +80,6 @@ class WaveManager(
     var isWaveLoading by mutableStateOf(false)
         private set
 
-    // 🌊 Тематическая Волна (по жанру / настроению):
     var currentWaveTitle by mutableStateOf<String?>(null)
         private set
     var currentWaveSeeds by mutableStateOf<List<String>>(emptyList())
@@ -165,7 +154,6 @@ class WaveManager(
         )
     }
 
-    // 🌊 Персональные станции и категории настроек Волны с сервера + фолбэк:
     val personalWaveStations: SnapshotStateList<WaveThemeOption> = mutableStateListOf()
     val waveCategories: SnapshotStateList<WaveThemeCategory> = mutableStateListOf<WaveThemeCategory>().apply {
         addAll(LOCAL_FALLBACK_CATEGORIES)
@@ -266,7 +254,6 @@ class WaveManager(
         return result
     }
 
-    // 🌊 Постоянные пресеты тематических волн (динамически разные музыкальные стили):
     val defaultThematicWaves: SnapshotStateList<ThematicWavePreset> = mutableStateListOf()
 
     fun refreshDefaultThematicWaves() {
@@ -278,7 +265,6 @@ class WaveManager(
         defaultThematicWaves.addAll(selected)
     }
 
-    // 🌊 До 3 недавних тематических волн:
     val recentThematicWaves: SnapshotStateList<ThematicWavePreset> = mutableStateListOf()
     private val waveJson = Json { ignoreUnknownKeys = true }
 
@@ -327,7 +313,6 @@ class WaveManager(
         val displayTitle = title?.takeIf { it.isNotBlank() } ?: "Моя Волна"
         val entry = ThematicWavePreset(displayTitle, seeds)
 
-        // Исключаем предыдущее появление такой же волны (по seeds или по названию)
         val filtered = recentThematicWaves.filterNot { it.seeds == seeds || it.title == displayTitle }
         val updated = (listOf(entry) + filtered).take(3)
 
@@ -386,9 +371,6 @@ class WaveManager(
         return response
     }
 
-    /**
-     * ⏭ Получить кандидата на следующий трек в Моей Волне (для предзагрузки)
-     */
     override fun getNextWaveTrackCandidate(): FullTrackInfo? {
         val currentId = currentWaveTrack?.id
         val futureCandidate = waveFutureTracks.firstOrNull { it.id != currentId }
@@ -400,7 +382,6 @@ class WaveManager(
     val wavePastTracks: SnapshotStateList<FullTrackInfo> = mutableStateListOf()
     val waveFutureTracks: SnapshotStateList<FullTrackInfo> = mutableStateListOf()
 
-    // 🌊 Буфер накопленных фидбеков Моей Волны (строго изолирован от плейлистов):
     private val pendingWaveFeedbacks = mutableListOf<RotorFeedbackItem>()
     private val waveTrackBatchMap = mutableMapOf<String, String>()
     private val trackStartTimestamps = mutableMapOf<String, String>()
@@ -556,9 +537,6 @@ class WaveManager(
         }
     }
 
-    /**
-     * 🌊 Запустить тематическую Мою Волну (по жанру, артисту, стилю через seeds)
-     */
     fun startThematicWave(
         title: String?,
         seeds: List<String>,
@@ -671,9 +649,6 @@ class WaveManager(
         }
     }
 
-    /**
-     * 🔄 Сбросить Мою Волну к дефолтной персональной волне пользователя
-     */
     fun resetToDefaultWave(autoPlay: Boolean = true) {
         currentWaveTitle = null
         currentWaveSeeds = emptyList()
@@ -685,9 +660,6 @@ class WaveManager(
         loadInitialWave(autoPlay = autoPlay, source = TrackPlaySource.PLAY)
     }
 
-    /**
-     * 🌊 Воспроизвести трек Волны по индексу (0..4)
-     */
     fun playWaveTrack() {
         playWaveTrack(waveCurrentIndex, TrackPlaySource.PLAY, 0L)
     }
@@ -781,9 +753,6 @@ class WaveManager(
         }
     }
 
-    /**
-     * ⏮ Переход к предыдущему треку в Моей волне (до 5 треков назад)
-     */
     override fun playPrevWaveTrack() {
         try {
             if (!isWaveMode) {
@@ -879,9 +848,6 @@ class WaveManager(
         }
     }
 
-    /**
-     * 🌊 Переключить play/pause для Моей волны
-     */
     fun togglePlayPauseWave() {
         val pm = playbackManager
         if (isWaveMode && pm?.trackId != null) {
@@ -907,7 +873,6 @@ class WaveManager(
             return
         }
 
-        // Если в текущей очереди есть следующий трек — мгновенно переключаем на него (Zero Latency)
         val nextIndex = recommendedIndex(waveCurrentIndex + 1, currentWaveTrack?.id)
         if (nextIndex != null) {
             val oldTrack = currentWaveTrack
@@ -920,7 +885,6 @@ class WaveManager(
             }
             waveFutureTracks.clear()
 
-            // 1. Мгновенно запускаем воспроизведение следующего трека
             playWaveTrack(nextIndex, TrackPlaySource.NEXT, crossfadeMs)
             val nextTrack = waveTracks[waveCurrentIndex]
 
@@ -930,7 +894,6 @@ class WaveManager(
                 return
             }
 
-            // 2. В фоне отправляем skip фидбек, отчет /plays и обновляем хвост очереди
             replenishmentJob?.cancel()
             replenishmentJob = scope.launch {
                 try {
@@ -942,7 +905,6 @@ class WaveManager(
                     val startTs = (oldTrack?.let { trackStartTimestamps[it.id] }) ?: currentIsoUtcTimestamp()
                     val playId = (oldTrack?.let { trackPlayIds[it.id] }) ?: generatePlayUuid()
 
-                    // Отправляем /plays для пропущенного трека
                     if (oldTrack != null) {
                         repository.sendPlayReport(
                             trackId = oldTrack.id,
@@ -1025,7 +987,6 @@ class WaveManager(
             return
         }
 
-        // Если в очереди больше нет следующих треков — проверяем сессию
         val radioSessionId = waveRadioSessionId ?: ynisonWaveSessionId
         val batchId = waveBatchId
         if (radioSessionId == null) {
@@ -1034,7 +995,6 @@ class WaveManager(
             return
         }
 
-        // Показываем загрузку и ждем ответа сервера
         playbackManager?.setLoadingFlags(next = true, prev = false, play = false)
         val current = currentWaveTrack
         if (current != null && wavePastTracks.lastOrNull()?.id != current.id) {
@@ -1157,7 +1117,6 @@ class WaveManager(
         val current = currentWaveTrack
         if (current != null) recordWaveTrackFinished(current)
 
-        // Очищаем из waveFutureTracks любые вхождения текущего доигравшего трека
         while (waveFutureTracks.firstOrNull()?.id?.let { it == current?.id } == true) {
             waveFutureTracks.removeAt(0)
         }
@@ -1202,7 +1161,6 @@ class WaveManager(
             }
         }
 
-        // Накапливаем фидбек trackFinished для завершившегося трека Волны
         val albumId = current.albums.firstOrNull()?.id ?: 0
         val trackIdWithAlbum = "${current.id}:$albumId"
         val bId = waveTrackBatchMap[current.id] ?: waveBatchId ?: ""
@@ -1215,7 +1173,6 @@ class WaveManager(
         if (playId == lastFinishedPlayId) return
         lastFinishedPlayId = playId
 
-        // Отправляем /plays со статусом finish
         if (!radioSessionId.isNullOrBlank() && bId.isNotBlank()) {
             scope.launch {
                 repository.sendPlayReport(

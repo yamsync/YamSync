@@ -36,9 +36,6 @@ class PcmSpectrumAnalyzer(
         }
     }
 
-    /**
-     * Предрассчитанный план FFT фиксированного размера с собственными рабочими буферами.
-     */
     private class FftPlan(val size: Int) {
         val numBins = size / 2
         private val real = FloatArray(size)
@@ -85,7 +82,6 @@ class PcmSpectrumAnalyzer(
          * In-place Radix-2 Cooley-Tukey Decimation-in-Time FFT
          */
         private fun computeFft() {
-            // Битреверсивная перестановка
             for (i in 0 until size) {
                 val j = bitReversedIndices[i]
                 if (j > i) {
@@ -99,7 +95,6 @@ class PcmSpectrumAnalyzer(
                 }
             }
 
-            // Бабочки FFT (DIT)
             var len = 2
             while (len <= size) {
                 val halfLen = len shr 1
@@ -137,7 +132,6 @@ class PcmSpectrumAnalyzer(
     // Скользящее окно сэмплов под длинное FFT; короткое FFT берёт его хвост
     private val sampleBuffer = FloatArray(lowResPlan.size)
 
-    // Временный буфер для извлечения сэмплов из чанка байт
     private val tempExtracted = FloatArray(MAX_TEMP_SAMPLES)
 
     private val outputSpectrum25 = FloatArray(TwentyFiveBandVisualizer.SPECTRUM_BAND_COUNT)
@@ -145,9 +139,6 @@ class PcmSpectrumAnalyzer(
     private var highResBinHz = sampleRate / highResPlan.size.toFloat()
     private var lowResBinHz = sampleRate / lowResPlan.size.toFloat()
 
-    /**
-     * Сменить частоту дискретизации входного потока (например, 48 кГц на iOS).
-     */
     fun setSampleRate(rate: Float) {
         if (rate <= 0f) return
         synchronized(lock) {
@@ -159,18 +150,12 @@ class PcmSpectrumAnalyzer(
     var onSpectrumReady: ((spectrum: FloatArray) -> Unit)? = null
     var onAudibleEnergyDetected: (() -> Unit)? = null
 
-    /**
-     * 🛑 Сброс состояния и очистка буфера сэмплов
-     */
     fun reset() {
         synchronized(lock) {
             sampleBuffer.fill(0f)
         }
     }
 
-    /**
-     * 📊 Обработать 16-битный PCM-буфер (LE Stereo или Mono) и рассчитать 25-полосный спектр
-     */
     fun processPcmChunk(buffer: ByteArray, readBytes: Int) {
         if (readBytes < 4) return
 
@@ -232,21 +217,17 @@ class PcmSpectrumAnalyzer(
     }
 
     private fun notifyResult(maxSampleAbs: Float, avgEnergy: Float) {
-        // Детекция слышимой энергии
         if (maxSampleAbs > 0.015f || avgEnergy > 0.005f) {
             onAudibleEnergyDetected?.invoke()
         }
 
-        // Оповещаем подписчиков о новом 25-полосном спектре
         onSpectrumReady?.invoke(outputSpectrum25)
     }
 
     // Вызывается под lock: сдвигает окно на extractedCount сэмплов из tempExtracted и пересчитывает полосы
     private fun analyzeExtracted(extractedCount: Int) {
-        // Обновляем скользящий буфер новыми сэмплами
         val windowSize = sampleBuffer.size
         if (extractedCount >= windowSize) {
-            // Если сэмплов больше размера окна — берем последние windowSize сэмплов
             tempExtracted.copyInto(
                 destination = sampleBuffer,
                 destinationOffset = 0,
@@ -254,14 +235,12 @@ class PcmSpectrumAnalyzer(
                 endIndex = extractedCount
             )
         } else {
-            // Сдвигаем старые сэмплы влево на extractedCount
             sampleBuffer.copyInto(
                 destination = sampleBuffer,
                 destinationOffset = 0,
                 startIndex = extractedCount,
                 endIndex = windowSize
             )
-            // Дописываем новые сэмплы в конец
             tempExtracted.copyInto(
                 destination = sampleBuffer,
                 destinationOffset = windowSize - extractedCount,
@@ -273,7 +252,6 @@ class PcmSpectrumAnalyzer(
         lowResPlan.transform(sampleBuffer, 0)
         highResPlan.transform(sampleBuffer, windowSize - highResPlan.size)
 
-        // Формируем 25 логарифмических полос частот
         for (k in 0 until TwentyFiveBandVisualizer.SPECTRUM_BAND_COUNT) {
             val (fStart, fEnd) = VisualizerConstants.FREQ_RANGES_25[k]
             val useLowRes = fEnd <= LOW_RES_CROSSOVER_HZ

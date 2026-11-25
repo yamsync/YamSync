@@ -78,13 +78,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/**
- * 📱 Компактный мини-плеер внизу экрана для мобильных устройств (iOS / Android)
- * - Высота: ~62 dp.
- * - Крупные зоны нажатия для пальцев (42-48 dp).
- * - Тонкий прогресс-бар в самом низу карточки.
- * - Клик по карточке раскрывает полноэкранный плеер.
- */
 @Composable
 fun MobileMiniPlayerBar(
     state: PlayerBarState,
@@ -149,7 +142,6 @@ fun MobileMiniPlayerBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 🔼 Индикатор свайпа вверх (Drag Handle капсула, как на большом плеере)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -172,7 +164,6 @@ fun MobileMiniPlayerBar(
                 )
             }
 
-            // ⏱ Шкала прогресса над плеером (только индикация, без перемотки и перехвата касаний)
             MiniPlayerProgressBar(
                 progress = currentProgress,
                 modifier = Modifier
@@ -190,7 +181,6 @@ fun MobileMiniPlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // 🎵 Информация о треке и обложка (нажатие или свайп вверх открывает полный плеер)
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -204,7 +194,6 @@ fun MobileMiniPlayerBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 🎨 Миниатюра / Иконка воспроизведения слева
                     Box(
                         modifier = Modifier
                             .size(42.dp)
@@ -263,7 +252,6 @@ fun MobileMiniPlayerBar(
                         }
                     }
 
-                    // 📝 Название трека и артист
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.Center
@@ -321,12 +309,10 @@ fun MobileMiniPlayerBar(
                     }
                 }
 
-                // 🔘 Кнопки быстрого управления на ходу (42-48 dp): Назад, Play/Pause, Вперёд
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Предыдущий трек (42 dp) - заменил лайк
                     OutlineIconButton(
                         icon = Icons.Filled.SkipPrevious,
                         contentDescription = "Предыдущий",
@@ -335,7 +321,6 @@ fun MobileMiniPlayerBar(
                         onClick = { actions.onPrev?.invoke() }
                     )
 
-                    // Play / Pause (48 dp)
                     FilledIconButton(
                         icon = if (state.isPlaying && !state.isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (state.isPlaying && !state.isPaused) "Пауза" else "Воспроизведение",
@@ -344,7 +329,6 @@ fun MobileMiniPlayerBar(
                         onClick = actions.onPlayPause
                     )
 
-                    // Следующий трек (42 dp)
                     OutlineIconButton(
                         icon = Icons.Filled.SkipNext,
                         contentDescription = "Следующий",
@@ -439,14 +423,6 @@ private suspend fun PointerInputScope.detectPlayerDrag(
     }
 }
 
-/**
- * 📲 Полноэкранный раскрывающийся экран плеера (Full-screen Sheet) для iOS / Android
- * - Открывается по тапу на мини-плеер.
- * - Огромные кнопки Play (68 dp), Prev/Next (52 dp), комфортный скруббер (36 dp touch target).
- * - Свайп вниз и кнопка «Свернуть» для закрытия.
- * - Свайп влево переключает на следующий трек, вправо — на предыдущий.
- * - Полный доступ ко всем функциям: качество, эквалайзер, сохранение на диск, плейлист, шаринг.
- */
 @Composable
 fun MobileFullPlayerSheet(
     state: PlayerBarState,
@@ -457,7 +433,6 @@ fun MobileFullPlayerSheet(
 ) {
     val coverCornerRadius = 24.dp
 
-    // Поддержка системной кнопки "Назад" (Android)
     BackHandler(enabled = backHandlerEnabled, onBack = onDismiss)
 
     val coroutineScope = rememberCoroutineScope()
@@ -609,16 +584,12 @@ fun MobileFullPlayerSheet(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-            // ==========================================
-            // 1. ВЕРХНЯЯ ШАПКА: Drag Handle + Навигация
-            // ==========================================
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(dismissDragModifier),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Полоска-индикатор для свайпа (Drag Handle)
                 Box(
                     modifier = Modifier
                         .padding(top = 4.dp, bottom = 12.dp)
@@ -629,7 +600,6 @@ fun MobileFullPlayerSheet(
                         )
                 )
 
-                // Строка навигации: Свернуть (слева), Режим (по центру)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -694,7 +664,6 @@ fun MobileFullPlayerSheet(
                         }
                     }
 
-                    // Кнопка настроек в правом верхнем углу плеера
                     if (actions.onConfigClick != null) {
                         IconButton(
                             onClick = { actions.onConfigClick.invoke() },
@@ -708,15 +677,11 @@ fun MobileFullPlayerSheet(
                             )
                         }
                     } else {
-                        // Распорка справа для симметрии
                         Spacer(modifier = Modifier.size(44.dp))
                     }
                 }
             }
 
-            // ==========================================
-            // 2. ЦЕНТР: Большая обложка с мягким Ambilight-свечением (как на референсе с iOS)
-            // ==========================================
             Box(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -726,7 +691,6 @@ fun MobileFullPlayerSheet(
                     .then(dismissDragModifier),
                 contentAlignment = Alignment.Center
             ) {
-                // 🌟 1. Фоновый Ambilight-ореол за обложкой (как на референсе с iOS)
                 val glowLeft = ambilightPalette?.left ?: MaterialTheme.colorScheme.primary
                 val glowRight = ambilightPalette?.right ?: MaterialTheme.colorScheme.secondary
 
@@ -762,7 +726,6 @@ fun MobileFullPlayerSheet(
                         }
                 )
 
-                // 🖼️ 2. Сама чёткая карточка с обложкой альбома поверх ореола
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -820,7 +783,6 @@ fun MobileFullPlayerSheet(
                         }
                     }
 
-                    // Спектр с мягким затуханием по краям и отступом от скруглений.
                     CoverSpectrumVisualizer(
                         isPlaying = state.isPlaying && !state.isPaused,
                         glowLeft = glowLeft,
@@ -833,9 +795,6 @@ fun MobileFullPlayerSheet(
                 }
             }
 
-            // ==========================================
-            // 3. ИНФОРМАЦИЯ О ТРЕКЕ: Заголовок + Артист + Лайк
-            // ==========================================
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -879,7 +838,6 @@ fun MobileFullPlayerSheet(
                     }
                 }
 
-                // Кнопка Лайк (48 dp)
                 FavoriteButton(
                     isFavorite = state.isFavorite,
                     modifier = controlModifier,
@@ -888,9 +846,6 @@ fun MobileFullPlayerSheet(
                 )
             }
 
-            // ==========================================
-            // 4. СКРУББЕР / СЛАЙДЕР ВРЕМЕНИ
-            // ==========================================
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
             ) {
@@ -949,9 +904,6 @@ fun MobileFullPlayerSheet(
                 }
             }
 
-            // ==========================================
-            // 5. ОСНОВНЫЕ КНОПКИ ВОСПРОИЗВЕДЕНИЯ (44-68 dp)
-            // ==========================================
             val playButtonSize = if (isNarrow) 58.dp else 68.dp
             val skipButtonSize = if (isNarrow) 44.dp else 52.dp
             val sideSlotButtonSize = if (isNarrow) 38.dp else 44.dp
@@ -1012,7 +964,6 @@ fun MobileFullPlayerSheet(
                     )
                 }
 
-                // 3. Правый слот: Регулятор громкости (единый для всех платформ: ПК, Android, iOS)
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1027,9 +978,6 @@ fun MobileFullPlayerSheet(
                 }
             }
 
-            // ==========================================
-            // 6. СТРОКА ДЕЙСТВИЙ (Корзина, Очередь, EQ, Диск, Плейлист, Шаринг)
-            // ==========================================
             var justCopiedShare by remember { mutableStateOf(false) }
 
             LaunchedEffect(justCopiedShare) {
@@ -1049,7 +997,6 @@ fun MobileFullPlayerSheet(
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 1. Корзинка / Дизлайк
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1071,7 +1018,6 @@ fun MobileFullPlayerSheet(
                     )
                 }
 
-                // 2. Очередь воспроизведения (список)
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1094,7 +1040,6 @@ fun MobileFullPlayerSheet(
                     }
                 }
 
-                // 3. Эквалайзер
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1110,7 +1055,6 @@ fun MobileFullPlayerSheet(
                     )
                 }
 
-                // 4. Сохранить на диск / Скачать
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1142,7 +1086,6 @@ fun MobileFullPlayerSheet(
                     }
                 }
 
-                // 5. Добавить в плейлист
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1177,7 +1120,6 @@ fun MobileFullPlayerSheet(
                     )
                 }
 
-                // 6. Поделиться треком
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -1239,7 +1181,6 @@ private fun renderAmbilightGlow(
         for (i in steps downTo 1) {
             val d = (i.toFloat() / steps) * maxDistance
             val factor = d / maxDistance
-            // Гауссов колоколообразный спад e^(-2.2 * factor^2)
             val alpha = (0.13f * exp(-2.2f * factor * factor)).coerceIn(0f, 1f)
             drawRoundRect(
                 brush = Brush.horizontalGradient(
@@ -1256,9 +1197,6 @@ private fun renderAmbilightGlow(
     return image
 }
 
-/**
- * 💡 Цветовая палитра для фоновой Ambilight-подсветки вокруг обложки
- */
 data class AmbilightPalette(
     val left: Color,
     val right: Color,
@@ -1296,7 +1234,6 @@ fun extractAmbilightPalette(bitmap: androidx.compose.ui.graphics.ImageBitmap?): 
                     val saturation = if (maxVal > 0.05f) delta / maxVal else 0f
                     val brightness = maxVal
 
-                    // Отсеиваем слишком тёмные или блеклые пиксели (рамки/фон)
                     if (brightness in 0.15f..0.98f && saturation > 0.20f) {
                         val score = saturation * brightness
                         if (score > bestScore) {
@@ -1387,7 +1324,6 @@ fun CoverSpectrumVisualizer(
             )
             .pointerHoverIcon(if (onOpenEqualizer != null) PointerIcon.Hand else PointerIcon.Default)
     ) {
-        // Размеры следуют фактической ширине квадратной обложки.
         val bottomInset = maxOf(maxWidth * 0.045f, coverCornerRadius * 0.45f)
         val spectrumHeight = maxWidth * 0.20f
         Canvas(
@@ -1435,7 +1371,6 @@ fun CoverSpectrumVisualizer(
                 val y = maxH - h
                 val barRadius = CornerRadius(minOf(1.dp.toPx(), barW * 0.2f))
 
-                // Все столбики имеют общую плоскую нижнюю границу.
                 drawRoundRect(
                     brush = barBrush,
                     topLeft = Offset(x, y),
@@ -1444,7 +1379,6 @@ fun CoverSpectrumVisualizer(
                     alpha = opacity
                 )
 
-                // 2. Парящая пиковая засечка (Winamp Peak Cap, прямоугольная)
                 val capLevel = if (i < capLevels.size) capLevels[i].coerceAtLeast(level) else level
                 val taperedPeakH = peakH * envelope
                 val targetPeakY = (maxH - (maxH * capLevel.coerceIn(0.08f, 1f) * envelope))

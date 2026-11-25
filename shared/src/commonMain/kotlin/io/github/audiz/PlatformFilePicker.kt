@@ -1,8 +1,5 @@
 package io.github.audiz
 
-/**
- * 🖥️ Кроссплатформенный системный диалог выбора папки и файла
- */
 expect val isPlatformPickerSupported: Boolean
 
 expect fun pickDirectory(): String?

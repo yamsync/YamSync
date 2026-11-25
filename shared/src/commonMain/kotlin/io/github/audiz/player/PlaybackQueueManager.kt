@@ -9,14 +9,6 @@ import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.saveAppConfig
 import io.github.audiz.synchronized
 
-/**
- * 🔀 Менеджер очереди воспроизведения.
- * Инкапсулирует:
- * - Управление режимом случайного выбора (Shuffle).
- * - Историю воспроизведения (playbackHistory, forwardHistory).
- * - Расчет кандидата на следующий и предыдущий трек.
- * - Планирование предзагрузки следующего трека (plannedNextTrack).
- */
 class PlaybackQueueManager {
     companion object {
         const val MAX_HISTORY_SIZE = 100
@@ -149,9 +141,6 @@ class PlaybackQueueManager {
         }
     }
 
-    /**
-     * Извлечь предыдущий трек из истории воспроизведения (при нажатии ⏮).
-     */
     fun popPrevFromPlaybackHistory(
         activeId: String?,
         loadedTracks: List<FullTrackInfo>,
@@ -225,12 +214,10 @@ class PlaybackQueueManager {
             resetShuffleCycle()
         }
 
-        // 1. Фиксируем текущий активный трек в сыгранных текущего круга
         if (activeId != null) {
             recordPlayedInCycle(activeId)
         }
 
-        // 2. Ищем еще не игравшие в текущем круге треки (исключая сыгранные и текущий активный)
         val unplayed = tracks.filter { track ->
             !isTrackPlayedInCycle(track) && !isSameTrack(track, activeId)
         }
@@ -243,17 +230,12 @@ class PlaybackQueueManager {
         // Запоминаем последний отыгравший трек для защиты стыка между кругами
         lastCompletedCycleTrackId = activeId
 
-        // Начинаем новый круг со свежей перетасовкой
         playedInCycleTrackIds.clear()
 
-        // Кандидаты нового круга: все треки плейлиста КРОМЕ только что отыгравшего lastCompletedCycleTrackId
         val newCycleCandidates = tracks.filter { !isSameTrack(it, lastCompletedCycleTrackId) }
         return if (newCycleCandidates.isNotEmpty()) newCycleCandidates else tracks
     }
 
-    /**
-     * Вычисление кандидата на следующий трек в очереди.
-     */
     fun calculateNextCandidate(
         activeId: String?,
         isWaveMode: Boolean,
@@ -265,7 +247,6 @@ class PlaybackQueueManager {
             return nextWaveTrack
         }
 
-        // 1. Проверяем историю вперед
         if (forwardHistory.isNotEmpty()) {
             val candidateId = forwardHistory.lastOrNull { !isSameTrackId(it, activeId) }
             if (candidateId != null) {
@@ -277,7 +258,6 @@ class PlaybackQueueManager {
             }
         }
 
-        // 2. Текущий плейлист (loadedTracks)
         if (loadedTracks.isNotEmpty()) {
             if (isShuffleEnabled) {
                 val candidates = getShuffleCandidates(activeId, loadedTracks)
@@ -298,7 +278,6 @@ class PlaybackQueueManager {
             }
         }
 
-        // 3. Результаты поиска
         if (searchTracks.isNotEmpty()) {
             if (isShuffleEnabled) {
                 val candidates = getShuffleCandidates(activeId, searchTracks)
@@ -322,9 +301,6 @@ class PlaybackQueueManager {
         return null
     }
 
-    /**
-     * Выбрать следующий трек из списка треков (с учетом шаффла или последовательного порядка).
-     */
     fun getNextFromList(
         activeId: String?,
         tracks: List<FullTrackInfo>

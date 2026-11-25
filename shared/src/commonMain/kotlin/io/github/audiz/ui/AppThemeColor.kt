@@ -5,9 +5,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-/**
- * 🎨 Предустановленные варианты акцентного цвета приложения.
- */
 enum class AppAccentColor(
     val key: String,
     val title: String,
@@ -187,9 +184,6 @@ enum class AppAccentColor(
     }
 }
 
-/**
- * Генерирует адаптированную цветовую схему Material 3 на основе выбранного акцентного цвета.
- */
 fun buildAppColorScheme(isDark: Boolean, accent: AppAccentColor): ColorScheme {
     val baseScheme = if (isDark) darkColorScheme() else lightColorScheme()
     return if (isDark) {

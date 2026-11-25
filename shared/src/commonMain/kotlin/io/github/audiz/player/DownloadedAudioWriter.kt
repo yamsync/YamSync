@@ -18,7 +18,6 @@ internal class DownloadedAudioWriter(
     private val localTrackResolver: LocalTrackResolver,
     private val findTrackInfo: (String) -> FullTrackInfo?,
 ) {
-    /** Папка библиотеки для выбранного качества. */
     fun qualityBasePath(quality: String): String =
         "${localTrackResolver.getMusicStoragePath()}/${qualityFolder(quality)}"
 

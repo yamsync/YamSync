@@ -4,9 +4,6 @@ import io.github.audiz.models.YamSyncDevice
 import io.github.audiz.models.YamSyncManifest
 import io.github.audiz.models.YamSyncMergePayload
 
-/**
- * ⚡ Локальный HTTP-сервер сессии YamSync для взаимодействия по Wi-Fi.
- */
 expect class YamSyncServer(
     initialPort: Int = 43594,
     token: String,
@@ -24,6 +21,5 @@ expect class YamSyncServer(
     /** Запустить сервер. Возвращает реально назначенный порт */
     fun start(): Int
 
-    /** Остановить сервер и освободить порт */
     fun stop()
 }

@@ -67,16 +67,12 @@ internal class BeatTracker {
     val beatPeriodSec: Float
         get() = if (60f / tempoPeriodSec > MAX_PROMOTED_BPM) tempoPeriodSec * 2f else tempoPeriodSec
 
-    /** Уверенность в темпе 0..1. */
     var confidence: Float = 0f
         private set
 
     val bpm: Float
         get() = 60f / beatPeriodSec
 
-    /**
-     * Обработать кадр спектра длительностью [dtSec].
-     */
     fun process(bands: FloatArray, dtSec: Float) {
         pushHistory(onsetStrength(bands), dtSec)
 

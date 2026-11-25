@@ -25,9 +25,6 @@ import androidx.compose.ui.unit.sp
 import io.github.audiz.sync.YamSyncConnectionState
 import io.github.audiz.sync.YamSyncManager
 
-/**
- * 🟢 Компактный статус-индикатор активного соединения YamSync в панели навигации
- */
 @Composable
 fun YamSyncPill(
     syncManager: YamSyncManager,
@@ -83,7 +80,6 @@ fun YamSyncPill(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                // Пульсирующая / яркая цветная точка статуса
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -91,7 +87,6 @@ fun YamSyncPill(
                         .background(badgeColor)
                 )
 
-                // Пиктограмма устройства
                 Icon(
                     imageVector = deviceIcon,
                     contentDescription = null,
@@ -99,7 +94,6 @@ fun YamSyncPill(
                     modifier = Modifier.size(16.dp)
                 )
 
-                // Имя устройства (на широких экранах или при наличии места)
                 if (!isCompact && statusText.isNotBlank()) {
                     Text(
                         text = statusText,

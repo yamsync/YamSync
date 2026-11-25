@@ -54,7 +54,6 @@ class FiveBandVisualizer(
     var lastUpdateTimeMs: Long = 0L
         private set
 
-    // Состояние 5 полос
     private val targetLevels = FloatArray(BAND_COUNT) { RESTING_LEVEL }
     private val currentLevels = FloatArray(BAND_COUNT) { RESTING_LEVEL }
     private val velocities = FloatArray(BAND_COUNT) { 0f }
@@ -171,9 +170,6 @@ class FiveBandVisualizer(
         }
     }
 
-    /**
-     * ⏱ Рассчитать следующий кадр физики 5 полос для UI
-     */
     fun advanceFrame(dtSeconds: Float, isPlaying: Boolean): VisualizerFrame {
         synchronized(currentLevels) {
             val safeDt = dtSeconds.coerceIn(0.001f, 0.5f)
@@ -272,9 +268,6 @@ class FiveBandVisualizer(
         }
     }
 
-    /**
-     * 🛑 Сброс уровней в состояние покоя
-     */
     fun reset() {
         synchronized(currentLevels) {
             clearDelayQueue()
@@ -295,9 +288,6 @@ class FiveBandVisualizer(
         }
     }
 
-    /**
-     * 🌊 Получить текущий срез уровней для отображения
-     */
     fun getLevelsForDisplay(isPlaying: Boolean): FloatArray {
         return advanceFrame(0.033f, isPlaying).levels
     }

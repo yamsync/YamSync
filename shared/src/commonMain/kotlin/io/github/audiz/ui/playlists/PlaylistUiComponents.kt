@@ -28,9 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.audiz.ui.rememberCoverBitmap
 
-/**
- * 🎨 Квадратная обложка плейлиста со стильным скруглением, градиентом-заглушкой и мини-бейджем источника.
- */
 @Composable
 internal fun PlaylistArtwork(
     coverUri: String? = null,
@@ -71,7 +68,6 @@ internal fun PlaylistArtwork(
             )
         }
 
-        // Мини-бейдж источника в правом нижнем углу (💾 или ☁️)
         if (!badgeText.isNullOrBlank()) {
             Surface(
                 modifier = Modifier
@@ -106,9 +102,6 @@ internal fun formatTrackPlural(count: Int): String {
     }
 }
 
-/**
- * Количество треков в плейлисте.
- */
 @Composable
 internal fun PlaylistTracksPill(
     trackCount: Int,
@@ -144,9 +137,6 @@ internal fun PlaylistTracksPill(
     }
 }
 
-/**
- * 🏷 Бейдж источника: [☁️ Оффлайн] / [☁️ Яндекс]
- */
 @Composable
 internal fun PlaylistSourceBadge(
     isOffline: Boolean,
@@ -182,9 +172,6 @@ internal fun PlaylistSourceBadge(
     }
 }
 
-/**
- * ⋮ Компактное контекстное меню дополнительных действий карточки.
- */
 @Composable
 internal fun PlaylistMoreMenu(
     onRename: (() -> Unit)? = null,
@@ -267,9 +254,6 @@ internal fun PlaylistMoreMenu(
     }
 }
 
-/**
- * 🏷 Компактный бейдж-подпись с метаданными плейлиста.
- */
 @Composable
 internal fun PlaylistBadge(
     text: String,
@@ -295,9 +279,6 @@ internal fun PlaylistBadge(
     }
 }
 
-/**
- * ▶️ Аккуратная круглая кнопка запуска плейлиста в сочном акцентном стиле.
- */
 @Composable
 internal fun PlaylistPlayButton(
     onClick: () -> Unit,
@@ -325,9 +306,6 @@ internal fun PlaylistPlayButton(
     }
 }
 
-/**
- * 🎴 Единый контейнер карточки плейлиста: мягкая подложка + изумрудная полоска слева + тонкая рамка.
- */
 @Composable
 internal fun PlaylistCardSurface(
     modifier: Modifier = Modifier,

@@ -18,13 +18,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import io.github.audiz.util.AppLogger
 
-/**
- * 💾 Менеджер сохранения и восстановления последней сессии воспроизведения.
- * Отвечает за:
- * - Запоминание того, что играло последним («Моя Волна» или конкретный плейлист/папка).
- * - Обновление текущего играющего трека.
- * - Загрузку последней сессии при старте приложения.
- */
 class PlaybackSessionManager(
     scope: CoroutineScope? = null,
     private val readSession: () -> String? = { loadAppConfig(AppConfigKeys.LAST_PLAYBACK_SESSION) },
@@ -52,9 +45,6 @@ class PlaybackSessionManager(
         currentSession = loadSession()
     }
 
-    /**
-     * 📥 Загрузить сохраненную сессию из настроек
-     */
     fun loadSession(): LastPlaybackSession? {
         return try {
             val raw = readSession()
@@ -71,18 +61,12 @@ class PlaybackSessionManager(
         }
     }
 
-    /**
-     * 💾 Записать сессию воспроизведения
-     */
     fun recordSession(session: LastPlaybackSession) {
         val updated = session.copy(timestamp = currentTimeMillis())
         currentSession = updated
         persist(updated)
     }
 
-    /**
-     * 🌊 Записать запуск Моей Волны
-     */
     fun recordWave(title: String? = null, seeds: List<String> = emptyList()) {
         val session = LastPlaybackSession(
             type = LastPlaybackType.WAVE,
@@ -94,9 +78,6 @@ class PlaybackSessionManager(
         persist(session)
     }
 
-    /**
-     * 🎵 Обновить информацию о последнем воспроизводимом треке в активной сессии
-     */
     fun updateLastTrack(
         trackId: String,
         trackTitle: String,

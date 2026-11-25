@@ -34,7 +34,6 @@ sealed interface AppDialog {
 
     data class PlayerTrackRemoval(val track: FullTrackInfo) : AppDialog
 
-    /** Подтверждение удаления файла трека с диска. */
     data class DeleteTrack(
         val trackId: String,
         val title: String,
@@ -42,10 +41,8 @@ sealed interface AppDialog {
     ) : AppDialog
 }
 
-/** Навигационное состояние главного экрана: оверлеи, раскрытый плеер, выбранные вкладки. */
 @Stable
 class AppNavigationState internal constructor(initialMobilePlayerExpanded: Boolean) {
-    /** Экран «Подборки» вместо домашнего хаба. */
     var showCollections by mutableStateOf(false)
 
     /** Полноэкранный оверлей настроек. Не модальное окно, поэтому живёт отдельно от [AppDialog]. */

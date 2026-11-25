@@ -13,9 +13,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * ⚡ Модель предзагруженного аудиотрека для мгновенного воспроизведения.
- */
 data class PreloadedAudio(
     val trackId: String,
     val audioData: DownloadedTrackAudio?,
@@ -39,7 +36,6 @@ internal class TrackPreloader(
     private val currentTrackId: () -> String?,
     /** Актуальный запланированный следующий трек: результат сохраняется, только пока он не сменился. */
     private val plannedNextTrackId: () -> String?,
-    /** Обложка для тегов при сохранении предзагруженного трека на диск. */
     private val coverUriForTags: () -> String?,
 ) {
     var preloadedAudio: PreloadedAudio? = null
@@ -67,7 +63,6 @@ internal class TrackPreloader(
         if (preloadedAudio?.trackId != trackId) preloadedAudio = null
     }
 
-    /** Для трека [trackId] уже подготовлено начало потока или файл. */
     fun isPreloaded(trackId: String?): Boolean =
         trackId != null && preloadedAudio?.trackId == trackId
 
@@ -84,7 +79,6 @@ internal class TrackPreloader(
             } != null)
     }
 
-    /** Запуск фоновой предзагрузки трека [nextTrack]. */
     fun schedule(nextTrack: FullTrackInfo?) {
         preloadJob?.cancel()
         nextTrack ?: return
@@ -108,7 +102,6 @@ internal class TrackPreloader(
             }
 
             try {
-                // 1. Проверяем, есть ли уже файл на диске
                 val existingFilePath = withContext(DispatcherIO) {
                     localTrackResolver.findLocalTrackFile(targetTrackId, cleanArtist, cleanTitle, selectedQuality)
                 }

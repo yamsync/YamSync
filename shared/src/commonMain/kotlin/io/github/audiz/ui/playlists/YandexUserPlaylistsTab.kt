@@ -19,9 +19,6 @@ import androidx.compose.ui.unit.dp
 import io.github.audiz.SearchViewModel
 import io.github.audiz.models.PlaylistInfo
 
-/**
- * ☁️ Вкладка 2: Плейлисты пользователя из Яндекс Музыки
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun YandexUserPlaylistsTab(
@@ -78,7 +75,6 @@ internal fun YandexUserPlaylistsTab(
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Верхняя строка: Название и бейджи слева + вертикально отцентрированные действия справа
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -108,7 +104,6 @@ internal fun YandexUserPlaylistsTab(
                             }
                         }
 
-                        // Правый ряд действий: [⬇ Скачать / Спиннер] [⋮ Меню]
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -149,7 +144,6 @@ internal fun YandexUserPlaylistsTab(
                         }
                     }
 
-                    // 📥 Статус-бар скачивания плейлиста в оффлайн (если активен)
                     if (downloadProgress != null && isThisDownloading) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),

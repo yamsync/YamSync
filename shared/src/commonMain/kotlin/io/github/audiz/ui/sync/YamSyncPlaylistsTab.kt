@@ -29,9 +29,6 @@ import io.github.audiz.models.YamSyncResolution
 import io.github.audiz.sync.YamSyncManager
 import io.github.audiz.sync.YamSyncPlaylistProgress
 
-/**
- * 🔀 Вкладка «Плейлисты»: у каждого плейлиста своя синхронизация
- */
 @Composable
 internal fun YamSyncPlaylistsTab(syncManager: YamSyncManager) {
     if (!syncManager.isConnected) {
@@ -137,7 +134,6 @@ private fun diffBadge(state: YamSyncDiffState): DiffBadge = when (state) {
     YamSyncDiffState.IDENTICAL -> DiffBadge("Совпадает", Color(0xFF2DD881))
 }
 
-/** Подпись основной кнопки в зависимости от состояния плейлиста и выбранного действия. */
 private fun primaryActionLabel(diff: YamSyncPlaylistDiff, peerName: String, missingCount: Int): String {
     val download = if (missingCount > 0) " и скачать $missingCount" else ""
     return when (diff.state) {
@@ -309,7 +305,6 @@ private fun PlaylistSyncCard(
             }
         }
 
-        // Список изменений по трекам
         val totalChanges = diff.remoteOnlyTracks.size + diff.localOnlyTracks.size
         if (diff.state == YamSyncDiffState.MODIFIED && totalChanges > 0) {
             TextButton(

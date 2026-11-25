@@ -26,9 +26,6 @@ import io.github.audiz.sync.YamSyncConnectionState
 import io.github.audiz.sync.YamSyncManager
 import kotlinx.coroutines.delay
 
-/**
- * 🔗 Вкладка «Связь»: раздача QR-кода, подключение по ссылке и сохранённые устройства
- */
 @Composable
 internal fun YamSyncPairingTab(
     syncManager: YamSyncManager,
@@ -120,7 +117,6 @@ private fun HostingBlock(
     )
     Spacer(modifier = Modifier.height(14.dp))
 
-    // Адрес в одну строку + круглая кнопка копирования ссылки
     Row(
         modifier = Modifier
             .fillMaxWidth()

@@ -113,16 +113,13 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     var searchResult by mutableStateOf<YandexMusicResponse?>(null)
         private set
 
-    // 📊 Список уже загруженных детальных треков (делегирован в TrackListCoordinator)
     val loadedTracks: androidx.compose.runtime.snapshots.SnapshotStateList<FullTrackInfo>
         get() = trackListCoordinator.loadedTracks
 
-    // 📁 Флаг экрана плейлиста загруженной музыки (локальные файлы на диске)
     var isDownloadedTracksScreen: Boolean
         get() = trackListCoordinator.isDownloadedTracksScreen
         set(value) { trackListCoordinator.isDownloadedTracksScreen = value }
 
-    // 📋 Флаг видимости экрана списка треков / активной очереди (Экран Б)
     private var _isTracksListVisible = mutableStateOf(loadAppConfig(AppConfigKeys.TRACKS_LIST_VISIBLE) == "true")
     var isTracksListVisible: Boolean
         get() = _isTracksListVisible.value
@@ -131,7 +128,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             saveAppConfig(AppConfigKeys.TRACKS_LIST_VISIBLE, value.toString())
         }
 
-    // 📁 Контекст текущего открытого проводника по локальным папкам (для возврата в ту же папку)
     var activeBrowsedFolderSource: CustomMediaSource?
         get() = trackListCoordinator.activeBrowsedFolderSource
         set(value) { trackListCoordinator.activeBrowsedFolderSource = value }
@@ -144,7 +140,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     fun resetBrowsedFolder() = trackListCoordinator.resetBrowsedFolder()
 
-    // 🎵 Источник текущей активной очереди треков
     var activeQueueSource: CustomMediaSource?
         get() = trackListCoordinator.activeQueueSource
         set(value) { trackListCoordinator.activeQueueSource = value }
@@ -155,13 +150,11 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() = trackListCoordinator.activeQueueFolderName
         set(value) { trackListCoordinator.activeQueueFolderName = value }
 
-    // 🎵 Персональные плейлисты (Плейлист дня, Премьера, Дежавю и т.д.)
     val personalPlaylists: androidx.compose.runtime.snapshots.SnapshotStateList<io.github.audiz.models.PersonalPlaylistItemData>
         get() = playlistManager.personalPlaylists
     val isPersonalPlaylistsLoading: Boolean
         get() = playlistManager.isPersonalPlaylistsLoading
 
-    // 📊 Редакционная витрина: чарты, новые плейлисты и новые релизы
     val editorialCharts: androidx.compose.runtime.snapshots.SnapshotStateList<io.github.audiz.models.ChartCollection>
         get() = playlistManager.editorialCharts
     val editorialPlaylists: androidx.compose.runtime.snapshots.SnapshotStateList<PlaylistInfo>
@@ -173,13 +166,11 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val chartTrackPositions: Map<String, io.github.audiz.models.ChartPositionInfo>
         get() = trackListCoordinator.chartTrackPositions
 
-    // 📁 Персональные локальные оффлайн-плейлисты (на диске)
     val localPlaylists: androidx.compose.runtime.snapshots.SnapshotStateList<LocalPlaylist>
         get() = playlistManager.localPlaylists
     val isLocalPlaylistsLoading: Boolean
         get() = playlistManager.isLocalPlaylistsLoading
 
-    // ☁️ Пользовательские плейлисты из Яндекс Музыки
     val userPlaylists: androidx.compose.runtime.snapshots.SnapshotStateList<PlaylistInfo>
         get() = playlistManager.userPlaylists
     val isUserPlaylistsLoading: Boolean
@@ -188,7 +179,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() = if (trackListNavigation.isPreview) trackListCoordinator.viewedUserPlaylist else playlistManager.currentOpenUserPlaylist
         set(value) { playlistManager.currentOpenUserPlaylist = value }
 
-    // ☁️ Кеш идентификаторов треков пользовательских плейлистов Яндекс (kind -> Set<trackId>)
     val userPlaylistsTrackIds: androidx.compose.runtime.snapshots.SnapshotStateMap<Long, Set<String>>
         get() = playlistManager.userPlaylistsTrackIds
 
@@ -196,7 +186,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() = trackListCoordinator.currentScreenTitle
         set(value) { trackListCoordinator.currentScreenTitle = value }
 
-    // 🔀 Режим перемешивания (Shuffle) — делегируется в PlaybackManager
     val isShuffleEnabled: Boolean
         get() = playbackManager.isShuffleEnabled
 
@@ -204,7 +193,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         playbackManager.toggleShuffle()
     }
 
-    // 📜 Список всех ID треков, которые нужно загрузить частями
     val allTrackIds: List<String>
         get() = trackListCoordinator.allTrackIds
     val totalTracksCount: Int
@@ -216,12 +204,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val canLoadMore: Boolean
         get() = trackListCoordinator.canLoadMore
 
-    // 🔥 СОСТОЯНИЯ ДЛЯ СКАЧИВАНИЯ ТРЕКОВ (Делегированы в DownloadManager):
     val downloadingTrackId: String? get() = downloadManager.downloadingTrackId
     val isTrackDownloading: Boolean get() = downloadManager.isTrackDownloading
     val downloadVersion: Int get() = downloadManager.downloadVersion
 
-    // 🔧 Текущий OAuth access_token (виден из GUI для редактирования)
     val currentAccessToken: String
         get() = settingsManager.currentAccessToken
 
@@ -229,7 +215,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() = settingsManager.currentSessionCookie
         set(value) { settingsManager.currentSessionCookie = value }
 
-    // 🌊 Свойства Моей Волны (Делегированы в WaveManager):
     val ynisonWaveSessionId: String? get() = waveManager.ynisonWaveSessionId
     val isFetchingYnison: Boolean get() = waveManager.isFetchingYnison
     val ynisonHost: String? get() = waveManager.ynisonHost
@@ -259,7 +244,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val currentWaveTrackCandidate: WaveThemeOption?
         get() = buildCurrentTrackWaveCandidate()
 
-    // 🔑 Сервис авторизации:
     val cookieService: YandexCookieService get() = settingsManager.cookieService
     val isExchangingToken: Boolean get() = settingsManager.isExchangingToken
     var authStatusMessage: String?
@@ -276,7 +260,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() = settingsManager.storageStatusMessage
         set(value) { settingsManager.storageStatusMessage = value }
 
-    // 👑 Статус подписки Яндекс Плюс:
     val hasPlusSubscription: Boolean? get() = settingsManager.hasPlusSubscription
     fun refreshPlusSubscription() {
         launchSafe { settingsManager.checkPlusSubscription() }
@@ -290,7 +273,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val appTheme: String
         get() = settingsManager.appTheme
 
-    // 🎨 Акцентный цвет интерфейса
     val accentColor: String
         get() = settingsManager.accentColor
 
@@ -317,34 +299,27 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val isMobileUi: Boolean
         get() = settingsManager.isMobileUi
 
-    // 💾 Сохранять треки на диск при воспроизведении (Record to disk):
     val isRecordToDiskActive: Boolean get() = downloadManager.isRecordToDiskActive
     fun toggleRecordToDisk(active: Boolean = !isRecordToDiskActive) = downloadManager.toggleRecordToDisk(active)
 
-    // 🐕 Детектор зависаний UI (Watchdog)
     val isUiWatchdogActive: Boolean get() = settingsManager.isUiWatchdogEnabled
     fun toggleUiWatchdog(active: Boolean = !isUiWatchdogActive) = settingsManager.toggleUiWatchdog(active)
 
-    /** Проверяет, сохранен ли текущий воспроизводимый трек в библиотеке на диске */
     val isCurrentTrackSavedToDisk: Boolean get() = downloadManager.isCurrentTrackSavedToDisk
 
-    /** Проверяет, идет ли скачивание текущего трека в библиотеку прямо сейчас */
     val isCurrentTrackSavingToDisk: Boolean get() = downloadManager.isCurrentTrackSavingToDisk
 
-    /** Проверяет, является ли текущий воспроизводимый трек локальным файлом или источником */
     val isCurrentTrackLocal: Boolean
         get() {
             val id = playerTrackId ?: currentWaveTrack?.id ?: return false
             return isLocalTrackId(id)
         }
 
-    /** Скачать текущий трек на диск или удалить его из библиотеки, если уже скачан */
     fun toggleCurrentTrackSaveOrDelete() {
         if (isCurrentTrackLocal) return
         downloadManager.toggleCurrentTrackSaveOrDelete()
     }
 
-    // 📤 Поделиться треком:
     var isSharingTrack by mutableStateOf(false)
         private set
 
@@ -374,38 +349,31 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    // 📂 Путь хранения музыки (настраиваемый)
     val musicStoragePath: String
         get() = settingsManager.musicStoragePath
 
-    // ❤️ Список ID лайкнутых треков ("Мне нравится")
     val likedTrackIds: androidx.compose.runtime.snapshots.SnapshotStateSet<String> get() = playlistManager.likedTrackIds
 
-    // 💔 Список ID треков в дизлайках
     val dislikedTrackIds: androidx.compose.runtime.snapshots.SnapshotStateSet<String> get() = playlistManager.dislikedTrackIds
 
-    /** Проверяет, лайкнут ли текущий воспроизводимый трек */
     val isCurrentTrackLiked: Boolean
         get() {
             val id = playerTrackId ?: currentWaveTrack?.id
             return playlistManager.isTrackLiked(id)
         }
 
-    /** Проверяет, дизлайкнут ли текущий воспроизводимый трек */
     val isCurrentTrackDisliked: Boolean
         get() {
             val id = playerTrackId ?: currentWaveTrack?.id
             return playlistManager.isTrackDisliked(id)
         }
 
-    /** 🎵 Проверяет, содержится ли текущий воспроизводимый трек хотя бы в одном плейлисте (локальном или облачном) */
     val isCurrentTrackInPlaylist: Boolean
         get() {
             val track = getCurrentPlayingTrackInfo() ?: return false
             return isTrackInAnyPlaylist(track)
         }
 
-    /** 🔢 Количество плейлистов, в которых содержится текущий воспроизводимый трек */
     val currentTrackPlaylistsCount: Int
         get() {
             val track = getCurrentPlayingTrackInfo() ?: return 0
@@ -415,7 +383,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     /** 🔄 Версия состояния плейлистов (для реактивного обновления UI при добавлении/удалении треков) */
     val playlistsVersion: Long get() = playlistManager.playlistsVersion
 
-    /** Переключить лайк для текущего воспроизводимого трека */
     fun toggleLikeCurrentTrack() {
         if (isCurrentTrackLocal) return
         val trackId = playerTrackId ?: currentWaveTrack?.id ?: return
@@ -442,7 +409,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         playbackManager.systemMediaControls.updateLikedState(false)
     }
 
-    /** Переключить дизлайк для текущего воспроизводимого трека */
     fun toggleDislikeCurrentTrack() {
         if (isCurrentTrackLocal) return
         val trackId = playerTrackId ?: currentWaveTrack?.id ?: return
@@ -536,12 +502,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    /** Загрузить и обновить список всех лайкнутых треков пользователя в фоне */
     fun syncLikedTrackIds() {
         playlistManager.syncLikedTrackIds()
     }
 
-    // ⚙️ МЕНЕДЖЕР НАСТРОЕК И ТОКЕНОВ:
     val settingsManager: SettingsManager = SettingsManager(
         repository = repository,
         onTokenUpdated = { _ ->
@@ -648,7 +612,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    // 🌊 МЕНЕДЖЕР МОЕЙ ВОЛНЫ:
     val waveManager = WaveManager(
         scope = viewModelScope,
         repository = repository,
@@ -673,7 +636,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         getMusicStoragePath = { settingsManager.musicStoragePath }
     )
 
-    // 📂 МЕНЕДЖЕР ПОЛЬЗОВАТЕЛЬСКИХ МЕДИА (Папки, файлы, M3U):
     val localMediaManager = LocalMediaManager()
 
     val customMediaSources: androidx.compose.runtime.snapshots.SnapshotStateList<CustomMediaSource>
@@ -682,10 +644,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val localMediaStatusMessage: String?
         get() = localMediaManager.statusMessage
 
-    // 🔍 Резолвер локальных файлов:
     val localTrackResolver = LocalTrackResolver { settingsManager.musicStoragePath }
 
-    // 💾 МЕНЕДЖЕР СКАЧИВАНИЯ И ФАЙЛОВ:
     val downloadManager = DownloadManager(
         scope = viewModelScope,
         repository = repository,
@@ -706,15 +666,11 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
                 it.realId?.removePrefix("local:") == cleanId
             }
 
-            // Безусловно удаляем трек из текущего списка loadedTracks и allTrackIds
             trackListNavigation.active.removeTrack(trackId)
             if (trackListNavigation.isPreview) trackListCoordinator.removeTrack(trackId)
 
-            // Очищаем трек из локальных плейлистов
             if (removePlaylistEntries) playlistManager.removeTrackFileFromAllPlaylists(cleanId)
 
-            // Если удаленный трек играл прямо сейчас и в списке еще остались треки —
-            // плавно переключаемся на следующий трек в очереди
             if (wasPlaying) {
                 if (queueTracks.isNotEmpty()) {
                     val nextIndex = if (removedIndex != -1) removedIndex.coerceIn(0, queueTracks.size - 1) else 0
@@ -745,10 +701,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         getPlayingTrackCoverUrl = { playerCoverUri }
     )
 
-    // 💾 МЕНЕДЖЕР СЕССИИ ВОСПРОИЗВЕДЕНИЯ (Восстановление плейлиста или Волны при рестарте)
     val playbackSessionManager = PlaybackSessionManager(viewModelScope)
 
-    // 🎵 АУДИОПЛЕЕР (Делегирован в PlaybackManager):
     val playbackManager: PlaybackManager = PlaybackManager(
         scope = viewModelScope,
         repository = repository,
@@ -787,7 +741,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     )
 
-    // 📂 МЕНЕДЖЕР ПЛЕЙЛИСТОВ:
     val playlistManager: PlaylistManager = PlaylistManager(
         scope = viewModelScope,
         repository = repository,
@@ -798,7 +751,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         onError = { errorMessage = it }
     )
 
-    // 📋 КООРДИНАТОР СПИСКА ТРЕКОВ, ОЧЕРЕДЕЙ И ПАГИНАЦИИ:
     private val trackListNavigation = TrackListNavigation(createTrackListCoordinator())
 
     val trackListCoordinator: TrackListCoordinator
@@ -878,7 +830,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val hasPlaybackQueue: Boolean
         get() = trackListNavigation.active.loadedTracks.isNotEmpty() || (isWaveMode && waveTracks.isNotEmpty())
 
-    // ⚡ МЕНЕДЖЕР P2P СИНХРОНИЗАЦИИ YAMSYNC:
     val yamSyncManager: io.github.audiz.sync.YamSyncManager = io.github.audiz.sync.YamSyncManager(
         scope = viewModelScope,
         getMusicStoragePath = { settingsManager.musicStoragePath },
@@ -939,9 +890,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val isPlayTrackLoading: Boolean get() = playbackManager.isPlayLoading
     val plannedNextTrack: FullTrackInfo? get() = playbackManager.plannedNextTrack
 
-    /**
-     * 🎵 Получить FullTrackInfo текущего воспроизводимого трека
-     */
     fun getCurrentPlayingTrackInfo(): FullTrackInfo? {
         val id = playerTrackId
         if (id != null) {
@@ -1035,7 +983,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             onDislike = { dislikeCurrentTrackAndSkip() }
         )
 
-        // 🌊 При старте запрашиваем сессию Моей волны, персональные плейлисты, витрину и список лайков
         loadLocalPlaylistsFromDisk()
         if (currentAccessToken.isNotBlank()) {
             syncLikedTrackIds()
@@ -1059,9 +1006,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    /**
-     * 🔄 Восстановить последнюю сессию воспроизведения (плейлист или Мою волну)
-     */
     private fun restoreLastPlaybackSession() {
         try {
             val session = playbackSessionManager.loadSession()
@@ -1307,7 +1251,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             val allTracks = mutableListOf<FullTrackInfo>()
             val scannedFolders = mutableSetOf<String>()
 
-            // 1. Сканируем пользовательские источники (папки, одиночные файлы, плейлисты)
             for (src in sourcesSnapshot) {
                 try {
                     when (src.type) {
@@ -1327,7 +1270,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
                 }
             }
 
-            // 2. Сканируем стандартную папку хранилища, если она ещё не была охвачена
             val cleanStorage = storagePath.replace('\\', '/')
             if (cleanStorage.isNotBlank()) {
                 val alreadyCovered = scannedFolders.any { folder ->
@@ -1516,9 +1458,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    /**
-     * 🔍 Сброс поискового запроса и скрытие результатов поиска
-     */
     fun clearSearch() {
         cancelSearch()
         searchQuery = ""
@@ -1666,51 +1605,30 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         LastPlaybackSession(type = LastPlaybackType.YANDEX_HISTORY, title = "История прослушиваний"), restoreTrackId
     ) { it.loadHistory(restoreTrackId) }
 
-    /**
-     * 🎵 Загрузка персональных плейлистов (Плейлист дня, Премьера, Дежавю и др.)
-     */
     fun loadPersonalPlaylists() {
         playlistManager.loadPersonalPlaylists()
     }
 
-    /**
-     * 📊 Загрузка витрины: чарты, новые плейлисты и новые релизы
-     */
     fun loadEditorialShowcase(forceRefresh: Boolean = false) {
         playlistManager.loadEditorialShowcase(forceRefresh = forceRefresh)
     }
 
-    /**
-     * ☁️ Загрузка пользовательских плейлистов из Яндекс Музыки
-     */
     fun loadUserPlaylists() {
         playlistManager.loadUserPlaylists()
     }
 
-    /**
-     * 💾 Загрузка локальных плейлистов с диска
-     */
     fun loadLocalPlaylistsFromDisk() {
         playlistManager.loadLocalPlaylistsFromDisk()
     }
 
-    /**
-     * ➕ Создать новый локальный плейлист
-     */
     fun createLocalPlaylist(title: String, description: String = ""): LocalPlaylist {
         return playlistManager.createLocalPlaylist(title, description)
     }
 
-    /**
-     * ✏️ Переименовать локальный плейлист
-     */
     fun renameLocalPlaylist(playlistId: String, newTitle: String) {
         playlistManager.renameLocalPlaylist(playlistId, newTitle)
     }
 
-    /**
-     * 🗑️ Удалить локальный плейлист
-     */
     fun deleteLocalPlaylist(playlistId: String, deleteDownloadedTracks: Boolean = true) {
         playlistManager.deleteLocalPlaylist(playlistId, deleteDownloadedTracks)
     }
@@ -1723,16 +1641,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         playlistManager.addTrackToLocalPlaylist(playlistId, track, onComplete)
     }
 
-    /**
-     * ☁️ Добавить трек в персональный плейлист Яндекс Музыки
-     */
     fun addTrackToYandexPlaylist(playlist: PlaylistInfo, track: FullTrackInfo, onComplete: ((Boolean) -> Unit)? = null) {
         playlistManager.addTrackToYandexPlaylist(playlist, track, onComplete)
     }
 
-    /**
-     * 🗑️ Удалить трек из персонального плейлиста Яндекс Музыки
-     */
     fun removeTrackFromYandexPlaylist(
         playlist: PlaylistInfo,
         track: FullTrackInfo,
@@ -1750,37 +1662,22 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             onComplete = onComplete
         )
 
-    /**
-     * 📋 Загрузить детали плейлиста Яндекс Музыки (с треками) для отображения в диалоге
-     */
     suspend fun loadYandexPlaylistDetails(playlist: PlaylistInfo): io.github.audiz.models.YandexPlaylistDetails? {
         return playlistManager.loadYandexPlaylistDetails(playlist)
     }
 
-    /**
-     * 🔍 Проверить, содержится ли трек в локальном плейлисте
-     */
     fun isTrackInLocalPlaylist(playlist: LocalPlaylist, track: FullTrackInfo): Boolean {
         return playlistManager.isTrackInLocalPlaylist(playlist, track)
     }
 
-    /**
-     * 🔍 Проверить, содержится ли трек хотя бы в одном плейлисте (локальном или облачном Яндекс)
-     */
     fun isTrackInAnyPlaylist(track: FullTrackInfo): Boolean {
         return playlistManager.isTrackInAnyPlaylist(track)
     }
 
-    /**
-     * 🔢 Подсчитать количество плейлистов, в которых содержится трек
-     */
     fun getTrackPlaylistsCount(track: FullTrackInfo): Int {
         return playlistManager.getTrackPlaylistsCount(track)
     }
 
-    /**
-     * ➖ Удалить трек из локального плейлиста по объекту трека
-     */
     fun removeTrackFromLocalPlaylist(playlistId: String, track: FullTrackInfo) {
         playlistManager.removeTrackFromLocalPlaylist(
             playlistId = playlistId,
@@ -1794,16 +1691,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         )
     }
 
-    /**
-     * ☁️ Создать новый плейлист в аккаунте Яндекс Музыки
-     */
     fun createYandexPlaylist(title: String, onComplete: ((PlaylistInfo?) -> Unit)? = null) {
         playlistManager.createYandexPlaylist(title, onComplete)
     }
 
-    /**
-     * ✏️ Переименовать плейлист в аккаунте Яндекс Музыки
-     */
     fun renameYandexPlaylist(playlist: PlaylistInfo, newTitle: String, onComplete: ((Boolean) -> Unit)? = null) {
         val oldTitle = playlist.title
         val cleanTitle = newTitle.trim().ifBlank { oldTitle }
@@ -1818,9 +1709,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    /**
-     * ➖ Удалить трек из локального плейлиста
-     */
     fun removeTrackFromLocalPlaylist(playlistId: String, trackPathOrId: String) {
         playlistManager.removeTrackFromLocalPlaylist(
             playlistId = playlistId,
@@ -1851,48 +1739,29 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    // 📥 Активное состояние скачивания плейлиста в оффлайн
     val activePlaylistDownloadProgress: PlaylistDownloadProgress?
         get() = playlistManager.activeDownloadProgress
 
-    /**
-     * 💾 Скачать весь плейлист из Яндекс Музыки в локальный оффлайн-плейлист
-     */
     fun downloadYandexPlaylistToLocal(playlist: PlaylistInfo) {
         playlistManager.downloadYandexPlaylistToLocal(playlist)
     }
 
-    /**
-     * ⏹️ Отменить текущее скачивание плейлиста
-     */
     fun cancelPlaylistDownload() {
         playlistManager.cancelPlaylistDownload()
     }
 
-    /**
-     * 📋 Экспорт локального плейлиста в файл .m3u8
-     */
     fun exportLocalPlaylist(playlistId: String): String {
         return playlistManager.exportLocalPlaylist(playlistId)
     }
 
-    /**
-     * ➕ Добавить пользовательский источник (директорию, отдельный файл или M3U)
-     */
     fun addCustomSource(path: String, customName: String? = null): CustomMediaSource? {
         return localMediaManager.addSource(path, customName)
     }
 
-    /**
-     * 🗑️ Удалить пользовательский источник из сохраненных
-     */
     fun removeCustomSource(id: String) {
         localMediaManager.removeSource(id)
     }
 
-    /**
-     * 📂 Открыть пользовательский источник (папку, отдельный аудиофайл или M3U-плейлист)
-     */
     fun openCustomSource(source: CustomMediaSource, restoreTrackId: String? = null) {
         if (restoreTrackId == null) {
             browseTrackList(LastPlaybackSession(
@@ -1903,16 +1772,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    /**
-     * 🔍 Получить листинг содержимого директории для проводника
-     */
     fun browseFolder(folderPath: String, rootPath: String? = null): FolderListing {
         return trackListCoordinator.browseFolder(folderPath, rootPath)
     }
 
-    /**
-     * 📁 Воспроизвести выбранную папку или подпапку (рекурсивно или только файлы текущей папки)
-     */
     fun playFolder(
         folderPath: String,
         folderName: String,
@@ -1957,25 +1820,13 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         source: CustomMediaSource? = null
     ) = playbackListForNavigation().playSingleLocalTrack(track, folderTracks, folderName, folderPath, source)
 
-    /**
-     * Догружает следующую пачку треков (вызывается при скролле)
-     */
     fun loadNextPage() = trackListCoordinator.loadNextPage()
 
-    /**
-     * 📥 Постепенно загружает все оставшиеся страницы (как непрерывный скролл)
-     */
     fun loadAllRemainingPages() = trackListCoordinator.loadAllRemainingPages()
 
-    /**
-     * 🔥 ФУНКЦИЯ СКАЧИВАНИЯ ТРЕКА ПО КЛИКУ (ОБНОВЛЕНО: принимает artistName)
-     */
     fun downloadTrack(trackId: String, trackTitle: String, artistName: String) =
         downloadManager.downloadTrack(trackId, trackTitle, artistName)
 
-    /**
-     * 📁 Экспортировать / сохранить трек в произвольную директорию на устройстве
-     */
     fun saveTrackToCustomFolder(
         track: FullTrackInfo,
         targetDirectory: String,
@@ -1983,18 +1834,12 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         onComplete: ((String?) -> Unit)? = null
     ) = downloadManager.saveTrackToCustomFolder(track, targetDirectory, customFileName, onComplete)
 
-    /**
-     * 💾 Сохранить трек по конкретному выбранному пути файла (из системного Save As диалога)
-     */
     fun saveTrackToFilePath(
         track: FullTrackInfo,
         targetFilePath: String,
         onComplete: ((String?) -> Unit)? = null
     ) = downloadManager.saveTrackToFilePath(track, targetFilePath, onComplete)
 
-    /**
-     * 🗑️ Удалить трек с диска
-     */
     fun deleteTrack(trackId: String, trackTitle: String, artistName: String) {
         val cleanId = trackId.removePrefix("local:")
         val foundTrack = loadedTracks.firstOrNull {
@@ -2020,14 +1865,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         downloadManager.deleteTrack(finalTrackId, effectiveTitle, effectiveArtist)
     }
 
-    /**
-     * 🧹 Очистить кеш плейлистов
-     */
     fun clearPlaylistsCache() = downloadManager.clearPlaylistsCache()
 
-    /**
-     * 💣 Удалить все скачанные треки с диска
-     */
     fun clearAllDownloadedMusic() = downloadManager.clearAllDownloadedMusic()
 
     fun sanitizeKeepSpaces(input: String): String = downloadManager.sanitizeKeepSpaces(input)
@@ -2052,9 +1891,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         }
     }
 
-    /**
-     * 🎶 Переключить отображение экрана очереди воспроизведения
-     */
     fun toggleQueueView() {
         queueScrollRequest = null
         val wasPreview = trackListNavigation.isPreview
@@ -2070,9 +1906,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         if (isTracksListVisible) requestScrollToPlayingTrack()
     }
 
-    /**
-     * 🎶 Открыть экран очереди воспроизведения
-     */
     fun openQueueView(origin: TracksListOrigin = TracksListOrigin.HOME) {
         queueScrollRequest = null
         closeTrackListPreview()
@@ -2084,14 +1917,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         )
         if (isTracksListVisible) requestScrollToPlayingTrack()
     }
-
-    // ==========================================
-    // 🎵 УПРАВЛЕНИЕ АУДИОПЛЕЕРОМ
-    // ==========================================
-
-    // ==========================================
-    // 🎵 УПРАВЛЕНИЕ АУДИОПЛЕЕРОМ (Делегировано в PlaybackManager)
-    // ==========================================
 
     fun playTrack(
         trackId: String,
@@ -2137,7 +1962,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         )
     }
 
-    /** Запуск трека по внешнему ID (например, из Deep Link) */
     fun playTrackByExternalId(trackId: String) =
         playbackListForNavigation().playTrackByExternalId(trackId)
 

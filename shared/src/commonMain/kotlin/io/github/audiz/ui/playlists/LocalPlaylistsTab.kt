@@ -28,9 +28,6 @@ import io.github.audiz.models.LocalSourceType
 import io.github.audiz.resolveLocalPath
 import kotlinx.coroutines.CancellationException
 
-/**
- * 💾 Вкладка 1: Локальные источники (папки, файлы, M3U) и оффлайн-плейлисты
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LocalPlaylistsTab(
@@ -49,9 +46,6 @@ internal fun LocalPlaylistsTab(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // ==========================================
-        // 📁 СЕКЦИЯ 1: Папки и файлы устройства
-        // ==========================================
         item(key = "custom_sources_header") {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -150,9 +144,6 @@ internal fun LocalPlaylistsTab(
             }
         }
 
-        // ==========================================
-        // 💾 СЕКЦИЯ 2: Оффлайн-плейлисты
-        // ==========================================
         item(key = "local_playlists_header") {
             Spacer(modifier = Modifier.height(6.dp))
             HorizontalDivider(
@@ -277,7 +268,6 @@ internal fun LocalPlaylistsTab(
                     Column(
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Верхняя строка: Название и бейджи слева + вертикально отцентрированные действия справа
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -319,7 +309,6 @@ internal fun LocalPlaylistsTab(
                                 }
                             }
 
-                            // Правый ряд действий: [YamSync (если нужен)] [⋮ Меню]
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)

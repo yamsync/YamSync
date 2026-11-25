@@ -48,9 +48,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * 📥 Модель состояния активного прогресса скачивания плейлиста в оффлайн
- */
 data class PlaylistDownloadProgress(
     val playlistId: String,
     val playlistTitle: String,
@@ -61,14 +58,6 @@ data class PlaylistDownloadProgress(
     val isIndeterminate: Boolean = false
 )
 
-/**
- * 📂 Менеджер плейлистов и пользовательских отметок (Лайки/Дизлайки).
- * Инкапсулирует:
- * - Персональные плейлисты Яндекса (Плейлист дня, Дежавю, Премьера и др.) и их дисковый кеш.
- * - Пользовательские плейлисты аккаунта Яндекс Музыки (CRUD, добавление/удаление треков, кеш ID).
- * - Локальные оффлайн-плейлисты на диске (CRUD, автоскачивание треков, экспорт в M3U8).
- * - Лайки и дизлайки (оптимистичный UI, фоновая синхронизация с сервером и откат при ошибках).
- */
 class PlaylistManager(
     private val scope: CoroutineScope,
     private val repository: MusicRepository,
@@ -93,15 +82,11 @@ class PlaylistManager(
         }
     }
 
-    // 📥 Активное состояние скачивания плейлиста в оффлайн
     var activeDownloadProgress by mutableStateOf<PlaylistDownloadProgress?>(null)
         private set
 
     private var activeDownloadJob: Job? = null
 
-    /**
-     * ⏹️ Отменить текущее активное скачивание плейлиста
-     */
     fun cancelPlaylistDownload() {
         val current = activeDownloadProgress
         activeDownloadJob?.cancel()
@@ -112,12 +97,10 @@ class PlaylistManager(
         }
     }
 
-    // 🎵 Персональные плейлисты (Плейлист дня, Премьера, Дежавю и т.д.)
     val personalPlaylists = mutableStateListOf<PersonalPlaylistItemData>()
     var isPersonalPlaylistsLoading by mutableStateOf(false)
         private set
 
-    // 📊 Редакционная витрина: чарты, новые плейлисты и новые релизы
     val editorialCharts = mutableStateListOf<ChartCollection>()
     val editorialPlaylists = mutableStateListOf<PlaylistInfo>()
     val editorialNewReleases = mutableStateListOf<NewReleaseAlbum>()
@@ -125,7 +108,6 @@ class PlaylistManager(
         private set
     private var editorialShowcaseJob: Job? = null
 
-    // 📁 Персональные локальные оффлайн-плейлисты (на диске)
     val localPlaylists = mutableStateListOf<LocalPlaylist>()
     var isLocalPlaylistsLoading by mutableStateOf(false)
         private set
@@ -143,24 +125,17 @@ class PlaylistManager(
         onLocalPlaylistsChanged?.invoke()
     }
 
-    // ☁️ Пользовательские плейлисты из Яндекс Музыки
     val userPlaylists = mutableStateListOf<PlaylistInfo>()
     var isUserPlaylistsLoading by mutableStateOf(false)
         private set
     var currentOpenUserPlaylist by mutableStateOf<PlaylistInfo?>(null)
 
-    // ☁️ Кеш идентификаторов треков пользовательских плейлистов Яндекс (kind -> Set<trackId>)
     val userPlaylistsTrackIds = mutableStateMapOf<Long, Set<String>>()
 
-    // ❤️ Список ID лайкнутых треков ("Мне нравится")
     val likedTrackIds = mutableStateSetOf<String>()
 
-    // 💔 Список ID треков в дизлайках
     val dislikedTrackIds = mutableStateSetOf<String>()
 
-    /**
-     * 🎵 Загрузка персональных плейлистов (Плейлист дня, Премьера, Дежавю и др.)
-     */
     fun loadPersonalPlaylists() {
         launchSafe {
             isPersonalPlaylistsLoading = true
@@ -210,9 +185,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * 📊 Загрузка витрины: чарты, новые плейлисты и новые релизы
-     */
     fun loadEditorialShowcase(forceRefresh: Boolean = false) {
         if (!forceRefresh && editorialShowcaseJob?.isActive == true) return
         editorialShowcaseJob?.cancel()
@@ -271,9 +243,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * ☁️ Загрузка пользовательских плейлистов из Яндекс Музыки
-     */
     fun loadUserPlaylists() {
         launchSafe {
             isUserPlaylistsLoading = true
@@ -338,9 +307,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * 💾 Загрузка локальных плейлистов с диска
-     */
     fun loadLocalPlaylistsFromDisk() {
         launchSafe {
             isLocalPlaylistsLoading = true
@@ -362,9 +328,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * ➕ Создать новый локальный плейлист
-     */
     fun createLocalPlaylist(title: String, description: String = ""): LocalPlaylist {
         val cleanTitle = title.trim().ifBlank { "Мой плейлист" }
         val now = currentTimeMillis()
@@ -386,9 +349,6 @@ class PlaylistManager(
         return newPlaylist
     }
 
-    /**
-     * ✏️ Переименовать локальный плейлист
-     */
     fun renameLocalPlaylist(playlistId: String, newTitle: String) {
         val idx = localPlaylists.indexOfFirst { it.id == playlistId }
         if (idx < 0) return
@@ -451,7 +411,6 @@ class PlaylistManager(
 
                             val resolved = resolveLocalPath(cleanTrack).replace('\\', '/')
 
-                            // Ищем реальный путь файла на диске:
                             val candidatePath = when {
                                 localFileExists(resolved) -> resolved
                                 localFileExists("$normalizedStorage/$cleanTrack") -> "$normalizedStorage/$cleanTrack"
@@ -547,9 +506,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * ➖ Удалить трек из локального плейлиста по пути или ID
-     */
     fun removeTrackFromLocalPlaylist(
         playlistId: String,
         trackPathOrId: String,
@@ -571,9 +527,6 @@ class PlaylistManager(
         onStatusMessage("Удалено из плейлиста")
     }
 
-    /**
-     * ➖ Удалить трек из локального плейлиста по объекту трека
-     */
     fun removeTrackFromLocalPlaylist(
         playlistId: String,
         track: FullTrackInfo,
@@ -604,9 +557,6 @@ class PlaylistManager(
         onStatusMessage("Удалено из плейлиста")
     }
 
-    /**
-     * 🗑️ Удалить трек из всех локальных плейлистов при его физическом удалении с диска
-     */
     fun removeTrackFileFromAllPlaylists(trackPathOrId: String) {
         removeTrackFromLocalPlaylists(setOf(trackPathOrId))
     }
@@ -651,9 +601,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * ☁️ Создать новый плейлист в аккаунте Яндекс Музыки
-     */
     fun createYandexPlaylist(title: String, onComplete: ((PlaylistInfo?) -> Unit)? = null) {
         val cleanTitle = title.trim().ifBlank { "Новый плейлист" }
         launchSafe {
@@ -674,9 +621,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * ✏️ Переименовать плейлист в аккаунте Яндекс Музыки
-     */
     fun renameYandexPlaylist(playlist: PlaylistInfo, newTitle: String, onComplete: ((Boolean) -> Unit)? = null) {
         val kind = playlist.kind
         if (kind == null) {
@@ -720,9 +664,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * ☁️ Добавить трек в персональный плейлист Яндекс Музыки
-     */
     fun addTrackToYandexPlaylist(playlist: PlaylistInfo, track: FullTrackInfo, onComplete: ((Boolean) -> Unit)? = null) {
         val kind = playlist.kind
         if (kind == null || kind <= 0L) {
@@ -790,9 +731,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * 🗑️ Удалить трек из персонального плейлиста Яндекс Музыки
-     */
     fun removeTrackFromYandexPlaylist(
         playlist: PlaylistInfo,
         track: FullTrackInfo,
@@ -853,9 +791,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * 📋 Загрузить детали плейлиста Яндекс Музыки (с треками) для отображения в диалоге
-     */
     suspend fun loadYandexPlaylistDetails(playlist: PlaylistInfo): YandexPlaylistDetails? {
         val kind = playlist.kind ?: return null
         val uid = if (playlist.uid > 0L) playlist.uid else (repository.getAccountUid()?.toLongOrNull() ?: 0L)
@@ -869,9 +804,6 @@ class PlaylistManager(
         return details
     }
 
-    /**
-     * 🔍 Проверить, содержится ли трек в локальном плейлисте
-     */
     fun isTrackInLocalPlaylist(playlist: LocalPlaylist, track: FullTrackInfo): Boolean {
         val cleanPath = (track.realId ?: track.id).removePrefix("local:")
         val rawId = track.id.removePrefix("local:")
@@ -892,11 +824,7 @@ class PlaylistManager(
         return downloadedPath != null && playlist.trackPaths.contains(downloadedPath)
     }
 
-    /**
-     * 🔍 Проверить, содержится ли трек хотя бы в одном плейлисте (локальном или облачном Яндекс)
-     */
     fun isTrackInAnyPlaylist(track: FullTrackInfo): Boolean {
-        // 1. Сначала быстрая проверка облачных плейлистов Яндекс Музыки (чисто память O(1))
         val cleanTrackId = (track.realId?.ifBlank { null } ?: track.id).removePrefix("local:").substringBefore(":")
         val rawTrackId = track.id.removePrefix("local:").substringBefore(":")
 
@@ -906,13 +834,9 @@ class PlaylistManager(
             return true
         }
 
-        // 2. Проверяем локальные оффлайн-плейлисты
         return localPlaylists.any { isTrackInLocalPlaylist(it, track) }
     }
 
-    /**
-     * 🔢 Подсчитать количество плейлистов, в которых содержится трек
-     */
     fun getTrackPlaylistsCount(track: FullTrackInfo): Int {
         val cleanPath = (track.realId ?: track.id).removePrefix("local:")
         val rawId = track.id.removePrefix("local:")
@@ -944,9 +868,6 @@ class PlaylistManager(
         return count
     }
 
-    /**
-     * 💾 Скачать весь плейлист из Яндекс Музыки в локальный оффлайн-плейлист
-     */
     fun downloadYandexPlaylistToLocal(playlist: PlaylistInfo) {
         if (activeDownloadJob?.isActive == true) {
             onStatusMessage("⚠️ Уже выполняется скачивание другого плейлиста (${activeDownloadProgress?.playlistTitle})")
@@ -989,7 +910,6 @@ class PlaylistManager(
                     return@launch
                 }
 
-                // Дедуплицируем треки по базовому ID, исключая повторы
                 val cleanTrackIdList = mutableListOf<String>()
                 val seenTrackIds = mutableSetOf<String>()
                 for (raw in rawTrackIds) {
@@ -1114,9 +1034,6 @@ class PlaylistManager(
         }
     }
 
-    /**
-     * 📋 Экспорт локального плейлиста в файл .m3u8
-     */
     fun exportLocalPlaylist(playlistId: String): String {
         val playlist = localPlaylists.firstOrNull { it.id == playlistId } ?: return ""
         val tracks = getTracksFromLocalPaths(playlist.trackPaths)
@@ -1128,7 +1045,6 @@ class PlaylistManager(
         return path
     }
 
-    /** Проверяет, лайкнут ли трек (с учетом нормализации ID и суффиксов альбомов) */
     fun isTrackLiked(trackId: String?): Boolean {
         if (trackId.isNullOrBlank()) return false
         val clean = trackId.removePrefix("local:").substringBefore(":")
@@ -1141,7 +1057,6 @@ class PlaylistManager(
         return false
     }
 
-    /** Проверяет, дизлайкнут ли трек (с учетом нормализации ID и суффиксов альбомов) */
     fun isTrackDisliked(trackId: String?): Boolean {
         if (trackId.isNullOrBlank()) return false
         val clean = trackId.removePrefix("local:").substringBefore(":")
@@ -1154,9 +1069,6 @@ class PlaylistManager(
         return false
     }
 
-    /**
-     * ❤️ Загрузить и обновить список всех лайкнутых треков пользователя в фоне
-     */
     fun syncLikedTrackIds() {
         if (getAccessToken().isBlank()) return
         launchSafe {

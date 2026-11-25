@@ -74,7 +74,6 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun App() {
-    // Инициализируем вьюмодель реактивного состояния приложения
     val searchViewModel: SearchViewModel = viewModel { SearchViewModel() }
 
     val messageHost = remember { SnackbarHostState() }
@@ -100,7 +99,6 @@ fun App() {
         supportScope.launch { updateManager.checkForUpdates() }
     }
 
-    // 🔗 Обработка входящих Deep Link ссылок
     LaunchedEffect(Unit) {
         DeepLinkHandler.pendingTrackId.collect { trackId ->
             if (trackId != null) {
@@ -113,7 +111,7 @@ fun App() {
     val isDarkTheme = when (searchViewModel.appTheme) {
         "Light" -> false
         "Dark" -> true
-        else -> androidx.compose.foundation.isSystemInDarkTheme() // fallback to system
+        else -> androidx.compose.foundation.isSystemInDarkTheme()
     }
     
     val selectedAccent = remember(searchViewModel.accentColor) {
@@ -148,7 +146,6 @@ fun App() {
             // Не входит в [dialog]: открывается и по входящей ссылке поверх любого открытого окна.
             var showYamSyncDialog by remember { mutableStateOf(false) }
 
-            // 🔗 Обработка глубоких ссылок синхронизации YamSync (сканирование QR-кода камерой)
             LaunchedEffect(Unit) {
                 DeepLinkHandler.pendingYamSyncUri.collect { uri ->
                     if (uri != null) {
@@ -366,9 +363,6 @@ fun App() {
                             BackHandler(enabled = isSearchVisible || nav.showCollections) {
                                 if (isSearchVisible) searchViewModel.clearSearch() else nav.showCollections = false
                             }
-                            // ==================================================
-                            // 👤 ЭКРАН А: ПОИСК И ВЫДАЧА
-                            // ==================================================
                             Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
 
                                 Row(
@@ -401,9 +395,6 @@ fun App() {
                                     )
                                 }
 
-                            // ==================================================
-                            // 🏠 МУЗЫКАЛЬНЫЙ ХАБ (Скрывается при активном поиске)
-                            // ==================================================
                             AnimatedVisibility(
                                 visible = !isSearchVisible,
                                 enter = expandVertically() + fadeIn(),
@@ -479,7 +470,6 @@ fun App() {
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Вывод лога ошибки на экран в случае сбоя сети
                             searchViewModel.errorMessage?.let { error ->
                                 val displayText = if (error.startsWith("⚠️")) error else "⚠️ Ошибка: $error"
                                 val isMissingFilesError = error.contains("YamSync", ignoreCase = true) ||
@@ -547,7 +537,6 @@ fun App() {
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
 
-                            // Сетка результатов поиска
                             searchViewModel.searchResult?.let { response ->
                                 SearchResultsList(
                                     result = response,
@@ -618,9 +607,6 @@ fun App() {
                         }
                         BackHandler(enabled = showTracksScreen, onBack = goBackFromTracks)
 
-                        // ==================================================
-                        // 🎵 ЭКРАН Б: БЕСКОНЕЧНЫЙ СПИСОК ТРЕКОВ ИСПОЛНИТЕЛЯ
-                        // ==================================================
                         ArtistTracksList(
                             isPlaybackQueue = !searchViewModel.isPreviewingTrackList,
                             chartPositions = searchViewModel.chartTrackPositions,
@@ -710,12 +696,9 @@ fun App() {
                             }
                         )
                     }
-                    } // closes outer Column
+                    }
                 }
             }
-            // ==================================================
-            // 📲 ПОЛНОЭКРАННЫЙ ПЛЕЕР ДЛЯ МОБИЛЬНЫХ (iOS / Android)
-            // ==================================================
             if (isMobileUi) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
@@ -765,9 +748,6 @@ fun App() {
                 }
             }
 
-            // ==================================================
-            // ⚙️ НАСТРОЙКИ (Оверлей поверх Scaffold и плеера)
-            // ==================================================
             SettingsDialog(
                 visible = nav.settingsExpanded,
                 state = SettingsState(
@@ -871,9 +851,6 @@ fun App() {
                     }
                 )
 
-                // ==================================================
-                // 🗑️ ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ФАЙЛА С ДИСКА
-                // ==================================================
                 is AppDialog.DeleteTrack -> DeleteTrackConfirmDialog(
                     target = current,
                     onDismiss = { dialog = null },
@@ -894,7 +871,7 @@ fun App() {
                     onDismiss = { showYamSyncDialog = false }
                 )
             }
-            } // closes outer Box
+            }
         }
     }
 }

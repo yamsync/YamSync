@@ -50,7 +50,6 @@ fun WaveTrackCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // 🏷️ Верхняя строка: Заголовок "Моя Волна" + индикатор трека (N из 5) + кнопка обновления
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -127,13 +126,11 @@ fun WaveTrackCard(
                 val artistsString = currentTrack.artists.joinToString { it.name }.ifBlank { "Неизвестный исполнитель" }
                 val albumTitle = currentTrack.albums.firstOrNull()?.title
 
-                // 🎵 Текущий трек (ОДИН трек из пачки)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Иконка обложки / трека
                     Surface(
                         modifier = Modifier.size(52.dp),
                         shape = RoundedCornerShape(10.dp),
@@ -149,7 +146,6 @@ fun WaveTrackCard(
                         }
                     }
 
-                    // Название трека и артист
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = currentTrack.title,
@@ -176,12 +172,10 @@ fun WaveTrackCard(
                         }
                     }
 
-                    // 🎛️ Кнопки управления треком
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // ⬇️ Скачивание
                         if (isDownloading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(36.dp).padding(6.dp),
@@ -195,7 +189,6 @@ fun WaveTrackCard(
                             )
                         }
 
-                        // ▶️ / ⏸ Play / Pause
                         FilledIconButton(
                             icon = if (isPlaying && !isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying && !isPaused) "Пауза" else "Воспроизвести",
@@ -203,7 +196,6 @@ fun WaveTrackCard(
                             onClick = onPlayPause
                         )
 
-                        // ⏭ Кнопка Next (пропуск трека и перезагрузка списка из 5 треков)
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(36.dp).padding(6.dp),
@@ -220,7 +212,6 @@ fun WaveTrackCard(
                     }
                 }
 
-                // 📊 Прогресс-бар воспроизведения для активного трека Волны
                 AnimatedVisibility(visible = isPlaying || isPaused) {
                     Column(modifier = Modifier.padding(top = 8.dp)) {
                         ThinTrackProgressBar(
@@ -231,7 +222,6 @@ fun WaveTrackCard(
                     }
                 }
             } else {
-                // Если сессия еще не загружена или пуста
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.Center,

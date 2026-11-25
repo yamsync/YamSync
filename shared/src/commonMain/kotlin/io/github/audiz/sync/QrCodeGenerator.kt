@@ -46,7 +46,6 @@ object QrCodeGenerator {
         require(minVersion in 1..maxVersion && maxVersion <= 40) { "Invalid version range" }
         require(mask in -1..7) { "Invalid mask" }
 
-        // Поиск минимальной подходящей версии
         var version = minVersion
         var dataUsedBits = -1
         while (true) {
@@ -71,7 +70,6 @@ object QrCodeGenerator {
             }
         }
 
-        // Формирование битового потока
         val bb = BitBuffer()
         for (seg in segs) {
             bb.appendBits(seg.mode.modeBits, 4)
@@ -125,7 +123,7 @@ object QrCodeGenerator {
                         mask = m
                         minPenalty = penalty
                     }
-                    applyMask(m) // Откат маски
+                    applyMask(m)
                 }
             }
             applyMask(mask)
@@ -164,7 +162,6 @@ object QrCodeGenerator {
                 }
             }
 
-            // Форматные биты и информация о версии
             drawFormatBits(0)
             drawVersion()
         }

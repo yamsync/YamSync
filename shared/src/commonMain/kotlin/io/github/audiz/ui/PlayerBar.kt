@@ -26,9 +26,6 @@ import androidx.compose.ui.unit.sp
 import io.github.audiz.models.FullArtistInfo
 import kotlinx.coroutines.delay
 
-/**
- * 📦 Данные состояния нижнего плеера
- */
 data class PlayerBarState(
     val trackTitle: String = "Выберите трек",
     val artistName: String = "",
@@ -63,9 +60,6 @@ data class PlayerBarState(
     val trackArtists: List<FullArtistInfo> = emptyList(),
 )
 
-/**
- * ⚡ Действия и колбэки нижнего плеера
- */
 data class PlayerBarActions(
     val onVolumeChange: (Float) -> Unit = {},
     val onPlayPause: () -> Unit = {},
@@ -90,11 +84,6 @@ data class PlayerBarActions(
     val onMobilePlayerDragEnd: (Boolean) -> Unit = {},
 )
 
-/**
- * 🎵 Панель аудиоплеера внизу экрана:
- * - На мобильных (iOS / Android): компактный мини-плеер с крупными кнопками 44-48 dp.
- * - На десктопе (Linux, macOS, Windows): полноразмерная панель со всеми регуляторами и возможностью ультракомпактного окна.
- */
 @Composable
 fun PlayerBar(
     state: PlayerBarState,
@@ -117,7 +106,6 @@ fun PlayerBar(
     }
 }
 
-/** Компактный десктопный плеер с симметричными группами действий вокруг управления. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DesktopPlayerBar(

@@ -37,7 +37,6 @@ object AudioVisualizer {
     val pcmAnalyzer: PcmSpectrumAnalyzer = PcmSpectrumAnalyzer()
 
     init {
-        // Подключаем честный FFT-анализатор PCM: результат сразу передается в общий пайплайн
         pcmAnalyzer.onSpectrumReady = { spectrum25 ->
             updateSpectrum(spectrum25)
         }
@@ -111,11 +110,9 @@ object AudioVisualizer {
         applyEffectiveLatency()
     }
 
-    // --- 5 полос для микро-иконок ---
     val levels: StateFlow<FloatArray>
         get() = fiveBand.levels
 
-    // --- Детекция слышимости и тишины в хвосте трека ---
     @Volatile
     private var lastAudiblePcmTimeMs: Long = 0L
 
@@ -190,9 +187,6 @@ object AudioVisualizer {
         fiveBand.updateBands(b1, b2, b3, b4, b5)
     }
 
-    /**
-     * Агрегация полос спектра с взвешиванием пика и среднего
-     */
     private fun groupEnergy(spectrum: FloatArray, start: Int, end: Int, peakWeight: Float = 0.75f): Float {
         val size = spectrum.size
         if (size == 0) return RESTING_LEVEL
@@ -217,27 +211,18 @@ object AudioVisualizer {
         pcmAnalyzer.processPcmChunk(buffer, readBytes)
     }
 
-    /**
-     * ⏱ Рассчитать следующий кадр физики 5 полос (для 60 FPS UI)
-     */
     fun advanceFrame(dtSeconds: Float, isPlaying: Boolean): VisualizerFrame {
         val frame = fiveBand.advanceFrame(dtSeconds, isPlaying)
         twentyFiveBand.trackPeakEma = fiveBand.trackPeakEma
         return frame
     }
 
-    /**
-     * ⏱ Рассчитать следующий кадр физики 25 полос спектроанализатора
-     */
     fun advanceSpectrumFrame(dtSeconds: Float, isPlaying: Boolean): VisualizerFrame {
         val frame = twentyFiveBand.advanceFrame(dtSeconds, isPlaying)
         fiveBand.trackPeakEma = twentyFiveBand.trackPeakEma
         return frame
     }
 
-    /**
-     * 🛑 Сброс уровней в состояние покоя при остановке или паузе
-     */
     fun reset() {
         pcmAnalyzer.reset()
         fiveBand.reset()

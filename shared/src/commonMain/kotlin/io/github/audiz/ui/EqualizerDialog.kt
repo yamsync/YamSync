@@ -63,7 +63,6 @@ fun EqualizerDialog(
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // ==================== 1. ЗАГОЛОВОК И ВКЛЮЧАТЕЛЬ (STICKY) ====================
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -135,7 +134,6 @@ fun EqualizerDialog(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                // ==================== 2. ВКЛАДКИ (STICKY) ====================
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -182,7 +180,6 @@ fun EqualizerDialog(
                     )
                 }
 
-                // ==================== 3. СКРОЛЛИРУЕМАЯ ОБЛАСТЬ ====================
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -191,9 +188,6 @@ fun EqualizerDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (selectedTab == 0) {
-                        // ===== ВКЛАДКА 0: 10 ПОЛОС ЭКВАЛАЙЗЕРА =====
-
-                        // Пресеты
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -258,7 +252,6 @@ fun EqualizerDialog(
                             }
                         }
 
-                        // 10 Полос (Горизонтальный скролл при необходимости)
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
@@ -313,7 +306,6 @@ fun EqualizerDialog(
                             }
                         }
 
-                        // Быстрая панель перехода к срезам
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -369,9 +361,6 @@ fun EqualizerDialog(
                         }
 
                     } else {
-                        // ===== ВКЛАДКА 1: СРЕЗЫ ЧАСТОТ (HPF И LPF) =====
-
-                        // Карточка диапазона пропускания
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
@@ -410,7 +399,6 @@ fun EqualizerDialog(
                             }
                         }
 
-                        // 1. Срез НЧ (Low-Cut / HPF)
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
@@ -460,7 +448,6 @@ fun EqualizerDialog(
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
-                                // Чипы с автоматическим переносом (FlowRow)
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -487,7 +474,6 @@ fun EqualizerDialog(
                             }
                         }
 
-                        // 2. Срез ВЧ (High-Cut / LPF)
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
@@ -537,7 +523,6 @@ fun EqualizerDialog(
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
-                                // Чипы с автоматическим переносом (FlowRow)
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -564,7 +549,6 @@ fun EqualizerDialog(
                             }
                         }
 
-                        // 3. Синхронизация спектра (Audio-Visual Sync)
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
@@ -665,7 +649,6 @@ fun EqualizerDialog(
                             }
                         }
 
-                        // Кнопка возврата к 10 полосам
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Start
@@ -681,7 +664,6 @@ fun EqualizerDialog(
                     }
                 }
 
-                // ==================== 4. КНОПКА ЗАКРЫТИЯ (STICKY FOOTER) ====================
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -700,9 +682,6 @@ fun EqualizerDialog(
     }
 }
 
-/**
- * 🎚 Вертикальный слайдер одной полосы эквалайзера (компактный для любых экранов).
- */
 @Composable
 private fun VerticalBandSlider(
     gainDb: Float,
@@ -720,7 +699,6 @@ private fun VerticalBandSlider(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Значение dB
         val gainText = when {
             gainDb > 0.05f -> "+${(gainDb * 10).roundToInt() / 10f}"
             gainDb < -0.05f -> "${(gainDb * 10).roundToInt() / 10f}"
@@ -736,7 +714,6 @@ private fun VerticalBandSlider(
             maxLines = 1
         )
 
-        // Вертикальный трек со слайдером
         Box(
             modifier = Modifier
                 .height(trackHeight)
@@ -760,7 +737,6 @@ private fun VerticalBandSlider(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Фон линии
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -769,7 +745,6 @@ private fun VerticalBandSlider(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             )
 
-            // Центральная линия (0 dB)
             Box(
                 modifier = Modifier
                     .width(14.dp)
@@ -777,7 +752,6 @@ private fun VerticalBandSlider(
                     .background(MaterialTheme.colorScheme.outlineVariant)
             )
 
-            // Активная заливка от центра к ползунку
             val normalizedGain = ((gainDb + 12f) / 24f).coerceIn(0f, 1f)
             val fillHeightFraction = kotlin.math.abs(gainDb) / 24f
             val isPositive = gainDb >= 0f
@@ -799,7 +773,6 @@ private fun VerticalBandSlider(
                 }
             }
 
-            // Бегунок (Thumb)
             val thumbOffsetY = ((1f - normalizedGain) * (trackHeight.value - thumbSize.value)).dp
             Box(
                 modifier = Modifier
@@ -811,7 +784,6 @@ private fun VerticalBandSlider(
             )
         }
 
-        // Подпись частоты
         Text(
             text = freqLabel,
             style = MaterialTheme.typography.labelSmall,

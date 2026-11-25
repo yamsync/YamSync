@@ -16,20 +16,11 @@ import io.github.audiz.saveAppConfig
 import io.github.audiz.saveMusicStoragePath
 import io.github.audiz.saveSessionToken
 
-/**
- * ⚙️ Менеджер настроек приложения и авторизации в Яндекс Музыке.
- * Инкапсулирует:
- * - Управление токеном доступа OAuth (сохранение в реестр, извлечение, валидация).
- * - Настройки звука (качество скачивания).
- * - Оформление (тема оформления, режим интерфейса Desktop/Mobile).
- * - Настройки пути к хранилищу музыки.
- */
 class SettingsManager(
     private val repository: MusicRepository,
     private val onTokenUpdated: ((String) -> Unit)? = null,
     private val onStoragePathUpdated: ((String) -> Unit)? = null
 ) {
-    // 🔧 Текущий OAuth access_token
     var currentAccessToken by mutableStateOf("")
         private set
 
@@ -37,7 +28,6 @@ class SettingsManager(
         get() = currentAccessToken
         set(value) { currentAccessToken = value }
 
-    // 🔑 Сервис авторизации
     val cookieService = YandexCookieService()
     var isExchangingToken by mutableStateOf(false)
         private set
@@ -65,7 +55,6 @@ class SettingsManager(
     var appTheme by mutableStateOf(loadAppConfig(AppConfigKeys.APP_THEME) ?: "Dark")
         private set
 
-    // 🎨 Акцентный цвет интерфейса
     var accentColor by mutableStateOf(loadAppConfig(AppConfigKeys.ACCENT_COLOR) ?: "purple")
         private set
 
@@ -81,13 +70,11 @@ class SettingsManager(
             else -> true
         }
 
-    // 📂 Путь хранения музыки (настраиваемый)
     var musicStoragePath by mutableStateOf(
         loadMusicStoragePath()?.takeIf { it.isNotBlank() && localFileExists(it) } ?: getDefaultMusicDir()
     )
         private set
 
-    // 🐕 Детектор зависаний UI (Watchdog)
     var isUiWatchdogEnabled by mutableStateOf(loadAppConfig(AppConfigKeys.UI_WATCHDOG_ENABLED) == "true")
         private set
 

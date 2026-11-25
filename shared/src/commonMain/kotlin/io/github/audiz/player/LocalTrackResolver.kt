@@ -118,17 +118,10 @@ class LocalTrackResolver(
         return getDownloadedTrackPath(artist, title)
     }
 
-    /**
-     * Проверка, скачан ли трек на диск (мгновенный O(1) поиск в оперативной памяти).
-     */
     fun isTrackDownloaded(artist: String, title: String): Boolean {
         return getDownloadedTrackPath(artist, title) != null
     }
 
-    /**
-     * Получить абсолютный путь к скачанному треку по исполнителю и названию.
-     * Результаты кэшируются в памяти, полностью исключая системные вызовы диска при скролле.
-     */
     fun getDownloadedTrackPath(artist: String, title: String): String? {
         val cleanArtist = artist.trim()
         val cleanTitle = title.trim()

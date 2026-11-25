@@ -15,9 +15,6 @@ import io.github.audiz.models.YamSyncDiffState
 import io.github.audiz.sync.YamSyncManager
 import io.github.audiz.ui.BackHandler
 
-/**
- * ⚡ Главный диалог управления P2P Wi-Fi синхронизацией YamSync
- */
 @Composable
 fun YamSyncDialog(
     syncManager: YamSyncManager,
@@ -56,10 +53,8 @@ fun YamSyncDialog(
                 var selectedTabIndex by remember { mutableIntStateOf(0) }
 
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // 1. Шапка: устройство и статус соединения
                     YamSyncDialogHeader(syncManager = syncManager, onDismiss = onDismiss)
 
-                    // 2. Вкладки: Связь • Плейлисты • Треки
                     val playlistsCount = syncManager.playlistDiffs.count { it.state != YamSyncDiffState.IDENTICAL }
                     val tracksCount = syncManager.missingFiles.size
                     SyncSegmentedControl(
@@ -74,7 +69,6 @@ fun YamSyncDialog(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // 3. Содержимое активной вкладки
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         when (selectedTabIndex) {
                             0 -> YamSyncPairingTab(syncManager = syncManager, isCompact = isCompact)

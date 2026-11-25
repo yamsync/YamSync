@@ -160,7 +160,6 @@ object EqualizerEngine {
 
         val safeFreq = freqHz.coerceAtLeast(1f)
 
-        // 1. 10 полос эквалайзера
         val eqGain = interpolateGain(safeFreq, _state.value.gains)
 
         // 2. Срез НЧ (HPF / Low-Cut): спад 2-го порядка (-12 дБ/октава) ниже частоты среза
@@ -313,22 +312,18 @@ object EqualizerEngine {
                 var l = leftRaw / 32768f
                 var r = rightRaw / 32768f
 
-                // 1. Срез НЧ (HPF)
                 l = hpfFilter.processLeft(l)
                 r = hpfFilter.processRight(r)
 
-                // 2. 10 полос эквалайзера
                 for (k in 0..9) {
                     val filter = bandFilters[k]
                     l = filter.processLeft(l)
                     r = filter.processRight(r)
                 }
 
-                // 3. Срез ВЧ (LPF)
                 l = lpfFilter.processLeft(l) * preamp
                 r = lpfFilter.processRight(r) * preamp
 
-                // Ограничение амплитуды (soft clamp)
                 val outL = (l * 32767f).roundToInt().coerceIn(-32768, 32767)
                 val outR = (r * 32767f).roundToInt().coerceIn(-32768, 32767)
 

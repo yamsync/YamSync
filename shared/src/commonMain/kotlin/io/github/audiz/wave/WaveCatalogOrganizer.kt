@@ -3,9 +3,6 @@ package io.github.audiz.wave
 import io.github.audiz.models.ThematicWavePreset
 import io.github.audiz.models.WaveThemeOption
 
-/**
- * Группа жанров внутри раскрытого списка настроек «Моей волны».
- */
 data class WaveGenreFamilyGroup(
     val id: String,
     val title: String,
@@ -206,9 +203,6 @@ object WaveCatalogOrganizer {
         return (listOf(selectedItem) + topSlice).take(limit)
     }
 
-    /**
-     * Группирует жанры по семействам для удобного просмотра при раскрытии полного каталога.
-     */
     fun groupGenresByFamily(items: List<WaveThemeOption>): List<WaveGenreFamilyGroup> {
         if (items.isEmpty()) return emptyList()
         val buckets = linkedMapOf<GenreFamily, MutableList<WaveThemeOption>>()

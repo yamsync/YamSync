@@ -61,7 +61,6 @@ fun LogsDialog(
                     .fillMaxSize()
                     .padding(14.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -103,7 +102,6 @@ fun LogsDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Actions: Copy all, Clear
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -142,7 +140,6 @@ fun LogsDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Log entries
                 Box(
                     modifier = Modifier
                         .weight(1f)

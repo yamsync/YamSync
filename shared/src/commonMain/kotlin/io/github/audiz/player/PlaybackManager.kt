@@ -252,7 +252,6 @@ class PlaybackManager(
     var isCurrentTrackHQ: Boolean = false
         private set
 
-    // ⚡ Предзагрузка следующего трека
     var plannedNextTrack: FullTrackInfo?
         get() = queueManager.plannedNextTrack
         set(value) { queueManager.plannedNextTrack = value }
@@ -269,7 +268,6 @@ class PlaybackManager(
     @Volatile private var lastPrevClickTimestamp: Long = 0L
     private var trackStartSystemTime: Long = 0L
 
-    // 📜 История воспроизведения для точного возврата назад (⏮) и перехода вперед (⏭)
     val playbackHistory: MutableList<String> get() = queueManager.playbackHistory
     val forwardHistory: MutableList<String> get() = queueManager.forwardHistory
 
@@ -279,7 +277,6 @@ class PlaybackManager(
     init {
         audioPlayer.setVolume(volume)
 
-        // 🐧 Кросс-платформенная интеграция с системным медиаплеером / MPRIS / SMTC
         systemMediaControls.initialize(
             onPlay = { if (isPaused) togglePlayPause() },
             onPause = { if (isPlaying && !isPaused) togglePlayPause() },
@@ -289,7 +286,6 @@ class PlaybackManager(
             onSeek = { seekTo(it) }
         )
 
-        // 🎵 Аппаратный коллбэк завершения трека
         audioPlayer.setOnCompletionListener {
             if (!hasTriggeredAutoAdvance) {
                 handleTrackFinished(isNaturalCompletion = true)
@@ -333,7 +329,6 @@ class PlaybackManager(
             }
         }
 
-        // 🎧 Обработка системных прерываний (звонки, будильники) и отключений (Bluetooth/наушники)
         audioPlayer.setOnInterruptionListener { shouldPause, canResume ->
             scope.launch {
                 if (shouldPause) {
@@ -345,7 +340,6 @@ class PlaybackManager(
                         systemMediaControls.updatePlaybackState(isPlaying = false, isPaused = true, positionMs)
                     }
                 } else {
-                    // Прерывание завершилось (звонок окончен)
                     if (wasInterruptedBySystem && isPaused && canResume) {
                         wasInterruptedBySystem = false
                         audioPlayer.resume()
@@ -357,7 +351,6 @@ class PlaybackManager(
             }
         }
 
-        // 🌐 Запуск локального HTTP стриминг-прокси (Zero-Latency Audio Streaming)
         try {
             LocalStreamProxy.start(
                 repository = repository,
@@ -557,9 +550,6 @@ class PlaybackManager(
             ?: queueSource.getSearchTracks().firstOrNull(::matches)
     }
 
-    /**
-     * Воспроизвести трек: если файл есть на диске — играть с диска; иначе скачать по сети.
-     */
     fun playTrack(
         targetTrackId: String,
         targetTrackTitle: String,
@@ -616,7 +606,6 @@ class PlaybackManager(
             try {
                 val resolvedAlbumId = targetAlbumId ?: findTrackInfo(targetTrackId)?.albums?.firstOrNull()?.id
 
-                // 🔍 1. Проверяем, есть ли файл на диске
                 val preloaded = preloadedAudio
                 val existingFilePath = withContext(DispatcherIO) {
                     preloaded?.filePath?.takeIf {
@@ -624,7 +613,6 @@ class PlaybackManager(
                     } ?: localTrackResolver.findLocalTrackFile(targetTrackId, cleanArtist, cleanTitle, selectedQuality)
                 }
 
-                // Если файл найден — играем с диска без скачивания
                 if (existingFilePath != null) {
                     println("▶️ Играем с диска: $existingFilePath")
                     isNextLoading = false
@@ -689,10 +677,8 @@ class PlaybackManager(
                     return@launch
                 }
 
-                // 3. 📥 Файла нет на диске и трек сетевой
                 val isPreloadedInMemory = preloaded?.trackId == targetTrackId && preloaded.quality == selectedQuality && preloaded.audioData != null
 
-                // 🌐 Если нет готового аудио в памяти и работает локальный стриминг-прокси — запускаем воспроизведение мгновенно!
                 if (!isPreloadedInMemory && LocalStreamProxy.isRunning()) {
                     trackId = targetTrackId
                     albumId = resolvedAlbumId
@@ -816,9 +802,6 @@ class PlaybackManager(
         playTrackJob = thisJob
     }
 
-    /**
-     * Fallback: принудительно скачать и воспроизвести в LQ
-     */
     fun playTrackForceLQ(
         targetTrackId: String,
         targetTrackTitle: String,
@@ -1022,7 +1005,6 @@ class PlaybackManager(
                         }
                     }
 
-                    // 📻 Радио-стык / Кроссфейд: автопереход к следующему треку заранее
                     val crossfadeMs = crossfadeSeconds * 1000L
                     val maxAllowedCrossfade = (totalDur * 0.35f).toLong()
                     val effectiveCrossfadeMs = effectiveCrossfadeMs(totalDur)
@@ -1230,9 +1212,6 @@ class PlaybackManager(
         }
     }
 
-    /**
-     * Переход к следующему треку в очереди
-     */
     fun playNextTrack(currentId: String? = trackId, source: TrackPlaySource = TrackPlaySource.NEXT, crossfadeMs: Long = 0L) {
         lastPrevClickTimestamp = 0L
         if (source == TrackPlaySource.NEXT) setLoadingFor(source)
@@ -1296,8 +1275,6 @@ class PlaybackManager(
             val currentPos = if (positionMs > 0L) positionMs else audioPlayer.getCurrentPositionMs()
             val timeSinceLastPrev = now - lastPrevClickTimestamp
 
-            // 🔄 Если трек уже играет больше 5 секунд и это НЕ быстрый повторный клик (прошло > 2 сек):
-            // перематываем текущий трек на начало и запускаем воспроизведение
             if (trackId != null && currentPos > PREV_RESTART_THRESHOLD_MS && timeSinceLastPrev > PREV_DOUBLE_CLICK_WINDOW_MS) {
                 println("PlaybackManager: ⏮ Трек играет $currentPos мс (> 5 сек) -> перезапуск с начала")
                 lastPrevClickTimestamp = now
@@ -1313,7 +1290,6 @@ class PlaybackManager(
                 return
             }
 
-            // Если сработал переход к предыдущему треку — сбрасываем таймер быстрого клика
             lastPrevClickTimestamp = 0L
 
             if (source == TrackPlaySource.PREV) setLoadingFor(source)
@@ -1345,21 +1321,15 @@ class PlaybackManager(
     private fun isNextTrackLocal(): Boolean =
         preloader.isLocallyAvailable(queueManager.plannedNextTrack, allowDiskLookup = currentPlayingFilePath != null)
 
-    /** Для следующего трека уже подготовлено начало потока. */
     private fun isNextTrackPreloaded(): Boolean = preloader.isPreloaded(queueManager.plannedNextTrack?.id)
 
-    /**
-     * ⚡ Запуск фоновой предзагрузки запланированного следующего трека
-     */
     fun schedulePreload() = preloader.schedule(plannedNextTrack)
 
-    /** Пересчитать следующий трек после запуска текущего и начать его предзагрузку. */
     private fun planNextAndPreload() {
         queueManager.plannedNextTrack = calculateNextTrackCandidate()
         schedulePreload()
     }
 
-    /** Применить длительность, размер и битрейт полученного по сети аудио к текущему треку. */
     private fun applyDownloadedAudioInfo(audio: DownloadedTrackAudio, forTrackId: String, quality: String) {
         positionMs = 0L
         durationMs = findTrackInfo(forTrackId)?.durationMs?.takeIf { it > 0 } ?: 0L
@@ -1374,9 +1344,6 @@ class PlaybackManager(
         return if (crossfadeMs > 0L) minOf(crossfadeMs, (totalDurationMs * 0.35f).toLong()) else 0L
     }
 
-    /**
-     * 🌊 Уведомление об изменении очереди (например, дозагрузка треков в Моей Волне)
-     */
     fun onQueueUpdated() {
         val candidate = calculateNextTrackCandidate()
         if (candidate?.id != plannedNextTrack?.id) {

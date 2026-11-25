@@ -26,9 +26,6 @@ import androidx.compose.ui.unit.dp
 import io.github.audiz.models.ChartPositionInfo
 import io.github.audiz.models.FullTrackInfo
 
-/**
- * 📦 Состояние отображения трека в списке
- */
 data class TrackItemState(
     val isDownloading: Boolean = false,
     val isActive: Boolean = false,
@@ -41,9 +38,6 @@ data class TrackItemState(
     val chartPosition: ChartPositionInfo? = null
 )
 
-/**
- * ⚡ Обработчики действий для трека
- */
 data class TrackItemActions(
     val onPlay: () -> Unit,
     val onTogglePlayPause: () -> Unit = {},
@@ -54,9 +48,6 @@ data class TrackItemActions(
     val onRemoveFromPlaylist: (() -> Unit)? = null,
 )
 
-/**
- * 🎵 Единая карточка трека для экранов артиста, плейлистов и результатов поиска.
- */
 @Composable
 fun TrackItemCard(
     track: FullTrackInfo,
@@ -84,7 +75,6 @@ fun TrackItemCard(
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {
-            // 🎵 Верхняя строка: Название трека слева + Время трека СПРАВА
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -112,7 +102,6 @@ fun TrackItemCard(
                     )
                 }
 
-                // ⏱ Длительность трека
                 if (track.durationMs > 0) {
                     val min = (track.durationMs / 1000) / 60
                     val sec = (track.durationMs / 1000) % 60
@@ -124,7 +113,6 @@ fun TrackItemCard(
                 }
             }
 
-            // 👤 Нижняя строка: Артист и Альбом слева + Кнопочки СПРАВА (под временем)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -171,13 +159,11 @@ fun TrackItemCard(
                     }
                 }
 
-                // 🔘 Кнопки управления под временем
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (state.isActive) {
-                        // ⏸ / ▶️ Кнопка паузы / возобновления
                         FilledIconButton(
                             icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (state.isPlaying) "Пауза" else "Воспроизвести",
@@ -185,7 +171,6 @@ fun TrackItemCard(
                             onClick = actions.onTogglePlayPause
                         )
                     } else {
-                        // ▶️ Кнопка воспроизведения
                         OutlineIconButton(
                             icon = Icons.Filled.PlayArrow,
                             contentDescription = "Воспроизвести",
@@ -194,7 +179,6 @@ fun TrackItemCard(
                         )
                     }
 
-                    // ➕ Добавить в локальный / облачный плейлист
                     if (actions.onAddToPlaylist != null) {
                         OutlineIconButton(
                             icon = if (state.isInPlaylist) Icons.AutoMirrored.Filled.PlaylistAddCheck else Icons.AutoMirrored.Filled.PlaylistAdd,
@@ -206,7 +190,6 @@ fun TrackItemCard(
                         )
                     }
 
-                    // ⬇️ Кнопка скачивания / Скачан
                     if (state.isDownloading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(36.dp).padding(6.dp),
@@ -241,7 +224,6 @@ fun TrackItemCard(
                 }
             }
 
-            // 📊 Тонкий прогресс-бар для активного трека
             if (state.isActive) {
                 Spacer(modifier = Modifier.height(6.dp))
                 ThinTrackProgressBar(

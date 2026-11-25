@@ -12,9 +12,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
-/**
- * 💾 Сохранение и восстановление очереди «Далее» между запусками приложения.
- */
 internal class PlaybackQueuePersistence(
     private val scope: CoroutineScope,
 ) {
@@ -32,7 +29,6 @@ internal class PlaybackQueuePersistence(
         }
     }
 
-    /** Сохранять каждое изменение [queue] в конфиг приложения. */
     fun startAutoSave(queue: UpNextQueue) {
         autoSaveJob?.cancel()
         autoSaveJob = scope.launch {

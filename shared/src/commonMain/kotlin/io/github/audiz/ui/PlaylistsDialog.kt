@@ -27,10 +27,6 @@ import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.PlaylistInfo
 import io.github.audiz.ui.playlists.*
 
-/**
- * 🗂️ Диалог медиатеки: управление персональными локальными плейлистами
- * и плейлистами из аккаунта Яндекс Музыки.
- */
 @Composable
 fun PlaylistsDialog(
     viewModel: SearchViewModel,
@@ -71,7 +67,6 @@ fun PlaylistsDialog(
                     .fillMaxSize()
                     .padding(14.dp)
             ) {
-                // Верхняя шапка: переключается в режим Проводника по папке
                 if (browsingFolderSource != null) {
                     val src = browsingFolderSource!!
                     Row(
@@ -176,7 +171,6 @@ fun PlaylistsDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Вкладки
                     TabRow(
                         selectedTabIndex = selectedTab,
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -205,7 +199,6 @@ fun PlaylistsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Контент вкладок или Проводника
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (browsingFolderSource != null) {
                         LocalFolderBrowserView(
@@ -255,7 +248,6 @@ fun PlaylistsDialog(
         }
     }
 
-    // Вспомогательные диалоговые окна действий с плейлистами и источниками
     if (showAddSourceDialog) {
         AddSourceDialog(
             viewModel = viewModel,

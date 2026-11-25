@@ -85,7 +85,6 @@ class TwentyFiveBandVisualizer(
     @Volatile
     var trackPeakEma: Float = 0.5f
 
-    // --- Трекер темпа и динамики для пространственной связности полос ---
     private var currentPaceFactor: Float = 0.35f
 
     private var onsetDensityEma = 0f
@@ -93,7 +92,6 @@ class TwentyFiveBandVisualizer(
     private val prevRawSpectrum = FloatArray(SPECTRUM_BAND_COUNT) { 0f }
     private var lastAnalysisTimeMs: Long = 0L
 
-    // --- Per-band AGC: огибающие пола и потолка каждой полосы ---
     private val agcFloor = FloatArray(SPECTRUM_BAND_COUNT)
     private val agcCeil = FloatArray(SPECTRUM_BAND_COUNT)
     private var agcInitialized = false
@@ -101,7 +99,6 @@ class TwentyFiveBandVisualizer(
     // Уровни до AGC: трекер темпа должен видеть реальную динамику, а не усиленные колебания
     private val globalSpectrum = FloatArray(SPECTRUM_BAND_COUNT)
 
-    // --- Привязка к долям ---
     private val beatTracker = BeatTracker()
     private val shapeLevels = FloatArray(SPECTRUM_BAND_COUNT) { RESTING_LEVEL }
     private val hitPulse = FloatArray(SPECTRUM_BAND_COUNT)
@@ -148,7 +145,6 @@ class TwentyFiveBandVisualizer(
 
     private val delayQueue25 = ArrayDeque<Spectrum25Snapshot>()
 
-    // Состояние 25 полос
     private val targetSpectrumLevels = FloatArray(SPECTRUM_BAND_COUNT) { RESTING_LEVEL }
     private val currentSpectrumLevels = FloatArray(SPECTRUM_BAND_COUNT) { RESTING_LEVEL }
     private val spectrumHoldTimers = FloatArray(SPECTRUM_BAND_COUNT) { 0f }
@@ -158,9 +154,6 @@ class TwentyFiveBandVisualizer(
 
     private fun currentTime(): Long = timeProvider()
 
-    /**
-     * 🛑 Очистить буфер задержки
-     */
     fun clearDelayQueue() {
         synchronized(currentSpectrumLevels) {
             delayQueue25.clear()
@@ -186,9 +179,6 @@ class TwentyFiveBandVisualizer(
         }
     }
 
-    /**
-     * 🧠 Анализ спектрального потока (Spectral Flux) и плотности транзиентов (ударов)
-     */
     private fun updateTempoTrackerFromSpectrum(normalizedBands: FloatArray, dtSec: Float) {
         var bassFlux = 0f
         var midHighFlux = 0f
@@ -248,9 +238,6 @@ class TwentyFiveBandVisualizer(
         }
     }
 
-    /**
-     * 🎚 Обновить полосы спектроанализатора напрямую из FFT.
-     */
     fun updateSpectrum(spectrum: FloatArray) {
         synchronized(currentSpectrumLevels) {
             lastSpectrumUpdateTimeMs = currentTime()
@@ -392,9 +379,6 @@ class TwentyFiveBandVisualizer(
         hitHasPrev = false
     }
 
-    /**
-     * ⏱ Рассчитать следующий кадр физики 25 полос спектроанализатора
-     */
     fun advanceFrame(dtSeconds: Float, isPlaying: Boolean): VisualizerFrame {
         synchronized(currentSpectrumLevels) {
             val safeDt = dtSeconds.coerceIn(0.001f, 0.5f)
@@ -502,9 +486,6 @@ class TwentyFiveBandVisualizer(
         }
     }
 
-    /**
-     * 🛑 Сброс уровней в состояние покоя
-     */
     fun reset() {
         synchronized(currentSpectrumLevels) {
             clearDelayQueue()

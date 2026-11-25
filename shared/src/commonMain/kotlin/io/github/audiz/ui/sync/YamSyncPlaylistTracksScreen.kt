@@ -30,7 +30,6 @@ import io.github.audiz.ui.BackHandler
 
 private enum class TrackFilter { MISSING, LOCAL, ALL }
 
-/** Состояние строки трека с учётом идущих загрузок. */
 private enum class TrackRowState { LOCAL, DOWNLOADING, QUEUED, FAILED, DOWNLOADABLE, UNAVAILABLE }
 
 private fun rowState(
@@ -47,9 +46,6 @@ private fun rowState(
     else -> TrackRowState.UNAVAILABLE
 }
 
-/**
- * 📃 Экран плейлиста: полный список треков с поиском, фильтром и скачиванием по одному
- */
 @Composable
 internal fun YamSyncPlaylistTracksScreen(
     syncManager: YamSyncManager,
@@ -104,7 +100,6 @@ internal fun YamSyncPlaylistTracksScreen(
             )
         }
 
-        // Компактная строка поиска в стиле поиска на главной
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -150,7 +145,6 @@ internal fun YamSyncPlaylistTracksScreen(
             }
         }
 
-        // Фильтры — компактные капсулы, помещаются в одну строку на узком экране
         FlowRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

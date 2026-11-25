@@ -56,12 +56,6 @@ import io.github.audiz.saveAppConfig
 import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.models.PlaylistInfo
 
-/**
- * 📂 Диалог добавления трека в персональный плейлист:
- * - 💾 Локальные (Оффлайн) — добавление на диск (с автоскачиванием)
- * - ☁️ Яндекс Музыка — добавление в облачный плейлист аккаунта
- * - 📁 Сохранить как... — сохранение файла в любую папку через системное окно
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddToPlaylistDialog(
@@ -135,7 +129,6 @@ fun AddToPlaylistDialog(
                         .fillMaxSize()
                         .padding(horizontal = horizontalPadding, vertical = 8.dp)
                 ) {
-                    // 🔝 Шапка с Drag Handle, кнопкой закрытия и жестом свайпа вниз
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -164,7 +157,6 @@ fun AddToPlaylistDialog(
                                 )
                             }
                     ) {
-                        // Полоска-индикатор (Drag Handle)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -182,7 +174,6 @@ fun AddToPlaylistDialog(
                             )
                         }
 
-                        // Заголовок
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -221,7 +212,6 @@ fun AddToPlaylistDialog(
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // Информация о треке
                         Text(
                             text = "${track.artists.joinToString { it.name }} — ${track.title}",
                             style = MaterialTheme.typography.bodySmall,
@@ -255,7 +245,6 @@ fun AddToPlaylistDialog(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                // Переключатель вкладок: Локальные / Яндекс Музыка
                 TabRow(
                     selectedTabIndex = selectedTab,
                     modifier = Modifier
@@ -288,7 +277,6 @@ fun AddToPlaylistDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 if (selectedTab == 0) {
-                    // ==================== 💾 ВКЛАДКА: ЛОКАЛЬНЫЕ ПЛЕЙЛИСТЫ ====================
                     PlaylistSectionHeader(
                         title = "Локальные плейлисты",
                         onCreate = { isCreatingLocal = !isCreatingLocal }
@@ -438,7 +426,6 @@ fun AddToPlaylistDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Подсказка об автоскачивании
                 if (!isCompact) Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -457,7 +444,6 @@ fun AddToPlaylistDialog(
                     )
                 }
                 } else if (selectedTab == 1) {
-                    // ==================== ☁️ ВКЛАДКА: ЯНДЕКС МУЗЫКА ====================
                     PlaylistSectionHeader(
                         title = "Плейлисты Яндекс",
                         enabled = !isActionInProgress,
@@ -675,7 +661,6 @@ fun AddToPlaylistDialog(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Подсказка об облачной синхронизации
                     if (!isCompact) Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -694,7 +679,6 @@ fun AddToPlaylistDialog(
                         )
                     }
                 } else if (selectedTab == 2) {
-                    // ==================== 📁 ВКЛАДКА: СОХРАНИТЬ КАК (СИСТЕМНЫЙ ДИАЛОГ) ====================
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

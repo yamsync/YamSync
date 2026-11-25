@@ -7,7 +7,6 @@ internal sealed interface NavigationTarget {
     /** Трек из очереди «Далее» (или возврат к исходному списку после неё). */
     data class UpNext(val track: FullTrackInfo) : NavigationTarget
 
-    /** Обычный трек списка или поиска. */
     data class Track(val track: FullTrackInfo, val albumId: Long?) : NavigationTarget
 
     /** Последний трек списка: сначала догрузить следующую страницу после [currentIndex]. */
@@ -19,7 +18,6 @@ internal sealed interface NavigationTarget {
     /** Нет текущего трека, но есть треки Волны. */
     data object WaveFallback : NavigationTarget
 
-    /** Переходить некуда. */
     data object None : NavigationTarget
 }
 
@@ -68,7 +66,6 @@ internal class PlaybackNavigator(
         val loadedTracks = queueSource.getLoadedTracks()
         val searchTracks = queueSource.getSearchTracks()
 
-        // 1. История перемотки вперед
         val fromForward = if (!upNextQueue.state.started) queueManager.popNextFromForwardHistory(activeId, loadedTracks, searchTracks) else null
         if (fromForward != null) return fromForward.asTarget()
 
@@ -76,7 +73,6 @@ internal class PlaybackNavigator(
             queueManager.recordPlayed(activeId)
         }
 
-        // 2. Текущий плейлист (loadedTracks)
         if (loadedTracks.isNotEmpty()) {
             if (queueManager.isShuffleEnabled) {
                 queueManager.getNextFromList(activeId, loadedTracks)?.let { return it.asTarget() }
@@ -90,12 +86,10 @@ internal class PlaybackNavigator(
             }
         }
 
-        // 3. Результаты поиска
         if (searchTracks.isNotEmpty()) {
             queueManager.getNextFromList(activeId, searchTracks)?.let { return NavigationTarget.Track(it, albumId = null) }
         }
 
-        // 4. Волна
         return if (activeId == null && waveBridge?.waveTracks.orEmpty().isNotEmpty()) NavigationTarget.WaveFallback
         else NavigationTarget.None
     }
@@ -108,16 +102,13 @@ internal class PlaybackNavigator(
         val loadedTracks = queueSource.getLoadedTracks()
         val searchTracks = queueSource.getSearchTracks()
 
-        // 1. Реальная история прослушивания
         queueManager.popPrevFromPlaybackHistory(activeId, loadedTracks, searchTracks)?.let { return it.asTarget() }
 
-        // 2. Текущий плейлист (loadedTracks)
         if (loadedTracks.isNotEmpty()) {
             if (activeId != null) queueManager.recordForward(activeId)
             queueManager.getPrevFromList(activeId, loadedTracks)?.let { return it.asTarget() }
         }
 
-        // 3. Результаты поиска
         if (searchTracks.isNotEmpty()) {
             if (activeId != null) queueManager.recordForward(activeId)
             queueManager.getPrevFromList(activeId, searchTracks)?.let { return NavigationTarget.Track(it, albumId = null) }
@@ -127,10 +118,6 @@ internal class PlaybackNavigator(
         else NavigationTarget.None
     }
 
-    /**
-     * ⏭ Кандидат на следующий трек: очередь «Далее», затем Волна, история перемотки вперёд,
-     * текущий список (по порядку или Shuffle) и результаты поиска.
-     */
     fun calculateNextTrackCandidate(trackId: String?): FullTrackInfo? {
         upNextQueue.peek(::canResumeRecommendedTrack)?.let { return it }
         val candidate = calculateBaseNextTrackCandidate(if (upNextQueue.state.suspended) upNextQueue.state.anchorId else trackId)

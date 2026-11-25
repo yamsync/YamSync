@@ -1,9 +1,5 @@
 package io.github.audiz
 
-/**
- * ⚙️ Константы ключей конфигурации приложения.
- * Устраняют опечатки и централизуют доступ к настройкам приложения.
- */
 object AppConfigKeys {
     const val STAR_PROMPT_STATE = "star_prompt_state"
     // Preserve the mode selected before switching to the bundled database.
@@ -48,9 +44,6 @@ object AppConfigKeys {
     fun eqBand(index: Int): String = "eq_band_$index"
 }
 
-/**
- * 🔥 КРОСС-ПЛАТФОРМЕННЫЕ КОНТРАКТЫ ХРАНИЛИЩА КОНФИГУРАЦИИ И ФАЙЛОВ
- */
 expect fun saveFilePlatformSpecific(bytes: ByteArray, fileName: String)
 expect fun saveSessionToken(token: String)
 expect fun loadSavedSessionToken(): String?

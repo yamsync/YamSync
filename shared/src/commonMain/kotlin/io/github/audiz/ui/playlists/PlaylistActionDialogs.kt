@@ -23,9 +23,6 @@ import io.github.audiz.launchDirectoryPicker
 import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.PlaylistInfo
 
-/**
- * 📁 Диалог добавления локального источника музыки (папка, аудиофайл или M3U).
- */
 @Composable
 internal fun AddSourceDialog(
     viewModel: SearchViewModel,
@@ -211,9 +208,6 @@ internal fun AddSourceDialog(
     )
 }
 
-/**
- * ➕ Диалог создания нового локального плейлиста.
- */
 @Composable
 internal fun CreatePlaylistDialog(
     onDismiss: () -> Unit,
@@ -265,9 +259,6 @@ internal fun CreatePlaylistDialog(
     )
 }
 
-/**
- * ✏️ Диалог переименования локального плейлиста.
- */
 @Composable
 internal fun RenameLocalPlaylistDialog(
     playlist: LocalPlaylist,
@@ -308,9 +299,6 @@ internal fun RenameLocalPlaylistDialog(
     )
 }
 
-/**
- * 🗑️ Диалог подтверждения удаления локального плейлиста.
- */
 @Composable
 internal fun DeletePlaylistConfirmDialog(
     playlist: LocalPlaylist,
@@ -370,9 +358,6 @@ internal fun DeletePlaylistConfirmDialog(
     )
 }
 
-/**
- * ☁️ Диалог переименования плейлиста Яндекс Музыки.
- */
 @Composable
 internal fun RenameYandexPlaylistDialog(
     playlist: PlaylistInfo,

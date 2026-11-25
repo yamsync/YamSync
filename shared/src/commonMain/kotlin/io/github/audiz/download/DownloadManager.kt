@@ -29,15 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import io.github.audiz.util.AppLogger
 
-/**
- * 💾 Менеджер скачивания и управления аудиофайлами на диске.
- * Инкапсулирует:
- * - Скачивание трека по клику (с выбором качества HQ/LQ).
- * - Удаление трека с диска и очистку хранилища.
- * - Режим «Record to disk» (автосохранение треков при воспроизведении).
- * - Проверку наличия трека на диске во всех подпапках качества.
- * - Версионирование локальной библиотеки (downloadVersion) для реактивного обновления карточек UI.
- */
 class DownloadManager(
     private val scope: CoroutineScope,
     private val repository: MusicRepository,
@@ -114,9 +105,6 @@ class DownloadManager(
         downloadVersion++
     }
 
-    /**
-     * Переключить режим автосохранения на диск при воспроизведении
-     */
     fun toggleRecordToDisk(active: Boolean = !isRecordToDiskActive) {
         isRecordToDiskActive = active
         saveAppConfig(io.github.audiz.AppConfigKeys.RECORD_TO_DISK, active.toString())
@@ -129,9 +117,6 @@ class DownloadManager(
         }
     }
 
-    /**
-     * Проверяет, сохранен ли текущий воспроизводимый трек в библиотеке на диске
-     */
     val isCurrentTrackSavedToDisk: Boolean
         get() {
             val id = getPlayingTrackId() ?: return false
@@ -140,15 +125,9 @@ class DownloadManager(
             return isTrackDownloaded(getPlayingArtistName(), getPlayingTrackTitle())
         }
 
-    /**
-     * Проверяет, идет ли скачивание текущего трека в библиотеку прямо сейчас
-     */
     val isCurrentTrackSavingToDisk: Boolean
         get() = isTrackDownloading && downloadingTrackId == getPlayingTrackId()
 
-    /**
-     * Скачать текущий трек на диск или удалить его из библиотеки, если уже скачан
-     */
     fun toggleCurrentTrackSaveOrDelete() {
         val trackId = getPlayingTrackId() ?: return
         val title = getPlayingTrackTitle()
@@ -241,9 +220,6 @@ class DownloadManager(
         }
     }
 
-    /**
-     * 🗑️ Удалить трек с диска
-     */
     fun deleteTrack(
         trackId: String,
         trackTitle: String,
@@ -256,7 +232,6 @@ class DownloadManager(
                 val cleanArtist = artistName.trim()
                 val cleanTitle = trackTitle.trim()
 
-                // 1. Локальный путь, если trackId указывает на файл или начинается с "local:"
                 val resolvedPath = withContext(DispatcherIO) {
                     when {
                         exactFilePath != null -> exactFilePath
@@ -282,7 +257,6 @@ class DownloadManager(
                     playingFilePath
                 } else null
 
-                // 2. Проверяем, играет ли этот трек сейчас (с нормализацией префикса local: и проверкой localPath / playingFilePath)
                 val playingId = getPlayingTrackId()
                 val isPlayingCurrent = (playingId != null && (
                     playingId == trackId ||
@@ -300,7 +274,6 @@ class DownloadManager(
                 }
                 val storagePath = getMusicStoragePath()
 
-                // 3. Вызываем удаление файла на диске
                 val success = withContext(DispatcherIO) {
                     deleteTrackFile(
                         basePath = if (exactFilePath == null) storagePath else "",
@@ -326,9 +299,6 @@ class DownloadManager(
         }
     }
 
-    /**
-     * 🧹 Очистить кеш плейлистов
-     */
     fun clearPlaylistsCache() {
         scope.launch {
             try {
@@ -345,9 +315,6 @@ class DownloadManager(
         }
     }
 
-    /**
-     * 💣 Удалить все скачанные треки с диска
-     */
     fun clearAllDownloadedMusic() {
         scope.launch {
             try {
@@ -379,9 +346,6 @@ class DownloadManager(
         return localTrackResolver.isTrackDownloaded(artistName, trackTitle)
     }
 
-    /**
-     * Возвращает абсолютный путь к скачанному треку, если он существует на диске
-     */
     fun getDownloadedTrackPath(artistName: String, trackTitle: String): String? {
         return localTrackResolver.getDownloadedTrackPath(artistName, trackTitle)
     }
@@ -406,9 +370,6 @@ class DownloadManager(
         coverUri = coverUri
     )
 
-    /**
-     * ⚡ Гарантирует наличие файла трека на диске с возможностью использования уже предзагруженного BatchTrackDownloadInfo
-     */
     suspend fun ensureTrackFileWithInfo(
         trackId: String,
         trackTitle: String,
@@ -483,9 +444,6 @@ class DownloadManager(
         return repository.getBatchTrackDownloadInfo(trackIds, quality = quality)
     }
 
-    /**
-     * 💾 Сохранить трек в указанную папку
-     */
     fun saveTrackToCustomFolder(
         track: FullTrackInfo,
         targetDirectory: String,
@@ -501,7 +459,6 @@ class DownloadManager(
 
                 onStatusMessage("⏳ Сохранение '$chosenBaseTitle' в папку...")
 
-                // 1. Проверяем, есть ли трек уже локально на диске
                 var localSrcPath: String? = null
                 if (track.id.startsWith("local:")) {
                     val p = track.id.removePrefix("local:")
@@ -541,7 +498,6 @@ class DownloadManager(
                     return@launch
                 }
 
-                // 2. Если трека нет на диске — скачиваем аудиопоток из Яндекс Музыки
                 val quality = getSelectedQuality()
                 val audioData = repository.downloadTrackAudio(track.id, quality = quality)
                 val rawExtension = audioData.type.substringBefore("-")
@@ -583,9 +539,6 @@ class DownloadManager(
         }
     }
 
-    /**
-     * 💾 Сохранить трек по конкретному выбранному пути файла (из системного Save As диалога)
-     */
     fun saveTrackToFilePath(
         track: FullTrackInfo,
         targetFilePath: String,
@@ -599,7 +552,6 @@ class DownloadManager(
 
                 onStatusMessage("⏳ Сохранение '$baseTitle'...")
 
-                // 1. Проверяем, есть ли трек уже локально на диске
                 var localSrcPath: String? = null
                 if (track.id.startsWith("local:")) {
                     val p = track.id.removePrefix("local:")
@@ -639,7 +591,6 @@ class DownloadManager(
                     return@launch
                 }
 
-                // 2. Если трека нет на диске — скачиваем аудиопоток из Яндекс Музыки
                 val quality = getSelectedQuality()
                 val audioData = repository.downloadTrackAudio(track.id, quality = quality)
                 val rawExtension = audioData.type.substringBefore("-")

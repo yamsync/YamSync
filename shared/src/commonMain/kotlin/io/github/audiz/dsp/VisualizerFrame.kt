@@ -23,21 +23,16 @@ data class VisualizerFrame(
     }
 }
 
-/**
- * ⚙️ Общие базовые константы спектральной баллистики и визуализации
- */
 internal object VisualizerConstants {
     const val RESTING_LEVEL = 0.15f
 
-    // 5-полосная и 25-полосная студийная баллистика Winamp Pro
-    const val BAR_HOLD_SEC = 0.060f       // 60 мс фиксация удара бочки/баса
-    const val BAR_GRAVITY = 4.2f          // Ускорение падения столбиков (g ≈ 4.2 / s²)
-    const val PEAK_CAP_HOLD_SEC = 0.280f  // 280 мс парение пиковой засечки
-    const val PEAK_CAP_GRAVITY = 2.8f     // Ускорение падения пиковой засечки
+    const val BAR_HOLD_SEC = 0.060f
+    const val BAR_GRAVITY = 4.2f
+    const val PEAK_CAP_HOLD_SEC = 0.280f
+    const val PEAK_CAP_GRAVITY = 2.8f
 
-    // Базовые границы адаптивной физики (Медленный темп <-> Быстрый темп)
-    const val SLOW_BAR_HOLD_SEC = 0.095f    // 95 мс мягкое зависание на плавных частях
-    const val FAST_BAR_HOLD_SEC = 0.030f    // 30 мс четкая отсечка на быстром ритме
+    const val SLOW_BAR_HOLD_SEC = 0.095f
+    const val FAST_BAR_HOLD_SEC = 0.030f
     const val SLOW_BAR_ATTACK_SEC = 0.045f  // Постоянная времени подъёма: мягкий рост на спокойной музыке
     const val FAST_BAR_ATTACK_SEC = 0.012f  // Почти мгновенный удар на быстром ритме
     const val SLOW_BAR_RELEASE_SEC = 0.32f  // Постоянная времени спада: плавное дыхание на интро/эмбиенте

@@ -1,18 +1,12 @@
 package io.github.audiz
 
-/**
- * 🎵 Кросс-платформенный аудиоплеер
- */
 expect class AudioPlayer() {
-    /** Воспроизвести из байтов (после скачивания) */
     fun playFromBytes(bytes: ByteArray)
     fun playFromBytes(bytes: ByteArray, crossfadeMs: Long)
 
-    /** Воспроизвести файл с диска */
     fun playFromFile(filePath: String)
     fun playFromFile(filePath: String, crossfadeMs: Long)
 
-    /** Воспроизвести аудиопоток по HTTP URL */
     fun playFromUrl(url: String)
     fun playFromUrl(url: String, crossfadeMs: Long)
 

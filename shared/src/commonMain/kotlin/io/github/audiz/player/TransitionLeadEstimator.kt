@@ -38,9 +38,6 @@ internal class TransitionLeadEstimator(
     private var pendingPreloaded = false
     private var nextTrackStarted = false
 
-    /**
-     * Запас (мс) перед кроссфейдом для следующего трека.
-     */
     fun leadMs(hasCrossfade: Boolean, isNextLocal: Boolean, isNextPreloaded: Boolean): Long {
         if (!hasCrossfade) return NO_CROSSFADE_LEAD_MS
         if (isNextLocal) return LOCAL_LEAD_MS

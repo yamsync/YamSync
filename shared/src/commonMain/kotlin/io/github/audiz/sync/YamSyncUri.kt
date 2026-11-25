@@ -2,9 +2,6 @@ package io.github.audiz.sync
 
 import kotlinx.serialization.Serializable
 
-/**
- * 🔗 Данные для подключения и авторизации сессии YamSync, кодируемые в QR-код.
- */
 @Serializable
 data class YamSyncPairInfo(
     val ip: String,
@@ -13,7 +10,6 @@ data class YamSyncPairInfo(
     val name: String,
     val platform: String
 ) {
-    /** Сформировать URI со схемой приложения */
     fun toUri(): String {
         val encodedName = encodeUrlParam(name)
         val encodedPlatform = encodeUrlParam(platform)
@@ -28,7 +24,6 @@ data class YamSyncPairInfo(
     }
 
     companion object {
-        /** Разобрать URI из отсканированного QR-кода, HTTP-ссылки или вставленного текста */
         fun parse(uriString: String): YamSyncPairInfo? {
             val trimmed = uriString.trim().trim('"', '\'', '`')
             if (trimmed.isBlank()) return null
@@ -128,9 +123,6 @@ private fun decodeUrlParam(s: String): String {
     return bytes.toByteArray().decodeToString()
 }
 
-/**
- * 📱 Сохраненное устройство, с которым ранее была успешная синхронизация
- */
 @Serializable
 data class YamSyncKnownDevice(
     val name: String,

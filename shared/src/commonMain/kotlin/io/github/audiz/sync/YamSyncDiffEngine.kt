@@ -9,9 +9,6 @@ import io.github.audiz.models.*
  */
 object YamSyncDiffEngine {
 
-    /**
-     * Сравнить локальный и удаленный манифесты, сформировать список различий по плейлистам.
-     */
     fun calculateDiff(
         localManifest: YamSyncManifest,
         remoteManifest: YamSyncManifest
@@ -21,7 +18,6 @@ object YamSyncDiffEngine {
         val localMap = localManifest.playlists.associateBy { normalizeTitle(it.title) }.toMutableMap()
         val remoteMap = remoteManifest.playlists.associateBy { normalizeTitle(it.title) }.toMutableMap()
 
-        // Все уникальные названия плейлистов
         val allTitles = (localMap.keys + remoteMap.keys).toList()
 
         for (titleKey in allTitles) {
@@ -104,7 +100,6 @@ object YamSyncDiffEngine {
             }
         }
 
-        // Сортировка: сначала измененные, потом новые, потом идентичные
         return result.sortedWith(
             compareBy<YamSyncPlaylistDiff> {
                 when (it.state) {
@@ -117,10 +112,6 @@ object YamSyncDiffEngine {
         )
     }
 
-    /**
-     * Выполнить слияние на основе выбранных пользователем резолюций.
-     * Возвращает список итоговых плейлистов, готовых к сохранению.
-     */
     fun mergePlaylists(diffs: List<YamSyncPlaylistDiff>): List<YamSyncPlaylist> {
         val mergedList = mutableListOf<YamSyncPlaylist>()
 
@@ -140,18 +131,15 @@ object YamSyncDiffEngine {
                         local != null && remote != null -> {
                             val combinedTracks = mutableListOf<YamSyncTrack>()
 
-                            // Сначала добавляем локальные треки с очисткой дубликатов
                             for (track in local.tracks) {
                                 if (combinedTracks.none { areTracksMatching(it, track) }) {
                                     combinedTracks.add(track)
                                 }
                             }
 
-                            // Затем добавляем уникальные треки с удаленного устройства
                             for (remoteTrack in remote.tracks) {
                                 val existingIndex = combinedTracks.indexOfFirst { areTracksMatching(it, remoteTrack) }
                                 if (existingIndex >= 0) {
-                                    // Обновляем метаданные на лучшую версию
                                     val best = pickBestTrackRepresentation(combinedTracks[existingIndex], remoteTrack)
                                     combinedTracks[existingIndex] = best
                                 } else {
@@ -188,9 +176,6 @@ object YamSyncDiffEngine {
         return mergedList
     }
 
-    /**
-     * Найти аудиофайлы, которые входят в итоговые плейлисты, но отсутствуют на текущем устройстве.
-     */
     fun findMissingFiles(
         mergedPlaylists: List<YamSyncPlaylist>,
         localAvailableFiles: List<YamSyncTrack>,
@@ -221,7 +206,6 @@ object YamSyncDiffEngine {
      * различные дефисы и совпадения ключевых токенов.
      */
     fun areTracksMatching(a: YamSyncTrack, b: YamSyncTrack): Boolean {
-        // 1. Быстрое совпадение по хешу или точному ключу
         if (a.checksum.isNotBlank() && b.checksum.isNotBlank() && a.checksum.equals(b.checksum, ignoreCase = true)) {
             return true
         }
@@ -229,14 +213,12 @@ object YamSyncDiffEngine {
             return true
         }
 
-        // 2. Точное совпадение имени файла (без расширения и без регистра)
         val fnA = a.fileName.substringBeforeLast('.').trim().lowercase()
         val fnB = b.fileName.substringBeforeLast('.').trim().lowercase()
         if (fnA.isNotBlank() && fnA == fnB) {
             return true
         }
 
-        // 3. Токены исполнителя и названия
         val fullA = "${a.artist} ${a.title} $fnA"
         val fullB = "${b.artist} ${b.title} $fnB"
         val tokensA = normalizeTokens(fullA)
@@ -249,7 +231,6 @@ object YamSyncDiffEngine {
             val union = tokensA.union(tokensB)
             val jaccard = intersection.size.toDouble() / union.size.toDouble()
 
-            // Высокое подобие токенов (от 0.60)
             if (jaccard >= 0.60) {
                 if (a.durationMs > 0 && b.durationMs > 0) {
                     return kotlin.math.abs(a.durationMs - b.durationMs) <= 5000
@@ -301,9 +282,6 @@ object YamSyncDiffEngine {
             .toSet()
     }
 
-    /**
-     * Выбрать вариант трека с более качественными и полными метаданными для плейлиста.
-     */
     fun pickBestTrackRepresentation(local: YamSyncTrack, remote: YamSyncTrack): YamSyncTrack {
         val localScore = scoreTrackMetadata(local)
         val remoteScore = scoreTrackMetadata(remote)

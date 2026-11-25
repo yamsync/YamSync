@@ -79,9 +79,6 @@ object CoverImageLoader {
         }
     }
 
-    /**
-     * Асинхронная загрузка обложки трека с кэшированием в оперативной памяти
-     */
     suspend fun loadCover(coverUri: String?, size: Int = 400): ImageBitmap? {
         val key = cacheKey(coverUri, size) ?: return null
         val trimmed = coverUri!!.trim()

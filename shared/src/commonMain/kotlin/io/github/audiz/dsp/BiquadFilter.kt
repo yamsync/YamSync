@@ -24,7 +24,6 @@ class BiquadFilter {
     var type: Type = Type.BYPASS
         private set
 
-    // Коэффициенты фильтра
     private var b0: Float = 1f
     private var b1: Float = 0f
     private var b2: Float = 0f
@@ -35,7 +34,6 @@ class BiquadFilter {
     private var d1L: Float = 0f
     private var d2L: Float = 0f
 
-    // Регистры задержки для правого канала
     private var d1R: Float = 0f
     private var d2R: Float = 0f
 
@@ -138,9 +136,6 @@ class BiquadFilter {
         a2 = (1f - alpha) / a0
     }
 
-    /**
-     * Фильтрация сэмпла левого канала.
-     */
     fun processLeft(input: Float): Float {
         if (type == Type.BYPASS) return input
         val output = b0 * input + d1L
@@ -149,9 +144,6 @@ class BiquadFilter {
         return output
     }
 
-    /**
-     * Фильтрация сэмпла правого канала.
-     */
     fun processRight(input: Float): Float {
         if (type == Type.BYPASS) return input
         val output = b0 * input + d1R

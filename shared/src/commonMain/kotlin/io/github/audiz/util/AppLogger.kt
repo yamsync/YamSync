@@ -13,7 +13,6 @@ object AppLogger {
     private val lock = Any()
 
     init {
-        // Подключаем слушатель из CoreLogger
         CoreLogger.listener = { level, tag, message, throwable ->
             log(level, tag, message, throwable)
         }

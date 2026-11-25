@@ -16,9 +16,6 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import io.github.audiz.util.AppLogger
 
-/**
- * Состояния подключения YamSync
- */
 sealed interface YamSyncConnectionState {
     data object Disconnected : YamSyncConnectionState
     data class Hosting(val pairInfo: YamSyncPairInfo, val qrMatrix: Array<BooleanArray>) : YamSyncConnectionState
@@ -41,9 +38,6 @@ data class YamSyncPlaylistProgress(
     val total: Int = 0
 )
 
-/**
- * 🎛️ Менеджер сессии P2P-синхронизации медиатеки YamSync
- */
 class YamSyncManager(
     private val scope: CoroutineScope,
     private val getMusicStoragePath: () -> String,
@@ -336,7 +330,6 @@ class YamSyncManager(
         return "Unknown Artist" to cleanTitle.ifBlank { "Track" }
     }
 
-    /** Сформировать актуальный манифест локальной медиатеки */
     fun buildLocalManifest(): YamSyncManifest {
         val basePath = getMusicStoragePath()
         val localPls = loadLocalPlaylists(basePath)
@@ -382,7 +375,6 @@ class YamSyncManager(
             addTrackIfNew(cleanPath, track)
         }
 
-        // Также обязательно добавляем все существующие на диске локальные файлы из плейлистов
         val allPlaylistPaths = localPls.flatMap { it.trackPaths }.distinct()
         val playlistTracksInfo = getTracksFromLocalPaths(allPlaylistPaths)
         for (track in playlistTracksInfo) {
@@ -526,7 +518,6 @@ class YamSyncManager(
 
         val rawDiffs = YamSyncDiffEngine.calculateDiff(localMan, remoteMan)
 
-        // Восстанавливаем выбранные пользователем правила слияния (resolution)
         val resolvedDiffs = rawDiffs.map { diff ->
             val normTitle = YamSyncDiffEngine.normalizeTitle(diff.title)
             val savedRes = userResolutions[diff.playlistId]
@@ -601,7 +592,6 @@ class YamSyncManager(
         val cleanFn = sanitizeKeepSpaces(safeName).trim()
         val base = getMusicStoragePath().trim()
 
-        // Helper to test if a candidate path exists on disk and return its resolved path
         fun verify(candidate: String?): String? {
             if (candidate.isNullOrBlank()) return null
             val clean = candidate.trim().removePrefix("local:").removePrefix("file://").removePrefix("file:")
@@ -611,19 +601,16 @@ class YamSyncManager(
             return null
         }
 
-        // 1. O(1) поиск по сохраненным прямым путям локальной медиатеки
         val direct = localFilePathsByMatchKey[cleanFn.lowercase()]
             ?: localFilePathsByMatchKey[safeName.lowercase()]
             ?: if (checksum.isNotBlank()) localFilePathsByMatchKey[checksum.trim().lowercase()] else null
         verify(direct)?.let { return it }
 
-        // 2. Поиск внутри базовой папки музыки (basePath)
         if (base.isNotBlank()) {
             verify("$base/$cleanFn")?.let { return it }
             verify("$base/$safeName")?.let { return it }
         }
 
-        // 3. Поиск по уже сформированному кэшу доступных файлов манифеста
         val cachedTrack = localManifestCache?.availableFiles?.firstOrNull {
             it.fileName.equals(safeName, ignoreCase = true) ||
             it.fileName.equals(cleanFn, ignoreCase = true) ||
@@ -657,7 +644,6 @@ class YamSyncManager(
             }
         }
 
-        // 4. Fallback через scanDownloadedTracks
         if (base.isNotBlank()) {
             val downloaded = scanDownloadedTracks(base)
             val byName = downloaded.firstOrNull {
@@ -691,7 +677,6 @@ class YamSyncManager(
         return null
     }
 
-    /** Запустить режим раздачи (Host): поднять сервер и показать QR-код */
     fun startHosting() {
         stopHosting()
         errorMessage = null
@@ -766,7 +751,6 @@ class YamSyncManager(
         statusMessage = "Ожидание подключения партнёра..."
     }
 
-    /** Остановить сервер и режим раздачи */
     fun stopHosting() {
         isHostingMode = false
         hostPairInfo = null
@@ -779,7 +763,6 @@ class YamSyncManager(
         }
     }
 
-    /** Подключиться к удаленному устройству по URI из QR-кода */
     fun connectToPeer(uriString: String) {
         val pairInfo = YamSyncPairInfo.parse(uriString)
         if (pairInfo == null) {
@@ -789,7 +772,6 @@ class YamSyncManager(
         connectToPairInfo(pairInfo)
     }
 
-    /** Подключиться к удаленному устройству */
     fun connectToPairInfo(pairInfo: YamSyncPairInfo) {
         stopHosting()
         isHostingMode = false
@@ -851,7 +833,6 @@ class YamSyncManager(
         }
     }
 
-    /** Разорвать текущее соединение */
     fun disconnect() {
         val pair = activePairInfo
         val token = pair?.token ?: hostPairInfo?.token
@@ -865,7 +846,6 @@ class YamSyncManager(
         handleRemotePeerDisconnected("Связь разорвана")
     }
 
-    /** Запросить свежий манифест с удаленного устройства и пересчитать diff */
     fun refreshManifestAndDiff() {
         val pair = activePairInfo ?: return
         scope.launch(Dispatchers.Main) {
@@ -880,7 +860,6 @@ class YamSyncManager(
                 return@launch
             }
 
-            // Пробуем exchangeManifests (POST /manifest) для мгновенного двустороннего обмена манифестами
             val remoteRes = withContext(DispatcherIO) {
                 client.exchangeManifests(pair.ip, pair.port, pair.token, localMan)
             }
@@ -891,7 +870,6 @@ class YamSyncManager(
                     applyDiffs(localMan, remoteMan)
                 },
                 onFailure = { exchangeErr ->
-                    // Fallback на обычный GET /manifest
                     val getRes = withContext(DispatcherIO) {
                         client.fetchManifest(pair.ip, pair.port, pair.token)
                     }
@@ -914,7 +892,6 @@ class YamSyncManager(
         }
     }
 
-    /** Изменить стратегию слияния для конкретного плейлиста */
     fun setResolution(playlistId: String, resolution: YamSyncResolution) {
         userResolutions[playlistId] = resolution
         val idx = playlistDiffs.indexOfFirst { it.playlistId == playlistId }
@@ -926,7 +903,6 @@ class YamSyncManager(
         }
     }
 
-    /** Переключить выбор файла для загрузки */
     fun toggleFileSelection(trackKey: String) {
         if (selectedFiles.contains(trackKey)) {
             selectedFiles.remove(trackKey)
@@ -937,7 +913,6 @@ class YamSyncManager(
         }
     }
 
-    /** Выбрать или снять выбор со всех файлов */
     fun toggleSelectAllFiles() {
         if (selectedFiles.size == missingFiles.size) {
             selectedFiles.clear()
@@ -961,7 +936,6 @@ class YamSyncManager(
         playlistSyncQueue.trySend(PlaylistSyncRequest(playlistId, null))
     }
 
-    /** Поставить в очередь скачивание отдельных треков плейлиста (с экрана плейлиста). */
     fun downloadPlaylistTracks(playlistId: String, tracks: List<YamSyncTrack>) {
         val fresh = tracks.filter { queuedTrackKeys.add(it.matchKey) }
         if (fresh.isEmpty()) return
@@ -1005,12 +979,10 @@ class YamSyncManager(
         }
     }
 
-    /** Синхронизировать все плейлисты, которые отличаются на устройствах. */
     fun syncAllPlaylists() {
         playlistDiffs.filter { it.state != YamSyncDiffState.IDENTICAL }.forEach { syncPlaylist(it.playlistId) }
     }
 
-    /** Остановить синхронизацию плейлиста или убрать его из очереди. */
     fun cancelPlaylistSync(playlistId: String) {
         if (activePlaylistSyncId == playlistId) {
             activePlaylistSyncJob?.cancel()
@@ -1123,7 +1095,6 @@ class YamSyncManager(
                 }.onFailure { err -> errorMessage = "Не удалось отправить «${diff.title}»: ${err.message}" }
             }
 
-            // 3. Скачиваем недостающие треки этого плейлиста
             val missingOnDisk = withContext(DispatcherIO) {
                 YamSyncDiffEngine.findMissingFiles(listOf(merged), localMan.availableFiles, remoteMan.availableFiles)
             }
@@ -1161,7 +1132,6 @@ class YamSyncManager(
         }
     }
 
-    /** Скачать выбранные на вкладке «Треки» недостающие аудиофайлы */
     fun downloadSelectedFiles() {
         if (isDownloadingFiles) return
         val pair = activePairInfo ?: return
@@ -1281,7 +1251,6 @@ class YamSyncManager(
             )
         }
 
-        // Обновляем пути в локальных плейлистах с учетом скачанных файлов
         if (successCount > 0) {
             withContext(DispatcherIO) {
                 val freshDownloaded = scanDownloadedTracks(basePath)
@@ -1342,12 +1311,10 @@ class YamSyncManager(
                 val sep = if (basePath.contains('\\')) "\\" else "/"
                 val fallbackCandidate = "${basePath.trimEnd('/', '\\')}${sep}YamSync$sep$cleanArtist$sep$cleanFileName"
 
-                // 1. Проверяем, существует ли уже файл на диске
                 val existingOnDisk = resolveLocalPath(syncTrack.fileName).takeIf { localFileExists(it) }
                     ?: resolveLocalPath(fallbackCandidate).takeIf { localFileExists(it) }
                 if (existingOnDisk != null) return@mapNotNull existingOnDisk
 
-                // 2. Ищем среди уже скачанных треков
                 val found = downloadedTracks.firstOrNull {
                     val fn = (it.realId ?: it.id.removePrefix("local:")).substringAfterLast('/').substringAfterLast('\\')
                     fn.equals(syncTrack.fileName, ignoreCase = true) ||
@@ -1368,7 +1335,6 @@ class YamSyncManager(
             )
         }
 
-        // Сохраняем локальные плейлисты, которых не было в remotePlaylists
         val updatedIds = updatedList.map { it.id }.toSet()
         val untouchedLocal = currentLocal.filter { it.id !in updatedIds }
         val combinedPlaylists = updatedList + untouchedLocal

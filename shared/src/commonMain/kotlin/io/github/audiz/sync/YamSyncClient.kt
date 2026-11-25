@@ -38,9 +38,7 @@ private fun createYamSyncHttpClient(): HttpClient {
     }
 }
 
-/** HTTP-клиент YamSync для взаимодействия с удалённым сервером по Wi-Fi. */
 class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient()) {
-    /** Проверить доступность удаленного устройства */
     suspend fun ping(ip: String, port: Int): Result<YamSyncDevice> = runCatchingCancellable {
         val response = httpClient.get("http://$ip:$port/yamsync/v1/ping")
         if (response.status.isSuccess()) {
@@ -50,7 +48,6 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
         }
     }
 
-    /** Выполнить рукопожатие (Pairing) и авторизацию по токену */
     suspend fun pair(ip: String, port: Int, token: String, localDevice: YamSyncDevice): Result<YamSyncDevice> = runCatchingCancellable {
         val response = httpClient.post("http://$ip:$port/yamsync/v1/pair") {
             timeout { requestTimeoutMillis = 15_000 }
@@ -65,7 +62,6 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
         }
     }
 
-    /** Запросить манифест медиатеки с удаленного устройства */
     suspend fun fetchManifest(ip: String, port: Int, token: String): Result<YamSyncManifest> = runCatchingCancellable {
         val response = httpClient.get("http://$ip:$port/yamsync/v1/manifest") {
             header("X-YamSync-Token", token)
@@ -77,9 +73,6 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
         }
     }
 
-    /**
-     * Отправить свой манифест на удаленный хост (POST) и одновременно получить свежий манифест хоста в ответе
-     */
     suspend fun exchangeManifests(ip: String, port: Int, token: String, localManifest: YamSyncManifest): Result<YamSyncManifest> = runCatchingCancellable {
         val response = httpClient.post("http://$ip:$port/yamsync/v1/manifest") {
             header("X-YamSync-Token", token)
@@ -191,7 +184,6 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
         if (error is CancellationException) throw error
     }
 
-    /** Отправить результат слияния плейлистов обратно на хост */
     suspend fun sendMerge(ip: String, port: Int, token: String, payload: YamSyncMergePayload): Result<Unit> = runCatchingCancellable {
         val response = httpClient.post("http://$ip:$port/yamsync/v1/merge") {
             header("X-YamSync-Token", token)
@@ -203,7 +195,6 @@ class YamSyncClient(private val httpClient: HttpClient = createYamSyncHttpClient
         }
     }
 
-    /** Уведомить удаленное устройство о разрыве соединения */
     suspend fun notifyDisconnect(ip: String, port: Int, token: String): Result<Unit> = runCatchingCancellable {
         if (port <= 0 || ip.isBlank()) return@runCatchingCancellable
         withTimeout(1500) {

@@ -1,9 +1,5 @@
 package io.github.audiz.player
 
-/**
- * 🎵 Единая модель состояния пользовательского интерфейса аудиоплеера (UDF).
- * Консолидирует все свойства воспроизведения, метаданных и статусов трека.
- */
 data class PlayerUiState(
     val trackId: String? = null,
     val albumId: Long? = null,

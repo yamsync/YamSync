@@ -18,9 +18,6 @@ import androidx.compose.ui.unit.dp
 import io.github.audiz.models.CustomMediaSource
 import io.github.audiz.models.LocalSourceType
 
-/**
- * 📁 Карточка добавленного источника медиа (папка, аудиофайл, M3U)
- */
 @Composable
 internal fun CustomSourceCard(
     source: CustomMediaSource,

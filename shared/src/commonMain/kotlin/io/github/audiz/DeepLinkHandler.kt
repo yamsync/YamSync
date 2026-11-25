@@ -4,9 +4,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * 🔗 Диспетчер диплинков (yamsync:// и https://music.yandex.ru/...)
- */
 object DeepLinkHandler {
     private val _pendingTrackId = MutableStateFlow<String?>(null)
     val pendingTrackId: StateFlow<String?> = _pendingTrackId.asStateFlow()

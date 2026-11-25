@@ -22,7 +22,7 @@ import kotlinx.serialization.json.Json
  * Платформенный код предоставляет только примитивы I/O (см. [writeTextFileAtomic] и др. в MusicStorage.kt).
  */
 
-const val PLAYLIST_CACHE_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000L // 7 дней
+const val PLAYLIST_CACHE_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000L
 
 private const val TAG = "PlaylistCache"
 private const val CACHE_DIR = "playlists_cache"
@@ -49,7 +49,6 @@ private fun playlistCacheFile(basePath: String, cacheKey: String) =
 
 private fun localPlaylistsFile(basePath: String) = "$basePath/$LOCAL_PLAYLISTS_DIR/$LOCAL_PLAYLISTS_FILE"
 
-/** Очистка имени плейлиста для использования в имени файла */
 internal fun sanitizePlaylistFileName(title: String): String =
     sanitizeKeepSpaces(title).trim().ifBlank { "Playlist" }
 
@@ -74,9 +73,6 @@ private fun isExpired(path: String, maxAgeMs: Long, now: Long = currentTimeMilli
     return now - modified > maxAgeMs
 }
 
-// ───────────────────────────── Треки плейлистов ─────────────────────────────
-
-/** Сохранить список треков плейлиста в локальный кеш на диске: {basePath}/playlists_cache/{cacheKey}.json */
 fun savePlaylistTracksCache(basePath: String, cacheKey: String, tracks: List<FullTrackInfo>) {
     if (basePath.isBlank() || tracks.isEmpty() || cacheKey.isBlank()) return
     if (writeJson(playlistCacheFile(basePath, cacheKey), ListSerializer(FullTrackInfo.serializer()), tracks, "кеша плейлиста '$cacheKey'")) {
@@ -97,7 +93,6 @@ fun loadPlaylistTracksCache(basePath: String, cacheKey: String): List<FullTrackI
     return readJson(path, ListSerializer(FullTrackInfo.serializer()), "кеша плейлиста '$cacheKey'").orEmpty()
 }
 
-/** Удалить устаревшие файлы кеша плейлистов старше maxAgeMs (по умолчанию 7 дней) */
 fun cleanExpiredPlaylistCaches(basePath: String, maxAgeMs: Long = PLAYLIST_CACHE_MAX_AGE_MS): Int {
     if (basePath.isBlank()) return 0
     val dir = cacheDir(basePath)
@@ -110,7 +105,6 @@ fun cleanExpiredPlaylistCaches(basePath: String, maxAgeMs: Long = PLAYLIST_CACHE
     return removed
 }
 
-/** Очистить весь кеш плейлистов: удаляет все файлы из {basePath}/playlists_cache/ */
 fun clearPlaylistsCache(basePath: String): Int {
     if (basePath.isBlank()) return 0
     val dir = cacheDir(basePath)
@@ -119,59 +113,46 @@ fun clearPlaylistsCache(basePath: String): Int {
     return removed
 }
 
-// ───────────────────────────── Служебные кеши ─────────────────────────────
-
-/** Сохранить список персональных плейлистов в кеш для бокового меню */
 fun savePersonalPlaylistsCache(basePath: String, items: List<PersonalPlaylistItemData>) {
     if (basePath.isBlank() || items.isEmpty()) return
     writeJson(cacheFile(basePath, PERSONAL_PLAYLISTS_FILE), ListSerializer(PersonalPlaylistItemData.serializer()), items, "кеша персональных плейлистов")
 }
 
-/** Загрузить список персональных плейлистов из кеша */
 fun loadPersonalPlaylistsCache(basePath: String): List<PersonalPlaylistItemData> {
     if (basePath.isBlank()) return emptyList()
     return readJson(cacheFile(basePath, PERSONAL_PLAYLISTS_FILE), ListSerializer(PersonalPlaylistItemData.serializer()), "кеша персональных плейлистов").orEmpty()
 }
 
-/** Сохранить список пользовательских плейлистов из Яндекса в кеш */
 fun saveUserPlaylistsCache(basePath: String, items: List<PlaylistInfo>) {
     if (basePath.isBlank() || items.isEmpty()) return
     writeJson(cacheFile(basePath, USER_PLAYLISTS_FILE), ListSerializer(PlaylistInfo.serializer()), items, "кеша пользовательских плейлистов")
 }
 
-/** Загрузить список пользовательских плейлистов из Яндекса из кеша */
 fun loadUserPlaylistsCache(basePath: String): List<PlaylistInfo> {
     if (basePath.isBlank()) return emptyList()
     return readJson(cacheFile(basePath, USER_PLAYLISTS_FILE), ListSerializer(PlaylistInfo.serializer()), "кеша пользовательских плейлистов").orEmpty()
 }
 
-/** Сохранить редакционную витрину (чарты, новые плейлисты и релизы) в локальный кеш */
 fun saveEditorialShowcaseCache(basePath: String, showcase: EditorialShowcaseData) {
     if (basePath.isBlank() || showcase.isEmpty) return
     writeJson(cacheFile(basePath, EDITORIAL_SHOWCASE_FILE), EditorialShowcaseData.serializer(), showcase, "кеша витрины")
 }
 
-/** Загрузить редакционную витрину из локального кеша */
 fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? {
     if (basePath.isBlank()) return null
     return readJson(cacheFile(basePath, EDITORIAL_SHOWCASE_FILE), EditorialShowcaseData.serializer(), "кеша витрины")
 }
 
-/** Сохранить персональный каталог тем Моей волны в локальный кеш */
 fun saveWaveCatalogCache(basePath: String, catalog: WavePersonalCatalog) {
     if (basePath.isBlank() || catalog.isEmpty) return
     writeJson(cacheFile(basePath, WAVE_CATALOG_FILE), WavePersonalCatalog.serializer(), catalog, "кеша каталога волны")
 }
 
-/** Загрузить персональный каталог тем Моей волны из локального кеша */
 fun loadWaveCatalogCache(basePath: String): WavePersonalCatalog? {
     if (basePath.isBlank()) return null
     return readJson(cacheFile(basePath, WAVE_CATALOG_FILE), WavePersonalCatalog.serializer(), "кеша каталога волны")
 }
 
-// ───────────────────────────── Локальные плейлисты ─────────────────────────────
-
-/** Сохранить список локальных оффлайн-плейлистов на диск: {basePath}/playlists/local_playlists.json */
 fun saveLocalPlaylists(basePath: String, playlists: List<LocalPlaylist>) {
     if (basePath.isBlank()) return
     if (writeJson(localPlaylistsFile(basePath), ListSerializer(LocalPlaylist.serializer()), playlists, "локальных плейлистов")) {

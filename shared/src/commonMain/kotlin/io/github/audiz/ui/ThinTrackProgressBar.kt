@@ -16,9 +16,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Универсальный тонкий интерактивный слайдер без кругляшка/точки/ползунка (просто чистая полоска).
- */
 @Composable
 fun ThinSlider(
     value: Float,
@@ -69,7 +66,6 @@ fun ThinSlider(
             },
         contentAlignment = Alignment.CenterStart
     ) {
-        // Фоновая полоска (неактивная часть)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -77,7 +73,6 @@ fun ThinSlider(
                 .clip(RoundedCornerShape(barHeight / 2))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         )
-        // Заполненная полоска (активная часть)
         Box(
             modifier = Modifier
                 .fillMaxWidth(value.coerceIn(0f, 1f))
@@ -88,9 +83,6 @@ fun ThinSlider(
     }
 }
 
-/**
- * Тонкий интерактивный прогресс-бар для списка треков (без кругляшка/точки, просто тонкая полоска).
- */
 @Composable
 fun ThinTrackProgressBar(
     playbackPositionMs: Long,

@@ -13,9 +13,6 @@ package io.github.audiz.util
  */
 object AudioMetadataTagger {
 
-    /**
-     * Встроить метаданные и обложку в аудиоданные
-     */
     fun embedMetadata(
         audioBytes: ByteArray,
         extension: String,
@@ -53,10 +50,6 @@ object AudioMetadataTagger {
             audioBytes
         }
     }
-
-    // =========================================================================
-    // 🎵 MP3 / ID3v2.3 TAGGING
-    // =========================================================================
 
     private fun isMp3Header(data: ByteArray): Boolean {
         if (data.size < 3) return false
@@ -124,7 +117,6 @@ object AudioMetadataTagger {
 
         tagBuilder.write(tagPayload)
 
-        // Пропускаем старый ID3v2 заголовок, если он уже присутствовал в аудио
         var audioOffset = 0
         if (audioBytes.size >= 10 &&
             audioBytes[0] == 'I'.code.toByte() &&
@@ -200,10 +192,6 @@ object AudioMetadataTagger {
         out.write(coverBytes)
     }
 
-    // =========================================================================
-    // 🎼 FLAC TAGGING (METADATA_BLOCK_PICTURE & VORBIS_COMMENT)
-    // =========================================================================
-
     private fun isFlacHeader(data: ByteArray): Boolean {
         return data.size >= 4 &&
                 data[0] == 'f'.code.toByte() &&
@@ -247,7 +235,7 @@ object AudioMetadataTagger {
             }
         }
 
-        if (pos > audioBytes.size) return audioBytes // Некорректный FLAC — возвращаем оригинал
+        if (pos > audioBytes.size) return audioBytes
         val audioFramesStart = pos
 
         val newBlocks = mutableListOf<FlacBlock>()
@@ -270,7 +258,6 @@ object AudioMetadataTagger {
             newBlocks.add(FlacBlock(6, picPayload))
         }
 
-        // Сборка нового FLAC
         val out = ByteArrayBuilder(audioBytes.size + (coverBytes?.size ?: 0) + 2048)
         out.write('f'.code.toByte())
         out.write('L'.code.toByte())
@@ -342,10 +329,6 @@ object AudioMetadataTagger {
         return out.toByteArray()
     }
 
-    // =========================================================================
-    // 🎧 M4A / MP4 CONTAINER TAGGING (moov.udta.meta.ilst.covr)
-    // =========================================================================
-
     private fun isMp4Header(data: ByteArray): Boolean {
         if (data.size < 12) return false
         return data[4] == 'f'.code.toByte() && data[5] == 't'.code.toByte() &&
@@ -368,13 +351,10 @@ object AudioMetadataTagger {
         val moovEnd = moovBox.offset + moovBox.size
         val moovHeaderSize = moovBox.headerSize
 
-        // Дочерние боксы внутри moov
         val moovChildren = parseMp4Boxes(audioBytes, moovStart + moovHeaderSize, moovEnd)
 
-        // Строим новый бокс udta с метаданными и обложкой
         val newUdtaPayload = buildM4aUdtaBox(title, artist, album, year, coverBytes)
 
-        // Собираем новое содержимое moov: сохраняем все боксы кроме старого udta, затем добавляем новый udta
         val newMoovPayloadBuilder = ByteArrayBuilder()
         for (child in moovChildren) {
             if (child.type != "udta") {
@@ -398,7 +378,6 @@ object AudioMetadataTagger {
             adjustChunkOffsets(newMoovBytes, delta)
         }
 
-        // Собираем итоговый MP4 файл
         val result = ByteArrayBuilder(audioBytes.size + delta)
         result.write(audioBytes, 0, moovBox.offset)
         result.write(newMoovBytes)
@@ -569,10 +548,6 @@ object AudioMetadataTagger {
         }
     }
 
-    // =========================================================================
-    // 🛠️ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ И БИТОВЫЕ ОПЕРАЦИИ
-    // =========================================================================
-
     private fun isPngImage(bytes: ByteArray): Boolean {
         return bytes.size >= 8 &&
                 bytes[0] == 0x89.toByte() &&
@@ -629,9 +604,6 @@ object AudioMetadataTagger {
         return result
     }
 
-    /**
-     * Быстрый саморасширяющийся буфер байтов без внешних зависимостей
-     */
     private class ByteArrayBuilder(initialCapacity: Int = 1024) {
         private var buffer = ByteArray(initialCapacity)
         var size = 0

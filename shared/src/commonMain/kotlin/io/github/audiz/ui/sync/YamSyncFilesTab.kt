@@ -19,9 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.audiz.sync.YamSyncManager
 
-/**
- * 📥 Вкладка 3: Выборочная загрузка аудиофайлов по требованию
- */
 @Composable
 internal fun YamSyncFilesTab(syncManager: YamSyncManager) {
     if (!syncManager.isConnected) {
@@ -49,7 +46,6 @@ internal fun YamSyncFilesTab(syncManager: YamSyncManager) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Панель массового выбора
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -127,7 +123,6 @@ internal fun YamSyncFilesTab(syncManager: YamSyncManager) {
                             }
                         }
 
-                        // Прогресс загрузки трека
                         if (transfer != null) {
                             Spacer(modifier = Modifier.height(4.dp))
                             if (transfer.isCompleted) {
@@ -163,7 +158,6 @@ internal fun YamSyncFilesTab(syncManager: YamSyncManager) {
             }
         }
 
-        // Нижняя кнопка скачивания
         Surface(
             tonalElevation = 4.dp,
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),

@@ -102,9 +102,6 @@ internal fun PlaylistActionGroup(
     }
 }
 
-/**
- * Круглая иконка-действие с анимированной hover-подложкой.
- */
 @Composable
 private fun PlaylistActionButton(
     icon: ImageVector,

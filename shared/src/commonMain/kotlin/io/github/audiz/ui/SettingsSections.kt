@@ -292,7 +292,6 @@ private fun ThemeSettings(state: SettingsState, actions: SettingsActions) {
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    // 🎨 Цветовой акцент (Основной цвет интерфейса)
     Text(
         text = "Цветовой акцент",
         style = MaterialTheme.typography.labelLarge
@@ -561,7 +560,6 @@ private fun YandexAccountSettings(state: SettingsState, actions: SettingsActions
         }
     }
 
-    // 👑 Статус подписки Яндекс Плюс
     if (state.currentAccessToken.isNotBlank()) {
         Spacer(modifier = Modifier.height(8.dp))
         val badgeColor = when (state.hasPlusSubscription) {
@@ -675,7 +673,6 @@ private fun WaveConnectionSettings(state: SettingsState, actions: SettingsAction
         }
     }
 
-    // ⚠️ Ошибка подключения к Ynison хосту
     if (!state.ynisonError.isNullOrBlank()) {
         Spacer(modifier = Modifier.height(8.dp))
         Card(

@@ -23,13 +23,6 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import io.github.audiz.util.AppLogger
 
-/**
- * 📂 Менеджер пользовательских источников медиа (папки, отдельные треки, M3U-плейлисты).
- * Инкапсулирует:
- * - Хранение и персистентность добавленных путей к директориям и файлам.
- * - Сканирование и разрешение источников в список аудиотреков FullTrackInfo.
- * - Парсинг внешних плейлистов .m3u / .m3u8.
- */
 class LocalMediaManager {
 
     private val json = Json {
@@ -50,9 +43,6 @@ class LocalMediaManager {
         loadCustomSources()
     }
 
-    /**
-     * 📥 Загрузить сохраненные источники из постоянной конфигурации
-     */
     fun loadCustomSources() {
         try {
             val jsonStr = loadAppConfig(AppConfigKeys.CUSTOM_LOCAL_SOURCES)
@@ -69,9 +59,6 @@ class LocalMediaManager {
         }
     }
 
-    /**
-     * 💾 Сохранить список источников в постоянную конфигурацию
-     */
     private fun saveCustomSources() {
         try {
             val jsonStr = json.encodeToString(
@@ -84,10 +71,6 @@ class LocalMediaManager {
         }
     }
 
-    /**
-     * ➕ Добавить путь к папке, файлу или M3U плейлисту.
-     * Автоматически определяет тип источника.
-     */
     fun addSource(rawPath: String, customName: String? = null): CustomMediaSource? {
         val cleanPath = normalizePath(rawPath)
         if (cleanPath.isBlank()) {
@@ -95,7 +78,6 @@ class LocalMediaManager {
             return null
         }
 
-        // Проверяем, не добавлен ли уже этот путь
         if (customSources.any { it.path.equals(cleanPath, ignoreCase = true) }) {
             statusMessage = "⚠️ Этот источник уже добавлен в список"
             return null
@@ -107,7 +89,6 @@ class LocalMediaManager {
         }
 
         val source: CustomMediaSource = when {
-            // 1. Папка со структурой файлов
             isDirectory(cleanPath) -> {
                 val tracks = scanDownloadedTracks(cleanPath)
                 val folderName = customName?.trim()?.ifBlank { null }
@@ -124,7 +105,6 @@ class LocalMediaManager {
                 )
             }
 
-            // 2. Файл плейлиста M3U / M3U8
             isM3uPlaylist(cleanPath) -> {
                 val paths = parseM3uFile(cleanPath)
                 val playlistName = customName?.trim()?.ifBlank { null }
@@ -141,7 +121,6 @@ class LocalMediaManager {
                 )
             }
 
-            // 3. Отдельный аудиофайл
             isAudioFile(cleanPath) -> {
                 val fileName = customName?.trim()?.ifBlank { null }
                     ?: cleanPath.substringAfterLast('/')
@@ -169,9 +148,6 @@ class LocalMediaManager {
         return source
     }
 
-    /**
-     * 🗑️ Удалить добавленный источник
-     */
     fun removeSource(id: String) {
         val removed = customSources.removeAll { it.id == id }
         if (removed) {
@@ -180,9 +156,6 @@ class LocalMediaManager {
         }
     }
 
-    /**
-     * 🎵 Разрешить источник в список треков FullTrackInfo для воспроизведения
-     */
     fun getTracksForSource(source: CustomMediaSource): List<FullTrackInfo> {
         return when (source.type) {
             LocalSourceType.SINGLE_FILE -> {
@@ -200,9 +173,6 @@ class LocalMediaManager {
         }
     }
 
-    /**
-     * 📜 Парсинг файла плейлиста M3U / M3U8
-     */
     fun parseM3uFile(m3uPath: String): List<String> {
         val content = readTextFile(m3uPath) ?: return emptyList()
         val dir = m3uPath.substringBeforeLast('/', "")
@@ -211,7 +181,6 @@ class LocalMediaManager {
         content.lineSequence().forEach { line ->
             val trimmed = line.trim()
             if (trimmed.isNotBlank() && !trimmed.startsWith("#")) {
-                // Если путь относительный, дополняем папкой плейлиста
                 val fullPath = if (!trimmed.startsWith("/") && !trimmed.contains(":\\")) {
                     if (dir.isNotEmpty()) "$dir/$trimmed" else trimmed
                 } else {
@@ -235,9 +204,6 @@ class LocalMediaManager {
         return ext == "m3u" || ext == "m3u8"
     }
 
-    /**
-     * 🔍 Получить листинг содержимого папки для встроенного проводника
-     */
     fun browseFolder(folderPath: String, rootPath: String? = null): FolderListing {
         val clean = normalizePath(folderPath)
         val cleanRoot = rootPath?.let { normalizePath(it) }

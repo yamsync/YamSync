@@ -65,7 +65,6 @@ internal fun formatLastSeen(lastSeenMs: Long): String {
     }
 }
 
-/** Сегментный переключатель на всю ширину: используется для вкладок и подрежимов окна синхронизации. */
 @Composable
 internal fun SyncSegmentedControl(
     options: List<String>,
@@ -304,9 +303,6 @@ internal fun KnownDeviceCard(
     }
 }
 
-/**
- * Отрисовка матрицы QR-кода на Canvas
- */
 @Composable
 internal fun QrCodeCanvas(
     matrix: Array<BooleanArray>,

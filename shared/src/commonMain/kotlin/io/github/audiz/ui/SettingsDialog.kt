@@ -41,9 +41,6 @@ import io.github.audiz.player.RecentPlaybackHistory
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 
-/**
- * 📦 Данные состояния настроек
- */
 data class SettingsState(
     val isRecordToDiskActive: Boolean = false,
     val selectedQuality: String = "2",
@@ -67,9 +64,6 @@ data class SettingsState(
     val waveLoopHistoryLimit: Int = RecentPlaybackHistory.MAX_TRACKS,
 )
 
-/**
- * ⚡ Действия и колбэки панели настроек
- */
 data class SettingsActions(
     val onClose: () -> Unit = {},
     val onToggleRecordToDisk: (Boolean) -> Unit = {},
@@ -94,9 +88,6 @@ data class SettingsActions(
     val onSaveWaveLoopHistoryLimit: (Int) -> Unit = {},
 )
 
-/**
- * ⚙️ Модальная панель (шторка) настроек приложения
- */
 @Composable
 fun SettingsDialog(
     visible: Boolean,
@@ -146,7 +137,6 @@ fun SettingsDialog(
             }
         }
 
-        // 🔲 Полупрозрачный фон (scrim), клик по которому закрывает настройки
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -186,7 +176,6 @@ fun SettingsDialog(
                 )
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // 🔝 Фиксированная шапка с Drag Handle, кнопкой закрытия и жестом свайпа вниз
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -212,7 +201,6 @@ fun SettingsDialog(
                                 )
                             }
                     ) {
-                        // Полоска-индикатор (Drag Handle)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -313,7 +301,7 @@ fun SettingsDialog(
                     }
                 }
             }
-        } // closes scrim Box
+        }
     }
 }
 

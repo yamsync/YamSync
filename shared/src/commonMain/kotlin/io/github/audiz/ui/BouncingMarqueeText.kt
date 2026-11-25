@@ -47,7 +47,7 @@ fun BouncingMarqueeText(
     color: Color = Color.Unspecified,
     pauseStartMs: Long = 1500L,
     pauseEndMs: Long = 1500L,
-    msPerChar: Long = 650L, // Увеличено на 10% относительно 720L (~650 мс на символ)
+    msPerChar: Long = 650L,
     enableCopy: Boolean = true
 ) {
     var contentWidthPx by remember(text) { mutableStateOf(0) }
@@ -65,7 +65,6 @@ fun BouncingMarqueeText(
 
     val scrollOffset = remember(text) { Animatable(0f) }
 
-    // Средняя ширина символа для расчета времени движения
     val approxCharWidthPx = if (text.isNotEmpty() && contentWidthPx > 0) {
         contentWidthPx.toFloat() / text.length.toFloat()
     } else 15f

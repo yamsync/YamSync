@@ -61,10 +61,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// =========================================================
-// Core button primitives
-// =========================================================
-
 @Composable
 fun FilledIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -206,7 +202,6 @@ fun GhostIconButton(
     }
 }
 
-/** Toggle button whose background is a low-opacity accent tint when active (used for Repeat). */
 @Composable
 fun TintedToggleButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -246,10 +241,6 @@ fun TintedToggleButton(
         Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(size * 0.5f))
     }
 }
-
-// =========================================================
-// Track-row actions
-// =========================================================
 
 @Composable
 fun DownloadStateButton(
@@ -414,10 +405,6 @@ fun RepeatButton(
     )
 }
 
-// =========================================================
-// Content-type icons (artist / album / track / playlist)
-// =========================================================
-
 enum class ContentType { ARTIST, ALBUM, TRACK, PLAYLIST }
 
 @Composable
@@ -435,10 +422,6 @@ fun ContentTypeIcon(
     }
     Icon(icon, contentDescription = type.name.lowercase(), tint = tint, modifier = modifier.size(size))
 }
-
-// =========================================================
-// Volume controls
-// =========================================================
 
 @Composable
 fun VolumeIcon(
@@ -499,10 +482,6 @@ fun VolumeButton(
     }
 }
 
-// =========================================================
-// "Now playing" indicator — animated equalizer bars
-// =========================================================
-
 @Composable
 fun NowPlayingIndicator(
     isPlaying: Boolean,
@@ -547,14 +526,12 @@ fun NowPlayingIndicator(
             val x = i * (w + spacing)
             val y = maxH - h
 
-            // 1. Основной столбик частоты (прямоугольный)
             drawRect(
                 color = color,
                 topLeft = Offset(x, y),
                 size = Size(w, h)
             )
 
-            // 2. Парящая пиковая засечка (Winamp Peak Cap, прямоугольная)
             if (i < peakCaps.size) {
                 val peakLevel = peakCaps[i]
                 val targetPeakY = (maxH - (maxH * peakLevel.coerceIn(0.04f, 1f))).coerceIn(0f, maxH - peakH)
@@ -570,10 +547,6 @@ fun NowPlayingIndicator(
         }
     }
 }
-
-// =========================================================
-// Quality chip — HQ / LQ + bitrate в виде стильной единой капсулы
-// =========================================================
 
 @Composable
 fun QualityChip(
@@ -644,10 +617,6 @@ fun QualityChip(
     }
 }
 
-// =========================================================
-// Top bar icon button — rounded square (back / search / filter)
-// =========================================================
-
 @Composable
 fun TopBarIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -679,10 +648,6 @@ fun TopBarIconButton(
         )
     }
 }
-
-// =========================================================
-// Transport bar
-// =========================================================
 
 @Composable
 fun TransportBar(
@@ -782,11 +747,6 @@ fun RecordToDiskButton(
     }
 }
 
-/**
- * Кнопка «Поделиться» треком в нижнем плеере:
- * - Элегантная круглая кнопка с мягким фоном и плавной анимацией подтверждения копирования.
- * - При клике кратковременно отображает иконку галочки (зеленый акцент).
- */
 @Composable
 fun ShareTrackButton(
     isSharing: Boolean = false,
@@ -860,10 +820,6 @@ fun ShareTrackButton(
     }
 }
 
-/**
- * ➕ Кнопка «Добавить в плейлист» в нижнем плеере:
- * - Элегантная круглая кнопка в едином стиле с ShareTrackButton.
- */
 @Composable
 fun AddToPlaylistPlayerButton(
     modifier: Modifier = Modifier,
@@ -917,10 +873,6 @@ fun AddToPlaylistPlayerButton(
         )
     }
 }
-
-// =========================================================
-// Usage example
-// =========================================================
 
 @Composable
 fun PlayerButtonsDemo() {

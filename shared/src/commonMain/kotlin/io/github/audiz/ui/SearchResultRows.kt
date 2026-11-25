@@ -43,7 +43,6 @@ internal fun formatCompactCount(value: Int): String = when {
     else -> value.toString()
 }
 
-/** Цвет типа результата: адаптируется к светлой и тёмной теме. */
 @Composable
 internal fun searchTypeColor(type: String): Color {
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
@@ -55,7 +54,6 @@ internal fun searchTypeColor(type: String): Color {
     }
 }
 
-/** Карточка артиста, плейлиста или альбома: подпись типа, название на всю ширину, мета-строка. */
 @Composable
 internal fun CompactEntityRow(
     title: String,
@@ -116,7 +114,6 @@ internal fun CompactEntityRow(
     }
 }
 
-/** Карточка трека: название и длительность, ниже исполнитель и кнопки действий. */
 @Composable
 internal fun CompactTrackRow(
     track: FullTrackInfo,

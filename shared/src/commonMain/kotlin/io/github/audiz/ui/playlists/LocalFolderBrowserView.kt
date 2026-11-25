@@ -28,9 +28,6 @@ import io.github.audiz.models.CustomMediaSource
 import io.github.audiz.models.FolderListing
 import kotlinx.coroutines.withContext
 
-/**
- * 📂 Встроенный проводник по папкам источника
- */
 @Composable
 internal fun LocalFolderBrowserView(
     viewModel: SearchViewModel,
@@ -59,7 +56,6 @@ internal fun LocalFolderBrowserView(
     val listing = folderListing
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Навигационная плашка / Хлебные крошки
         Surface(
             shape = RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -110,7 +106,6 @@ internal fun LocalFolderBrowserView(
                     )
                 }
 
-                // Кнопки: Играть папку (только файлы папки или со всеми подпапками)
                 if (listing != null && (listing.tracks.isNotEmpty() || listing.subfolders.isNotEmpty())) {
                     val folderName = currentPath.substringAfterLast('/').ifBlank { source.name }
                     val currentTracksCount = listing.tracks.size
@@ -244,7 +239,6 @@ internal fun LocalFolderBrowserView(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Секция 1: Подпапки (если есть)
                 if (listing.subfolders.isNotEmpty()) {
                     item(key = "subfolders_header") {
                         Text(
@@ -307,7 +301,6 @@ internal fun LocalFolderBrowserView(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    // Кнопка: играть эту конкретную подпапку
                                     if (sub.trackCount > 0) {
                                         IconButton(
                                             onClick = {
@@ -336,7 +329,6 @@ internal fun LocalFolderBrowserView(
                     }
                 }
 
-                // Секция 2: Треки в текущей папке (если есть)
                 if (listing.tracks.isNotEmpty()) {
                     item(key = "tracks_header") {
                         Spacer(modifier = Modifier.height(4.dp))

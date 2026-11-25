@@ -16,9 +16,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Тонкий вертикальный слайдер громкости на всю высоту контейнера.
- */
 @Composable
 fun ThinVerticalSlider(
     value: Float,
@@ -64,7 +61,6 @@ fun ThinVerticalSlider(
             },
         contentAlignment = Alignment.Center
     ) {
-        // Фоновая полоса (трек)
         Box(
             modifier = Modifier
                 .width(barWidth)
@@ -72,7 +68,6 @@ fun ThinVerticalSlider(
                 .clip(RoundedCornerShape(barWidth / 2))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            // Активная заполненная часть (снизу вверх)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -85,9 +80,6 @@ fun ThinVerticalSlider(
     }
 }
 
-/**
- * Круглая кнопка громкости с вертикальным регулятором для Desktop.
- */
 @Composable
 expect fun DesktopVolumeControl(
     volume: Float,

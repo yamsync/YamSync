@@ -21,15 +21,6 @@ import io.github.audiz.scanDownloadedTracks
 import io.github.audiz.util.AppLogger
 import kotlinx.coroutines.*
 
-/**
- * 📋 Координатор списка треков, очередей, пагинации и локального кэша плейлистов.
- * Инкапсулирует:
- * - Загрузку треков исполнителя, альбомов, плейлистов (включая UUID/UID/Kind), лайков и истории.
- * - Локальный дисковый кэш треков для мгновенного отклика и оффлайн-доступа.
- * - Пагинацию (порционная подгрузка чанками по 100 треков при скролле).
- * - Воспроизведение и открытие локальных папок, источников и отдельных аудиофайлов.
- * - Восстановление предыдущей сессии плейлиста.
- */
 class TrackListCoordinator(
     private val scope: CoroutineScope,
     private val repository: MusicRepository,
@@ -58,10 +49,8 @@ class TrackListCoordinator(
         coordinatorScope.cancel()
     }
 
-    // 📊 Список уже загруженных детальных треков
     val loadedTracks = mutableStateListOf<FullTrackInfo>()
 
-    // 📜 Список всех ID треков, которые нужно загрузить частями
     var allTrackIds by mutableStateOf(listOf<String>())
         private set
 
@@ -74,7 +63,6 @@ class TrackListCoordinator(
     var isLoadingAllPages by mutableStateOf(false)
         private set
 
-    // 📁 Флаг экрана плейлиста загруженной музыки (локальные файлы на диске)
     var isDownloadedTracksScreen by mutableStateOf(false)
 
     var isBrowsingPreview = false
@@ -91,11 +79,9 @@ class TrackListCoordinator(
 
     var tracksListOrigin by mutableStateOf(TracksListOrigin.HOME)
 
-    // 📁 Контекст текущего открытого проводника по локальным папкам (для возврата в ту же папку)
     var activeBrowsedFolderSource by mutableStateOf<CustomMediaSource?>(null)
     var activeBrowsedFolderPath by mutableStateOf<String?>(null)
 
-    // 🎵 Источник текущей активной очереди треков
     var activeQueueSource by mutableStateOf<CustomMediaSource?>(null)
     var activeQueueFolderPath by mutableStateOf<String?>(null)
     var activeQueueFolderName by mutableStateOf<String?>(null)
@@ -160,9 +146,6 @@ class TrackListCoordinator(
         onLoadingChanged(loading)
     }
 
-    /**
-     * Загружает один чанк треков (для пагинации)
-     */
     suspend fun loadNextPageChunk(): Boolean {
         if (isChunkLoading) return false
         isChunkLoading = true
@@ -195,9 +178,6 @@ class TrackListCoordinator(
         }
     }
 
-    /**
-     * Инициализирует пагинацию для нового списка ID или списка с полными метаданными треков
-     */
     fun startPagination(
         title: String = "Загружено треков",
         userPlaylist: PlaylistInfo? = null,
@@ -331,9 +311,6 @@ class TrackListCoordinator(
         }
     }
 
-    /**
-     * Догружает следующую пачку треков (вызывается при скролле)
-     */
     fun loadNextPage() {
         if (!canLoadMore || isCoordinatorLoading || isChunkLoading) return
 
@@ -367,9 +344,6 @@ class TrackListCoordinator(
         }
     }
 
-    /**
-     * 📥 Постепенно загружает все оставшиеся страницы (как непрерывный скролл)
-     */
     fun loadAllRemainingPages() {
         if (isLoadingAllPages || !canLoadMore) return
 
@@ -475,9 +449,6 @@ class TrackListCoordinator(
         }
     }
 
-    /**
-     * 🎵 Загрузка треков плейлиста из поиска или каталога
-     */
     fun loadPlaylist(playlist: PlaylistInfo, restoreTrackId: String? = null, origin: TracksListOrigin? = null) {
         val title = playlist.title.ifBlank { "Плейлист" }
         val isUserPlaylist = playlistManager.userPlaylists.any { it.kind == playlist.kind }
@@ -547,9 +518,6 @@ class TrackListCoordinator(
         }
     }
 
-    /**
-     * 💿 Загрузка треков альбома из поиска или витрины
-     */
     fun loadAlbumTracks(
         albumId: Long,
         albumTitle: String,
@@ -572,9 +540,6 @@ class TrackListCoordinator(
         )
     }
 
-    /**
-     * 📊 Загрузка треков чарта (Россия, Мир и т.д.) с сохранением позиций
-     */
     fun loadChart(
         chartId: String,
         chartTitle: String? = null,
@@ -665,9 +630,6 @@ class TrackListCoordinator(
         )
     }
 
-    /**
-     * 🔥 Быстрая загрузка плейлиста по UUID (для персональных подборок Яндекса)
-     */
     fun loadPlaylistByUuid(
         uuid: String,
         playlistTitle: String? = null,
@@ -697,9 +659,6 @@ class TrackListCoordinator(
         )
     }
 
-    /**
-     * 🔥 Загрузка плейлиста "Мне нравится"
-     */
     fun loadLikesPlaylist(restoreTrackId: String? = null) {
         recordSession(
             LastPlaybackSession(
@@ -721,9 +680,6 @@ class TrackListCoordinator(
         )
     }
 
-    /**
-     * 🔥 Загрузка истории прослушивания
-     */
     fun loadHistory(restoreTrackId: String? = null) {
         recordSession(
             LastPlaybackSession(
