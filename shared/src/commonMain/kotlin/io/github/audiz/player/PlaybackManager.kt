@@ -14,20 +14,13 @@ import io.github.audiz.localFileExists
 import io.github.audiz.releasePlaybackWakeLock
 import io.github.audiz.saveAppConfig
 import io.github.audiz.AppConfigKeys
-import io.github.audiz.saveTrackFile
-import io.github.audiz.trackFileExists
 import io.github.audiz.stream.LocalStreamProxy
 import io.github.audiz.api.MusicRepository
 import io.github.audiz.models.DownloadedTrackAudio
 import io.github.audiz.models.FullTrackInfo
-import io.github.audiz.ui.CoverImageLoader
-import io.github.audiz.util.AudioMetadataTagger
 import io.github.audiz.DispatcherIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.collect
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,21 +28,14 @@ import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
 
 /**
- * ⚡ Модель предзагруженного аудиотрека для мгновенного воспроизведения.
- */
-data class PreloadedAudio(
-    val trackId: String,
-    val audioData: DownloadedTrackAudio?,
-    val quality: String,
-    val filePath: String? = null
-)
-
-/**
  * 🎵 Выделенный менеджер воспроизведения музыки и управления очередью треков.
  * Инкапсулирует:
  * - Стейт-машину аудиоплеера (play, pause, seek, volume, прогресс, битрейт).
  * - Аппаратную интеграцию (AudioPlayer, SystemMediaControls, PlatformWakeLock).
  * - Навигацию по истории и очереди треков (Next, Prev, Shuffle, loop).
+ *
+ * Выбор следующего/предыдущего трека — [PlaybackNavigator], предзагрузка — [TrackPreloader],
+ * сохранение очереди «Далее» — [PlaybackQueuePersistence], запись аудио на диск — [DownloadedAudioWriter].
  */
 class PlaybackManager(
     private val scope: CoroutineScope,
@@ -68,35 +54,37 @@ class PlaybackManager(
 ) {
     val upNextQueue = UpNextQueue()
     private var restoringUpNext = false
-    private val queueJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val queuePersistence = PlaybackQueuePersistence(scope)
+    private val navigator = PlaybackNavigator(upNextQueue, queueManager, queueSource, waveBridge, ::findTrackInfo)
+    private val audioWriter = DownloadedAudioWriter(repository, localTrackResolver, ::findTrackInfo)
+    private val preloader = TrackPreloader(
+        scope = scope,
+        repository = repository,
+        localTrackResolver = localTrackResolver,
+        audioWriter = audioWriter,
+        getSelectedQuality = getSelectedQuality,
+        isRecordToDisk = isRecordToDisk,
+        onTrackSavedToDisk = onTrackSavedToDisk,
+        currentTrackId = { trackId },
+        plannedNextTrackId = { plannedNextTrack?.id },
+        coverUriForTags = { coverUri },
+    )
 
     suspend fun restoreUpNextQueue() {
-        val saved = withContext(DispatcherIO) {
-            try {
-                loadAppConfig(AppConfigKeys.PLAYER_UP_NEXT)?.let { queueJson.decodeFromString(UpNextState.serializer(), it) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) { null }
-        }
+        val saved = queuePersistence.load()
         if (saved != null && upNextQueue.state == UpNextState()) {
             upNextQueue.restore(saved)
             queueManager.playedInCycleTrackIds.addAll(saved.shuffleCycle)
             restoringUpNext = saved.current?.inserted == true
             if (restoringUpNext) saved.current?.track?.let { setInitialTrack(it) }
         }
-        scope.launch {
-            snapshotFlow { upNextQueue.state }.collect { state ->
-                withContext(DispatcherIO) {
-                    saveAppConfig(AppConfigKeys.PLAYER_UP_NEXT, queueJson.encodeToString(UpNextState.serializer(), state))
-                }
-            }
-        }
+        queuePersistence.startAutoSave(upNextQueue)
     }
 
     fun addToUpNext(track: FullTrackInfo, first: Boolean = false) {
         val state = upNextQueue.state
         if (state.pending.isEmpty() && !state.suspended && state.forward.isEmpty()) {
-            val resume = calculateResumeTrack(trackId)
+            val resume = navigator.calculateResumeTrack(trackId)
             upNextQueue.prepareResume(resume, trackId, queueManager.playedInCycleTrackIds)
         }
         upNextQueue.add(track, first)
@@ -104,8 +92,8 @@ class PlaybackManager(
     }
 
     fun refreshUpNextPreload() {
-        preloadJob?.cancel()
-        preloadedAudio = null
+        preloader.cancel()
+        preloader.clearAudio()
         plannedNextTrack = null
         plannedNextTrack = calculateNextTrackCandidate()
         if (isPlaying) schedulePreload()
@@ -128,32 +116,8 @@ class PlaybackManager(
         }
     }
 
-    private fun calculateResumeTrack(activeId: String?): FullTrackInfo? {
-        val originalTracks = queueSource.getLoadedTracks()
-        return if (waveBridge?.isWaveMode != true && !isShuffleEnabled &&
-            originalTracks.lastOrNull()?.let { PlaybackQueueManager.isSameTrack(it, activeId) } == true) {
-            null
-        } else calculateBaseNextTrackCandidate(activeId)
-    }
-
-    private fun historyBeforeUpNext(): List<FullTrackInfo> {
-        if (upNextQueue.state.started || upNextQueue.state.pending.isEmpty()) return emptyList()
-        val index = buildMap<String, FullTrackInfo> {
-            val tracks = queueSource.getLoadedTracks() + queueSource.getSearchTracks() + waveBridge?.waveTracks.orEmpty()
-            for (track in tracks) {
-                put(track.id.removePrefix("local:"), track)
-                track.realId?.let { put(it.removePrefix("local:"), track) }
-            }
-        }
-        return queueManager.playbackHistory.mapNotNull { index[it.removePrefix("local:")] }
-    }
-
-    private val hasUpNextTransition: Boolean get() = upNextQueue.state.let {
-        it.pending.isNotEmpty() || it.forward.isNotEmpty() || it.suspended || it.current?.inserted == true
-    }
-
     /** Сейчас играет трек из очереди «Далее», а не из исходного списка или Волны. */
-    val isPlayingUpNextTrack: Boolean get() = upNextQueue.state.current?.inserted == true
+    val isPlayingUpNextTrack: Boolean get() = navigator.isPlayingUpNextTrack
 
     /**
      * Единая точка автоперехода после окончания трека: очередь «Далее» всегда имеет приоритет над Волной.
@@ -161,7 +125,7 @@ class PlaybackManager(
      */
     internal fun advanceAfterTrackEnd(prevId: String? = trackId, crossfadeMs: Long, finished: Boolean = true) {
         val bridge = waveBridge
-        if (bridge?.isWaveMode == true && !hasUpNextTransition) {
+        if (bridge?.isWaveMode == true && !navigator.hasUpNextTransition) {
             bridge.onWaveTrackFinished(crossfadeMs)
             return
         }
@@ -292,9 +256,7 @@ class PlaybackManager(
     var plannedNextTrack: FullTrackInfo?
         get() = queueManager.plannedNextTrack
         set(value) { queueManager.plannedNextTrack = value }
-    var preloadedAudio: PreloadedAudio? = null
-        private set
-    private var preloadJob: Job? = null
+    val preloadedAudio: PreloadedAudio? get() = preloader.preloadedAudio
 
     // ⏱ Запас на запуск следующего трека перед кроссфейдом по фактическим замерам
     private val transitionLead = TransitionLeadEstimator { currentTimeMillis() }
@@ -337,9 +299,7 @@ class PlaybackManager(
         // 📻 Нативный аппаратный тайм-обсервер (надежно срабатывает в фоне / при выключенном экране на iOS)
         audioPlayer.setOnNearEndListener {
             val totalDur = if (durationMs > 0) durationMs else audioPlayer.getDurationMs()
-            val crossfadeMs = crossfadeSeconds * 1000L
-            val maxAllowedCrossfade = (totalDur * 0.35f).toLong()
-            val effectiveCrossfadeMs = if (crossfadeMs > 0L) minOf(crossfadeMs, maxAllowedCrossfade) else 0L
+            val effectiveCrossfadeMs = effectiveCrossfadeMs(totalDur)
 
             if (!hasTriggeredAutoAdvance && !isSeeking && isPlaying && !isPaused && totalDur > 6000L) {
                 hasTriggeredAutoAdvance = true
@@ -431,8 +391,8 @@ class PlaybackManager(
     fun toggleShuffle() {
         queueManager.toggleShuffle()
         upNextQueue.captureShuffleCycle(queueManager.playedInCycleTrackIds)
-        preloadJob?.cancel()
-        preloadedAudio = null
+        preloader.cancel()
+        preloader.clearAudio()
         queueManager.plannedNextTrack = null
         queueManager.plannedNextTrack = calculateNextTrackCandidate()
         schedulePreload()
@@ -443,6 +403,12 @@ class PlaybackManager(
         isPrevLoading = prev
         isPlayLoading = play
     }
+
+    private fun setLoadingFor(source: TrackPlaySource) = setLoadingFlags(
+        next = source == TrackPlaySource.NEXT,
+        prev = source == TrackPlaySource.PREV,
+        play = source == TrackPlaySource.PLAY,
+    )
 
     fun resetLoadingFlags() {
         isNextLoading = false
@@ -478,9 +444,7 @@ class PlaybackManager(
         currentPlayingFilePath = null
         currentPlayingSizeBytes = null
         isCurrentTrackHQ = false
-        preloadJob?.cancel()
-        preloadJob = null
-        preloadedAudio = null
+        preloader.reset()
         queueManager.clearAll()
         systemMediaControls.clear()
     }
@@ -637,28 +601,10 @@ class PlaybackManager(
         }
 
         playTrackJob?.cancel()
-        preloadJob?.cancel()
+        preloader.cancel()
         io.github.audiz.dsp.AudioVisualizer.resetTrackAudibility()
-        if (preloadedAudio?.trackId != targetTrackId) {
-            preloadedAudio = null
-        }
-        when (source) {
-            TrackPlaySource.NEXT -> {
-                isNextLoading = true
-                isPrevLoading = false
-                isPlayLoading = false
-            }
-            TrackPlaySource.PREV -> {
-                isPrevLoading = true
-                isNextLoading = false
-                isPlayLoading = false
-            }
-            TrackPlaySource.PLAY -> {
-                isPlayLoading = true
-                isNextLoading = false
-                isPrevLoading = false
-            }
-        }
+        preloader.keepOnlyFor(targetTrackId)
+        setLoadingFor(source)
 
         var thisJob: Job? = null
         thisJob = scope.launch {
@@ -669,7 +615,6 @@ class PlaybackManager(
             var isStreamingStarted = false
             try {
                 val resolvedAlbumId = targetAlbumId ?: findTrackInfo(targetTrackId)?.albums?.firstOrNull()?.id
-                val sanitizedArtist = sanitizeKeepSpaces(cleanArtist.ifBlank { "Unknown Artist" })
 
                 // 🔍 1. Проверяем, есть ли файл на диске
                 val preloaded = preloadedAudio
@@ -695,10 +640,6 @@ class PlaybackManager(
                     val knownDuration = findTrackInfo(targetTrackId)?.durationMs?.takeIf { it > 0 } ?: 0L
                     positionMs = 0L
                     durationMs = knownDuration
-                    val calculatedBitrate = if (durationMs > 0 && currentPlayingSizeBytes != null && currentPlayingSizeBytes!! > 0) {
-                        ((currentPlayingSizeBytes!! * 8) / durationMs).toInt().takeIf { it > 0 }
-                    } else null
-                    val defaultBitrate = if (isCurrentTrackHQ) 320 else 192
                     audioPlayer.playFromFile(existingFilePath, effectiveCrossfade)
                     if (durationMs <= 0L) {
                         val playerDur = audioPlayer.getDurationMs()
@@ -731,10 +672,9 @@ class PlaybackManager(
                     )
                     systemMediaControls.updatePlaybackState(true, false, 0L)
                     onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave)
-                    preloadedAudio = null
+                    preloader.clearAudio()
                     startProgressPolling()
-                    queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                    schedulePreload()
+                    planNextAndPreload()
                     return@launch
                 }
 
@@ -761,8 +701,7 @@ class PlaybackManager(
                     val knownDuration = findTrackInfo(targetTrackId)?.durationMs?.takeIf { it > 0 } ?: 0L
                     positionMs = 0L
                     durationMs = knownDuration
-                    val defaultBitrate = if (selectedQuality == "2") 320 else 192
-                    bitrate = defaultBitrate
+                    bitrate = DownloadedAudioWriter.defaultBitrate(selectedQuality)
                     isCurrentTrackHQ = (selectedQuality == "2")
                     currentPlayingFilePath = null
                     currentPlayingSizeBytes = null
@@ -795,14 +734,10 @@ class PlaybackManager(
                     systemMediaControls.updatePlaybackState(true, false, 0L)
                     onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave)
                     startProgressPolling()
-                    preloadedAudio = null
-                    queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                    schedulePreload()
+                    preloader.clearAudio()
+                    planNextAndPreload()
                     return@launch
                 }
-
-                val qualityFolder = if (selectedQuality == "2") "HQ" else "LQ"
-                val basePath = "$musicStoragePath/$qualityFolder"
 
                 val audioData = if (isPreloadedInMemory) {
                     println("⚡ [Предзагрузка] Используем готовое аудио из памяти для: $cleanTitle")
@@ -810,36 +745,16 @@ class PlaybackManager(
                 } else {
                     repository.downloadTrackAudio(targetTrackId, quality = selectedQuality)
                 }
-                preloadedAudio = null
-
-                val rawExtension = audioData.type.substringBefore("-")
-                val extension = if (rawExtension.equals("aac", ignoreCase = true)) "m4a" else rawExtension
-                val fullFileName = sanitizeKeepSpaces(if (cleanArtist.isNotEmpty()) {
-                    "$cleanArtist — $cleanTitle.$extension"
-                } else {
-                    "$cleanTitle.$extension"
-                })
+                preloader.clearAudio()
 
                 trackId = targetTrackId
                 albumId = resolvedAlbumId
                 trackTitle = cleanTitle
                 artistName = cleanArtist
-                val knownDuration = findTrackInfo(targetTrackId)?.durationMs?.takeIf { it > 0 } ?: 0L
-                val bitrateFromType = audioData.type.substringAfter("-").substringBefore("-").toIntOrNull()
-                val parsedBitrate = audioData.bitrate ?: (if (bitrateFromType != null && bitrateFromType in 32..1000) bitrateFromType else null)
-                positionMs = 0L
-                durationMs = knownDuration
-                currentPlayingSizeBytes = audioData.result.size.toLong()
-                val calculatedBitrate = parsedBitrate ?: if (durationMs > 0 && currentPlayingSizeBytes != null) {
-                    ((currentPlayingSizeBytes!! * 8) / durationMs).toInt().takeIf { it > 0 }
-                } else null
-                val defaultBitrate = if (selectedQuality == "2") 320 else 192
-                bitrate = calculatedBitrate ?: defaultBitrate
-                isCurrentTrackHQ = (selectedQuality == "2")
+                applyDownloadedAudioInfo(audioData, targetTrackId, selectedQuality)
 
                 if (isRecordToDisk() && musicStoragePath.isNotBlank()) {
-                    val taggedBytes = prepareTaggedAudioBytes(targetTrackId, cleanTitle, cleanArtist, extension, audioData.result)
-                    saveTrackFile(basePath, cleanArtist, fullFileName, taggedBytes)
+                    val savedPath = audioWriter.save(targetTrackId, cleanTitle, cleanArtist, selectedQuality, audioData, coverUri)
                     localTrackResolver.invalidateCache()
                     onTrackSavedToDisk?.invoke()
                     val resolvedFile = localTrackResolver.findLocalTrackFile(
@@ -847,7 +762,7 @@ class PlaybackManager(
                         artist = cleanArtist,
                         title = cleanTitle,
                         selectedQuality = selectedQuality
-                    ) ?: "$basePath/$sanitizedArtist/$fullFileName"
+                    ) ?: savedPath
                     currentPlayingFilePath = resolvedFile
                     audioPlayer.playFromFile(resolvedFile, effectiveCrossfade)
                 } else {
@@ -874,8 +789,7 @@ class PlaybackManager(
                 systemMediaControls.updatePlaybackState(true, false, 0L)
                 onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave)
                 startProgressPolling()
-                queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                schedulePreload()
+                planNextAndPreload()
 
             } catch (e: CancellationException) {
                 throw e
@@ -913,33 +827,13 @@ class PlaybackManager(
     ) {
         wasInterruptedBySystem = false
         playTrackJob?.cancel()
-        when (source) {
-            TrackPlaySource.NEXT -> {
-                isNextLoading = true
-                isPrevLoading = false
-                isPlayLoading = false
-            }
-            TrackPlaySource.PREV -> {
-                isPrevLoading = true
-                isNextLoading = false
-                isPlayLoading = false
-            }
-            TrackPlaySource.PLAY -> {
-                isPlayLoading = true
-                isNextLoading = false
-                isPrevLoading = false
-            }
-        }
+        setLoadingFor(source)
         var thisJob: Job? = null
         thisJob = scope.launch {
             val cleanArtist = targetArtistName.trim()
             val cleanTitle = targetTrackTitle.trim()
             val musicStoragePath = localTrackResolver.getMusicStoragePath()
             try {
-                val sanitizedArtist = sanitizeKeepSpaces(cleanArtist.ifBlank { "Unknown Artist" })
-                val qualityFolder = "LQ"
-                val basePath = "$musicStoragePath/$qualityFolder"
-
                 val existingFilePath = localTrackResolver.findLocalTrackFile(
                     trackId = targetTrackId,
                     artist = cleanArtist,
@@ -960,17 +854,13 @@ class PlaybackManager(
                     positionMs = 0L
                     durationMs = knownDuration
                     currentPlayingSizeBytes = getFileSize(existingFilePath).takeIf { it > 0 }
-                    val calculatedBitrate = if (durationMs > 0 && currentPlayingSizeBytes != null) {
-                        ((currentPlayingSizeBytes!! * 8) / durationMs).toInt().takeIf { it > 0 }
-                    } else null
-                    bitrate = calculatedBitrate ?: 192
+                    bitrate = DownloadedAudioWriter.bitrateFromSize(currentPlayingSizeBytes, durationMs) ?: 192
                     audioPlayer.playFromFile(existingFilePath)
                     isPlaying = true
                     isPaused = false
                     releasePlaybackWakeLock()
                     startProgressPolling()
-                    queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                    schedulePreload()
+                    planNextAndPreload()
                     return@launch
                 }
 
@@ -1016,46 +906,28 @@ class PlaybackManager(
                     systemMediaControls.updatePlaybackState(true, false, 0L)
                     onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, resolvedCoverUri, isWave)
                     startProgressPolling()
-                    preloadedAudio = null
-                    queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                    schedulePreload()
+                    preloader.clearAudio()
+                    planNextAndPreload()
                     return@launch
                 }
 
                 println("📥 Скачиваем LQ трек...")
                 val audioData = repository.downloadTrackAudio(targetTrackId, quality = "1")
-                val rawExtension = audioData.type.substringBefore("-")
-                val extension = if (rawExtension.equals("aac", ignoreCase = true)) "m4a" else rawExtension
-                val fullFileName = sanitizeKeepSpaces(if (cleanArtist.isNotEmpty()) {
-                    "$cleanArtist — $cleanTitle.$extension"
-                } else {
-                    "$cleanTitle.$extension"
-                })
 
                 trackId = targetTrackId
                 trackTitle = cleanTitle
                 artistName = cleanArtist
-                val bitrateFromType = audioData.type.substringAfter("-").substringBefore("-").toIntOrNull()
-                val parsedBitrate = audioData.bitrate ?: (if (bitrateFromType != null && bitrateFromType in 32..1000) bitrateFromType else null)
-                positionMs = 0L
-                durationMs = knownDuration
-                currentPlayingSizeBytes = audioData.result.size.toLong()
-                val calculatedBitrate = parsedBitrate ?: if (durationMs > 0 && currentPlayingSizeBytes != null) {
-                    ((currentPlayingSizeBytes!! * 8) / durationMs).toInt().takeIf { it > 0 }
-                } else null
-                bitrate = calculatedBitrate ?: 192
-                isCurrentTrackHQ = false
+                applyDownloadedAudioInfo(audioData, targetTrackId, quality = "1")
 
                 if (isRecordToDisk() && musicStoragePath.isNotBlank()) {
-                    val taggedBytes = prepareTaggedAudioBytes(targetTrackId, cleanTitle, cleanArtist, extension, audioData.result)
-                    saveTrackFile(basePath, cleanArtist, fullFileName, taggedBytes)
+                    val savedPath = audioWriter.save(targetTrackId, cleanTitle, cleanArtist, "1", audioData, coverUri)
                     onTrackSavedToDisk?.invoke()
                     val resolvedFile = localTrackResolver.findLocalTrackFile(
                         trackId = targetTrackId,
                         artist = cleanArtist,
                         title = cleanTitle,
                         selectedQuality = "1"
-                    ) ?: "$basePath/$sanitizedArtist/$fullFileName"
+                    ) ?: savedPath
                     currentPlayingFilePath = resolvedFile
                     audioPlayer.playFromFile(resolvedFile)
                 } else {
@@ -1070,9 +942,10 @@ class PlaybackManager(
                 isPlayLoading = false
                 releasePlaybackWakeLock()
                 startProgressPolling()
-                queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                schedulePreload()
+                planNextAndPreload()
 
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 releasePlaybackWakeLock()
                 isNextLoading = false
@@ -1152,7 +1025,7 @@ class PlaybackManager(
                     // 📻 Радио-стык / Кроссфейд: автопереход к следующему треку заранее
                     val crossfadeMs = crossfadeSeconds * 1000L
                     val maxAllowedCrossfade = (totalDur * 0.35f).toLong()
-                    val effectiveCrossfadeMs = if (crossfadeMs > 0L) minOf(crossfadeMs, maxAllowedCrossfade) else 0L
+                    val effectiveCrossfadeMs = effectiveCrossfadeMs(totalDur)
                     val isNextLocal = isNextTrackLocal()
                     val isNextPreloaded = isNextTrackPreloaded()
 
@@ -1254,35 +1127,11 @@ class PlaybackManager(
 
                 val cleanTitle = currentTitle.trim()
                 val cleanArtist = currentArtist.trim()
-                val rawExtension = audioData.type.substringBefore("-")
-                val extension = if (rawExtension.equals("aac", ignoreCase = true)) "m4a" else rawExtension
-                val fullFileName = sanitizeKeepSpaces(if (cleanArtist.isNotEmpty()) {
-                    "$cleanArtist — $cleanTitle.$extension"
-                } else {
-                    "$cleanTitle.$extension"
-                })
-                val qualityFolder = if (selectedQuality == "2") "HQ" else "LQ"
-                val basePath = "${localTrackResolver.getMusicStoragePath()}/$qualityFolder"
-                val sanitizedArtist = sanitizeKeepSpaces(cleanArtist.ifBlank { "Unknown Artist" })
-
-                val knownDuration = findTrackInfo(currentId)?.durationMs?.takeIf { it > 0 } ?: 0L
-                val bitrateFromType = audioData.type.substringAfter("-").substringBefore("-").toIntOrNull()
-                val parsedBitrate = audioData.bitrate ?: (if (bitrateFromType != null && bitrateFromType in 32..1000) bitrateFromType else null)
-                positionMs = 0L
-                durationMs = knownDuration
-                currentPlayingSizeBytes = audioData.result.size.toLong()
-                val calculatedBitrate = parsedBitrate ?: if (durationMs > 0 && currentPlayingSizeBytes != null) {
-                    ((currentPlayingSizeBytes!! * 8) / durationMs).toInt().takeIf { it > 0 }
-                } else null
-                val defaultBitrate = if (selectedQuality == "2") 320 else 192
-                bitrate = calculatedBitrate ?: defaultBitrate
-                isCurrentTrackHQ = (selectedQuality == "2")
+                applyDownloadedAudioInfo(audioData, currentId, selectedQuality)
 
                 if (isRecordToDisk()) {
-                    val taggedBytes = prepareTaggedAudioBytes(currentId, cleanTitle, cleanArtist, extension, audioData.result)
-                    saveTrackFile(basePath, cleanArtist, fullFileName, taggedBytes)
+                    val filePath = audioWriter.save(currentId, cleanTitle, cleanArtist, selectedQuality, audioData, coverUri)
                     onTrackSavedToDisk?.invoke()
-                    val filePath = "$basePath/$sanitizedArtist/$fullFileName"
                     currentPlayingFilePath = filePath
                     audioPlayer.playFromFile(filePath, 0L)
                 } else {
@@ -1307,9 +1156,10 @@ class PlaybackManager(
                 )
                 systemMediaControls.updatePlaybackState(true, false, 0L)
                 startProgressPolling()
-                queueManager.plannedNextTrack = calculateNextTrackCandidate()
-                schedulePreload()
+                planNextAndPreload()
                 return
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 println("PlaybackManager: ❌ Прямое скачивание после ошибки стриминга завершилось ошибкой: ${e.message}")
             } finally {
@@ -1385,169 +1235,56 @@ class PlaybackManager(
      */
     fun playNextTrack(currentId: String? = trackId, source: TrackPlaySource = TrackPlaySource.NEXT, crossfadeMs: Long = 0L) {
         lastPrevClickTimestamp = 0L
-        if (source == TrackPlaySource.NEXT) {
-            isNextLoading = true
-            isPrevLoading = false
-            isPlayLoading = false
+        if (source == TrackPlaySource.NEXT) setLoadingFor(source)
+        when (val target = navigator.resolveNext(currentId ?: trackId)) {
+            is NavigationTarget.UpNext -> playUpNextTrack(target.track, source, crossfadeMs)
+            NavigationTarget.Wave -> waveBridge?.playNextWaveTrack(crossfadeMs)
+            is NavigationTarget.Track -> playNavigationTrack(target, source, crossfadeMs)
+            is NavigationTarget.LoadMoreAfter -> loadMoreAndPlayNext(target.currentIndex, source, crossfadeMs)
+            NavigationTarget.WaveFallback -> waveBridge?.playNextWaveTrack()
+            NavigationTarget.None -> isNextLoading = false
         }
-        val resumeAnchor = upNextQueue.state.let {
-            it.anchorId.takeIf { _ -> it.suspended && it.pending.isEmpty() && it.forward.isEmpty() }
+    }
+
+    /** Последний трек списка: догружаем следующую страницу, иначе начинаем список заново. */
+    private fun loadMoreAndPlayNext(currentIndex: Int, source: TrackPlaySource, crossfadeMs: Long) {
+        if (source == TrackPlaySource.NEXT) isNextLoading = true
+        scope.launch {
+            try {
+                val loaded = queueSource.loadMoreTracks()
+                val updatedTracks = queueSource.getLoadedTracks()
+                if (loaded && currentIndex + 1 < updatedTracks.size) {
+                    playNavigationTrack(updatedTracks[currentIndex + 1], source, crossfadeMs)
+                    return@launch
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                println("PlaybackManager: Ошибка догрузки следующей страницы: ${e.message}")
+                if (source == TrackPlaySource.NEXT) isNextLoading = false
+            }
+            val firstTrack = queueSource.getLoadedTracks().firstOrNull()
+            if (firstTrack != null) {
+                playNavigationTrack(firstTrack, source, crossfadeMs)
+            } else if (source == TrackPlaySource.NEXT) {
+                isNextLoading = false
+            }
         }
-        val currentInfo = (currentId ?: trackId)?.let { findTrackInfo(it) }
-        val queued = upNextQueue.next(
-            current = currentInfo,
-            resume = {
-                queueManager.plannedNextTrack = null
-                calculateResumeTrack(currentId ?: trackId)
-            },
-            shuffleCycle = { queueManager.playedInCycleTrackIds },
-            past = historyBeforeUpNext(),
-            canResumeTrack = ::canResumeRecommendedTrack,
+    }
+
+    private fun playNavigationTrack(track: FullTrackInfo, source: TrackPlaySource, crossfadeMs: Long) =
+        playNavigationTrack(NavigationTarget.Track(track, track.albums.firstOrNull()?.id), source, crossfadeMs)
+
+    private fun playNavigationTrack(target: NavigationTarget.Track, source: TrackPlaySource, crossfadeMs: Long = 0L) {
+        playTrack(
+            targetTrackId = target.track.id,
+            targetTrackTitle = target.track.title,
+            targetArtistName = target.track.artists.joinToString { it.name },
+            targetAlbumId = target.albumId,
+            isManualSelection = false,
+            source = source,
+            crossfadeMs = crossfadeMs
         )
-        if (queued != null) {
-            playUpNextTrack(queued, source, crossfadeMs)
-            return
-        }
-        if (waveBridge?.isWaveMode == true) {
-            waveBridge.playNextWaveTrack(crossfadeMs)
-            return
-        }
-
-        val activeId = resumeAnchor ?: currentId ?: trackId
-        val loadedTracks = queueSource.getLoadedTracks()
-        val searchTracks = queueSource.getSearchTracks()
-
-        // 1. История перемотки вперед
-        val fromForward = if (!upNextQueue.state.started) queueManager.popNextFromForwardHistory(activeId, loadedTracks, searchTracks) else null
-        if (fromForward != null) {
-            playTrack(
-                targetTrackId = fromForward.id,
-                targetTrackTitle = fromForward.title,
-                targetArtistName = fromForward.artists.joinToString { it.name },
-                targetAlbumId = fromForward.albums.firstOrNull()?.id,
-                isManualSelection = false,
-                source = source,
-                crossfadeMs = crossfadeMs
-            )
-            return
-        }
-
-        if (activeId != null && !upNextQueue.state.started) {
-            queueManager.recordPlayed(activeId)
-        }
-
-        // 2. Текущий плейлист (loadedTracks)
-        if (loadedTracks.isNotEmpty()) {
-            if (isShuffleEnabled) {
-                val nextTrack = queueManager.getNextFromList(activeId, loadedTracks)
-                if (nextTrack != null) {
-                    playTrack(
-                        targetTrackId = nextTrack.id,
-                        targetTrackTitle = nextTrack.title,
-                        targetArtistName = nextTrack.artists.joinToString { it.name },
-                        targetAlbumId = nextTrack.albums.firstOrNull()?.id,
-                        isManualSelection = false,
-                        source = source,
-                        crossfadeMs = crossfadeMs
-                    )
-                    return
-                }
-            } else {
-                val currentIndex = if (activeId != null) loadedTracks.indexOfFirst { PlaybackQueueManager.isSameTrack(it, activeId) } else -1
-                if (currentIndex != -1 && currentIndex < loadedTracks.size - 1) {
-                    val nextTrack = loadedTracks[currentIndex + 1]
-                    playTrack(
-                        targetTrackId = nextTrack.id,
-                        targetTrackTitle = nextTrack.title,
-                        targetArtistName = nextTrack.artists.joinToString { it.name },
-                        targetAlbumId = nextTrack.albums.firstOrNull()?.id,
-                        isManualSelection = false,
-                        source = source,
-                        crossfadeMs = crossfadeMs
-                    )
-                    return
-                } else if (currentIndex != -1 && currentIndex == loadedTracks.size - 1) {
-                    if (source == TrackPlaySource.NEXT) isNextLoading = true
-                    scope.launch {
-                        try {
-                            val loaded = queueSource.loadMoreTracks()
-                            val updatedTracks = queueSource.getLoadedTracks()
-                            if (loaded && currentIndex + 1 < updatedTracks.size) {
-                                val nextTrack = updatedTracks[currentIndex + 1]
-                                playTrack(
-                                    targetTrackId = nextTrack.id,
-                                    targetTrackTitle = nextTrack.title,
-                                    targetArtistName = nextTrack.artists.joinToString { it.name },
-                                    targetAlbumId = nextTrack.albums.firstOrNull()?.id,
-                                    isManualSelection = false,
-                                    source = source,
-                                    crossfadeMs = crossfadeMs
-                                )
-                                return@launch
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            println("PlaybackManager: Ошибка догрузки следующей страницы: ${e.message}")
-                            if (source == TrackPlaySource.NEXT) isNextLoading = false
-                        }
-                        val finalTracks = queueSource.getLoadedTracks()
-                        if (finalTracks.isNotEmpty()) {
-                            val firstTrack = finalTracks.first()
-                            playTrack(
-                                targetTrackId = firstTrack.id,
-                                targetTrackTitle = firstTrack.title,
-                                targetArtistName = firstTrack.artists.joinToString { it.name },
-                                targetAlbumId = firstTrack.albums.firstOrNull()?.id,
-                                isManualSelection = false,
-                                source = source,
-                                crossfadeMs = crossfadeMs
-                            )
-                        } else {
-                            if (source == TrackPlaySource.NEXT) isNextLoading = false
-                        }
-                    }
-                    return
-                } else if (currentIndex == loadedTracks.size - 1 || currentIndex == -1) {
-                    val firstTrack = loadedTracks.first()
-                    playTrack(
-                        targetTrackId = firstTrack.id,
-                        targetTrackTitle = firstTrack.title,
-                        targetArtistName = firstTrack.artists.joinToString { it.name },
-                        targetAlbumId = firstTrack.albums.firstOrNull()?.id,
-                        isManualSelection = false,
-                        source = source,
-                        crossfadeMs = crossfadeMs
-                    )
-                    return
-                }
-            }
-        }
-
-        // 3. Результаты поиска
-        if (searchTracks.isNotEmpty()) {
-            val nextTrack = queueManager.getNextFromList(activeId, searchTracks)
-            if (nextTrack != null) {
-                playTrack(
-                    targetTrackId = nextTrack.id,
-                    targetTrackTitle = nextTrack.title,
-                    targetArtistName = nextTrack.artists.joinToString { it.name },
-                    targetAlbumId = null,
-                    isManualSelection = false,
-                    source = source,
-                    crossfadeMs = crossfadeMs
-                )
-                return
-            }
-        }
-
-        // 4. Волна
-        val waveTracks = waveBridge?.waveTracks ?: emptyList()
-        if (activeId == null && waveTracks.isNotEmpty()) {
-            waveBridge?.playNextWaveTrack()
-        } else {
-            isNextLoading = false
-        }
     }
 
     /**
@@ -1579,82 +1316,12 @@ class PlaybackManager(
             // Если сработал переход к предыдущему треку — сбрасываем таймер быстрого клика
             lastPrevClickTimestamp = 0L
 
-            if (source == TrackPlaySource.PREV) {
-                isPrevLoading = true
-                isNextLoading = false
-                isPlayLoading = false
-            }
-            val queuedPrevious = upNextQueue.previous()
-            if (queuedPrevious != null) {
-                playUpNextTrack(queuedPrevious, source)
-                return
-            }
-            if (upNextQueue.state.started) {
-                isPrevLoading = false
-                return
-            }
-            if (waveBridge?.isWaveMode == true) {
-                waveBridge.playPrevWaveTrack()
-                return
-            }
-
-            val activeId = currentId ?: trackId
-            val loadedTracks = queueSource.getLoadedTracks()
-            val searchTracks = queueSource.getSearchTracks()
-
-            // 1. Реальная история прослушивания
-            val prevFromHistory = queueManager.popPrevFromPlaybackHistory(activeId, loadedTracks, searchTracks)
-            if (prevFromHistory != null) {
-                playTrack(
-                    targetTrackId = prevFromHistory.id,
-                    targetTrackTitle = prevFromHistory.title,
-                    targetArtistName = prevFromHistory.artists.joinToString { it.name },
-                    targetAlbumId = prevFromHistory.albums.firstOrNull()?.id,
-                    isManualSelection = false,
-                    source = source
-                )
-                return
-            }
-
-            // 2. Текущий плейлист (loadedTracks)
-            if (loadedTracks.isNotEmpty()) {
-                if (activeId != null) queueManager.recordForward(activeId)
-                val prevTrack = queueManager.getPrevFromList(activeId, loadedTracks)
-                if (prevTrack != null) {
-                    playTrack(
-                        targetTrackId = prevTrack.id,
-                        targetTrackTitle = prevTrack.title,
-                        targetArtistName = prevTrack.artists.joinToString { it.name },
-                        targetAlbumId = prevTrack.albums.firstOrNull()?.id,
-                        isManualSelection = false,
-                        source = source
-                    )
-                    return
-                }
-            }
-
-            // 3. Результаты поиска
-            if (searchTracks.isNotEmpty()) {
-                if (activeId != null) queueManager.recordForward(activeId)
-                val prevTrack = queueManager.getPrevFromList(activeId, searchTracks)
-                if (prevTrack != null) {
-                    playTrack(
-                        targetTrackId = prevTrack.id,
-                        targetTrackTitle = prevTrack.title,
-                        targetArtistName = prevTrack.artists.joinToString { it.name },
-                        targetAlbumId = null,
-                        isManualSelection = false,
-                        source = source
-                    )
-                    return
-                }
-            }
-
-            val waveTracks = waveBridge?.waveTracks ?: emptyList()
-            if (activeId == null && waveTracks.isNotEmpty()) {
-                waveBridge?.playPrevWaveTrack()
-            } else {
-                isPrevLoading = false
+            if (source == TrackPlaySource.PREV) setLoadingFor(source)
+            when (val target = navigator.resolvePrevious(currentId ?: trackId)) {
+                is NavigationTarget.UpNext -> playUpNextTrack(target.track, source)
+                NavigationTarget.Wave, NavigationTarget.WaveFallback -> waveBridge?.playPrevWaveTrack()
+                is NavigationTarget.Track -> playNavigationTrack(target, source)
+                is NavigationTarget.LoadMoreAfter, NavigationTarget.None -> isPrevLoading = false
             }
         } catch (e: CancellationException) {
             throw e
@@ -1664,195 +1331,47 @@ class PlaybackManager(
         }
     }
 
-    private fun canResumeRecommendedTrack(track: FullTrackInfo): Boolean =
-        waveBridge?.let { !it.isWaveMode || !it.isRecentWaveRepeat(track) } ?: true
-
     /**
      * ⏭ Вычислить кандидата на следующий трек в очереди с учетом приоритетов:
-     * 1. Моя Волна (getNextWaveTrack)
-     * 2. История перемотки вперед (forwardHistory)
-     * 3. Текущий список треков (loadedTracks) со случайным (Shuffle) или последовательным порядком
-     * 4. Результаты поиска (searchTracks)
+     * 1. Очередь «Далее»
+     * 2. Моя Волна (getNextWaveTrack)
+     * 3. История перемотки вперед (forwardHistory)
+     * 4. Текущий список треков (loadedTracks) со случайным (Shuffle) или последовательным порядком
+     * 5. Результаты поиска (searchTracks)
      */
-    fun calculateNextTrackCandidate(): FullTrackInfo? {
-        upNextQueue.peek(::canResumeRecommendedTrack)?.let { return it }
-        val candidate = calculateBaseNextTrackCandidate(if (upNextQueue.state.suspended) upNextQueue.state.anchorId else trackId)
-        if (upNextQueue.state.current?.inserted != true) {
-            upNextQueue.captureShuffleCycle(queueManager.playedInCycleTrackIds)
-        }
-        return candidate
-    }
-
-    private fun calculateBaseNextTrackCandidate(activeId: String?): FullTrackInfo? {
-        return queueManager.calculateNextCandidate(
-            activeId = activeId,
-            isWaveMode = waveBridge?.isWaveMode == true,
-            nextWaveTrack = waveBridge?.getNextWaveTrackCandidate(),
-            loadedTracks = queueSource.getLoadedTracks(),
-            searchTracks = queueSource.getSearchTracks()
-        )
-    }
+    fun calculateNextTrackCandidate(): FullTrackInfo? = navigator.calculateNextTrackCandidate(trackId)
 
     /** Следующий трек запустится без сети: файл на диске или аудио уже в памяти. */
-    private fun isNextTrackLocal(): Boolean {
-        val next = queueManager.plannedNextTrack
-        val preloaded = preloadedAudio?.takeIf { it.trackId == next?.id }
-        return preloaded?.filePath != null || preloaded?.audioData != null ||
-            next?.id?.startsWith("local:") == true ||
-            (currentPlayingFilePath != null && next?.let {
-                localTrackResolver.findLocalTrackFile(it.id, it.artists.joinToString { artist -> artist.name }, it.title, getSelectedQuality())
-            } != null)
-    }
+    private fun isNextTrackLocal(): Boolean =
+        preloader.isLocallyAvailable(queueManager.plannedNextTrack, allowDiskLookup = currentPlayingFilePath != null)
 
     /** Для следующего трека уже подготовлено начало потока. */
-    private fun isNextTrackPreloaded(): Boolean {
-        val nextId = queueManager.plannedNextTrack?.id ?: return false
-        return preloadedAudio?.trackId == nextId
-    }
+    private fun isNextTrackPreloaded(): Boolean = preloader.isPreloaded(queueManager.plannedNextTrack?.id)
 
     /**
      * ⚡ Запуск фоновой предзагрузки запланированного следующего трека
      */
-    fun schedulePreload() {
-        preloadJob?.cancel()
-        val nextTrack = plannedNextTrack ?: return
-        // Обложка следующего трека нужна сразу при переключении — загружаем её заранее
-        CoverImageLoader.prefetch(nextTrack.coverUri)
-        val targetTrackId = nextTrack.id
-        val cleanTitle = nextTrack.title.trim()
-        val cleanArtist = nextTrack.artists.joinToString { it.name }.trim()
-        val selectedQuality = getSelectedQuality()
+    fun schedulePreload() = preloader.schedule(plannedNextTrack)
 
-        if (preloadedAudio?.trackId == targetTrackId && preloadedAudio?.quality == selectedQuality) {
-            return
-        }
-
-        preloadJob = scope.launch {
-            // Задержка 3 секунды для предотвращения лишних скачиваний при быстром перелистывании
-            delay(3000L)
-
-            if (trackId == targetTrackId || plannedNextTrack?.id != targetTrackId) {
-                return@launch
-            }
-
-            try {
-                val musicStoragePath = localTrackResolver.getMusicStoragePath()
-                val sanitizedArtist = LocalTrackResolver.sanitizeKeepSpaces(cleanArtist.ifBlank { "Unknown Artist" })
-
-                // 1. Проверяем, есть ли уже файл на диске
-                val existingFilePath = withContext(DispatcherIO) {
-                    localTrackResolver.findLocalTrackFile(targetTrackId, cleanArtist, cleanTitle, selectedQuality)
-                }
-
-                if (existingFilePath != null) {
-                    println("⚡ [Предзагрузка] Трек '$cleanTitle' уже есть на диске: $existingFilePath")
-                    preloadedAudio = PreloadedAudio(
-                        trackId = targetTrackId,
-                        audioData = null,
-                        quality = selectedQuality,
-                        filePath = existingFilePath
-                    )
-                    return@launch
-                }
-
-                if (targetTrackId.startsWith("local:")) {
-                    return@launch
-                }
-
-                // 2. ⚡ Если запущен LocalStreamProxy — предзагружаем только Chunk 0 (256 КБ), экономя трафик!
-                if (LocalStreamProxy.isRunning()) {
-                    println("⚡ [Предзагрузка] Предзагрузка первого чанка стрима через LocalStreamProxy: $cleanTitle")
-                    try {
-                        val preloadedUrl = LocalStreamProxy.preloadTrack(targetTrackId, selectedQuality)
-                        if (preloadedUrl.isNotEmpty() && plannedNextTrack?.id == targetTrackId) {
-                            preloadedAudio = PreloadedAudio(
-                                trackId = targetTrackId,
-                                audioData = null,
-                                quality = selectedQuality,
-                                filePath = null
-                            )
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        println("⚡ [Предзагрузка] Ошибка предзагрузки стрима: ${e.message}")
-                    }
-                    return@launch
-                }
-
-                // 3. Скачиваем трек в фоне (fallback для сред без прокси)
-                println("⚡ [Предзагрузка] Фоновое скачивание трека: $cleanTitle ($cleanArtist) [Качество: $selectedQuality]")
-                val audioData = repository.downloadTrackAudio(targetTrackId, quality = selectedQuality)
-
-                if (plannedNextTrack?.id != targetTrackId) {
-                    return@launch
-                }
-
-                if (isRecordToDisk()) {
-                    val qualityFolder = if (selectedQuality == "2") "HQ" else "LQ"
-                    val basePath = "$musicStoragePath/$qualityFolder"
-                    val rawExtension = audioData.type.substringBefore("-")
-                    val extension = if (rawExtension.equals("aac", ignoreCase = true)) "m4a" else rawExtension
-                    val fullFileName = sanitizeKeepSpaces(if (cleanArtist.isNotEmpty()) {
-                        "$cleanArtist — $cleanTitle.$extension"
-                    } else {
-                        "$cleanTitle.$extension"
-                    })
-                    val taggedBytes = prepareTaggedAudioBytes(targetTrackId, cleanTitle, cleanArtist, extension, audioData.result)
-                    saveTrackFile(basePath, cleanArtist, fullFileName, taggedBytes)
-                    localTrackResolver.invalidateCache()
-                    onTrackSavedToDisk?.invoke()
-                    val filePath = "$basePath/$sanitizedArtist/$fullFileName"
-                    println("⚡ [Предзагрузка] Трек '$cleanTitle' сохранен на диск: $filePath")
-                    preloadedAudio = PreloadedAudio(
-                        trackId = targetTrackId,
-                        audioData = null,
-                        quality = selectedQuality,
-                        filePath = filePath
-                    )
-                } else {
-                    println("⚡ [Предзагрузка] Трек '$cleanTitle' сохранен в памяти (${audioData.result.size} байт)")
-                    preloadedAudio = PreloadedAudio(
-                        trackId = targetTrackId,
-                        audioData = audioData,
-                        quality = selectedQuality,
-                        filePath = null
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                println("⚡ [Предзагрузка] Не удалось предзагрузить трек: ${e.message}")
-            }
-        }
+    /** Пересчитать следующий трек после запуска текущего и начать его предзагрузку. */
+    private fun planNextAndPreload() {
+        queueManager.plannedNextTrack = calculateNextTrackCandidate()
+        schedulePreload()
     }
 
-    private suspend fun prepareTaggedAudioBytes(
-        targetTrackId: String,
-        cleanTitle: String,
-        cleanArtist: String,
-        extension: String,
-        rawAudioBytes: ByteArray
-    ): ByteArray {
-        val info = findTrackInfo(targetTrackId)
-        val effectiveCoverUri = coverUri ?: info?.coverUri
-        val effectiveAlbum = info?.albums?.firstOrNull()?.title
-        val effectiveYear = info?.albums?.firstOrNull()?.year?.toString()
+    /** Применить длительность, размер и битрейт полученного по сети аудио к текущему треку. */
+    private fun applyDownloadedAudioInfo(audio: DownloadedTrackAudio, forTrackId: String, quality: String) {
+        positionMs = 0L
+        durationMs = findTrackInfo(forTrackId)?.durationMs?.takeIf { it > 0 } ?: 0L
+        currentPlayingSizeBytes = audio.result.size.toLong()
+        bitrate = DownloadedAudioWriter.resolveBitrate(audio, durationMs) ?: DownloadedAudioWriter.defaultBitrate(quality)
+        isCurrentTrackHQ = (quality == "2")
+    }
 
-        val coverBytes = effectiveCoverUri?.let { uri ->
-            val url = CoverImageLoader.formatCoverUrl(uri, 600)
-            if (url != null) repository.fetchImageBytes(url) else null
-        }
-
-        return AudioMetadataTagger.embedMetadata(
-            audioBytes = rawAudioBytes,
-            extension = extension,
-            title = cleanTitle,
-            artist = cleanArtist,
-            album = effectiveAlbum,
-            year = effectiveYear,
-            coverBytes = coverBytes
-        )
+    /** Длительность кроссфейда с учётом ограничения в 35% длины трека. */
+    private fun effectiveCrossfadeMs(totalDurationMs: Long): Long {
+        val crossfadeMs = crossfadeSeconds * 1000L
+        return if (crossfadeMs > 0L) minOf(crossfadeMs, (totalDurationMs * 0.35f).toLong()) else 0L
     }
 
     /**
@@ -1867,9 +1386,7 @@ class PlaybackManager(
     }
 
     fun release() {
-        preloadJob?.cancel()
-        preloadJob = null
-        preloadedAudio = null
+        preloader.reset()
         plannedNextTrack = null
         playTrackJob?.cancel()
         progressJob?.cancel()
