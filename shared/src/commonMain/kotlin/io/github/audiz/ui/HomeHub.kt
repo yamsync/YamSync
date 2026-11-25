@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -76,7 +77,12 @@ internal fun HomeHub(
             }
 
             HomeListSurface {
-                HomeNavigationRow("Подборки", Icons.Filled.Layers, onClick = onOpenCollections)
+                HomeNavigationRow(
+                    "Подборки",
+                    Icons.Filled.Layers,
+                    iconTint = homeIconTint(Color(0xFFB9A6CA)),
+                    onClick = onOpenCollections,
+                )
             }
 
             if (viewModel.localPlaylists.isNotEmpty() || viewModel.customMediaSources.isNotEmpty() || isPlatformPickerSupported) {
@@ -209,17 +215,39 @@ private fun QuickAccessSection(
     Column {
         HomeSectionHeading("Быстрый доступ")
         HomeListSurface {
-            HomeNavigationRow("Скачанное", Icons.Filled.Download, onClick = { viewModel.loadDownloadedTracksPlaylist() })
+            HomeNavigationRow(
+                "Скачанное", Icons.Filled.Download, iconTint = homeIconTint(Color(0xFF8DB9A5)),
+                onClick = { viewModel.loadDownloadedTracksPlaylist() },
+            )
             HomeListDivider()
-            HomeNavigationRow("Любимые", Icons.Filled.Favorite, onClick = { viewModel.loadLikesPlaylist() })
+            HomeNavigationRow(
+                "Любимые", Icons.Filled.Favorite, iconTint = homeIconTint(Color(0xFFD2A0B0)),
+                onClick = { viewModel.loadLikesPlaylist() },
+            )
             HomeListDivider()
-            HomeNavigationRow("Медиатека", Icons.Filled.LibraryMusic, onClick = onOpenMediaLibrary)
+            HomeNavigationRow(
+                "Медиатека", Icons.Filled.LibraryMusic, iconTint = homeIconTint(Color(0xFFACADD0)),
+                onClick = onOpenMediaLibrary,
+            )
             HomeListDivider()
-            HomeNavigationRow("История", Icons.Filled.History, onClick = { viewModel.loadHistory() })
+            HomeNavigationRow(
+                "История", Icons.Filled.History, iconTint = homeIconTint(Color(0xFFC4AC88)),
+                onClick = { viewModel.loadHistory() },
+            )
             HomeListDivider()
-            HomeNavigationRow("Устройства", Icons.Filled.Devices, statusColor = deviceStateColor, onClick = onOpenDevices)
+            HomeNavigationRow(
+                "Устройства", Icons.Filled.Devices, iconTint = homeIconTint(Color(0xFF8EB7BA)),
+                statusColor = deviceStateColor, onClick = onOpenDevices,
+            )
         }
     }
+}
+
+@Composable
+private fun homeIconTint(color: Color): Color {
+    val colors = MaterialTheme.colorScheme
+    val neutralWeight = if (colors.surface.luminance() < 0.5f) 0.22f else 0.68f
+    return lerp(color, colors.onSurfaceVariant, neutralWeight)
 }
 
 @Composable
@@ -406,7 +434,8 @@ internal fun PersonalCollectionsScreen(
 
 @Composable
 private fun PersonalCollectionCard(title: String, coverUri: String?, onClick: () -> Unit) {
-    val cover = rememberCoverBitmap(coverUri, size = 240)
+    // Playlist cover URLs accept named dimensions such as 200x200.
+    val cover = rememberCoverBitmap(coverUri, size = 200)
     Column(
         Modifier.clip(RoundedCornerShape(14.dp))
             .clickable(role = Role.Button, onClick = onClick)
