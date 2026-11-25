@@ -25,7 +25,7 @@ class WaveManagerTest {
     )
 
     @Test
-    fun waveSkipsRepeatsAcrossTheWholeBufferWhilePreviousStillWorks() {
+    fun waveFinishesAReplayedTrackBeforeReturningToHistoryAndFilteringRecommendations() {
         val played = (1..8).map(Int::toString).toMutableSet()
         val wave = WaveManager(
             scope = CoroutineScope(Dispatchers.Unconfined),
@@ -43,8 +43,36 @@ class WaveManagerTest {
         wave.playPrevWaveTrack()
         assertEquals("1", wave.currentWaveTrack?.id)
 
+        assertEquals("9", wave.getNextWaveTrackCandidate()?.id)
+        wave.onWaveTrackFinished()
+        assertEquals("9", wave.currentWaveTrack?.id)
         wave.onWaveTrackFinished()
         assertEquals("10", wave.currentWaveTrack?.id)
+    }
+
+    @Test
+    fun nextAfterPreviousReturnsToTheAlreadyPlayedTrack() {
+        val played = mutableSetOf("1", "3")
+        val wave = WaveManager(
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            repository = MusicRepository(),
+            getAccessToken = { "" },
+            isRecentRepeat = { it.id in played },
+        )
+        wave.installInitialTracks((1..4).map { createDummyTrack(it.toString(), "Track $it") })
+        wave.playWaveTrack(0)
+        wave.playNextWaveTrack()
+        assertEquals("2", wave.currentWaveTrack?.id)
+        played.add("2")
+
+        wave.playPrevWaveTrack()
+        assertEquals("1", wave.currentWaveTrack?.id)
+        assertEquals("2", wave.getNextWaveTrackCandidate()?.id)
+        wave.playNextWaveTrack()
+        assertEquals("2", wave.currentWaveTrack?.id)
+
+        wave.playNextWaveTrack()
+        assertEquals("4", wave.currentWaveTrack?.id)
     }
 
     @Test

@@ -240,11 +240,12 @@ class WaveManager(
      */
     override fun getNextWaveTrackCandidate(): FullTrackInfo? {
         val currentId = currentWaveTrack?.id
-        val futureCandidate = waveFutureTracks.firstOrNull { it.id != currentId && !isRecentRepeat(it) }
+        val futureCandidate = waveFutureTracks.firstOrNull { it.id != currentId }
         return futureCandidate ?: recommendedIndex(waveCurrentIndex + 1, currentId)?.let(waveTracks::get)
     }
 
     // 🌊 История навигации Моей Волны (до 5 треков назад / вперед):
+    // Защита от повторов применяется к рекомендациям, история сохраняет порядок переходов.
     val wavePastTracks: SnapshotStateList<FullTrackInfo> = mutableStateListOf()
     val waveFutureTracks: SnapshotStateList<FullTrackInfo> = mutableStateListOf()
 
@@ -666,7 +667,7 @@ class WaveManager(
         playbackManager?.setLoadingFlags(next = true, prev = false, play = false)
 
         val current = currentWaveTrack
-        while (waveFutureTracks.firstOrNull()?.let { it.id == current?.id || isRecentRepeat(it) } == true) {
+        while (waveFutureTracks.firstOrNull()?.id?.let { it == current?.id } == true) {
             waveFutureTracks.removeAt(0)
         }
 
@@ -987,7 +988,7 @@ class WaveManager(
         if (current != null) recordWaveTrackFinished(current)
 
         // Очищаем из waveFutureTracks любые вхождения текущего доигравшего трека
-        while (waveFutureTracks.firstOrNull()?.let { it.id == current?.id || isRecentRepeat(it) } == true) {
+        while (waveFutureTracks.firstOrNull()?.id?.let { it == current?.id } == true) {
             waveFutureTracks.removeAt(0)
         }
 
