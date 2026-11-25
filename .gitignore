@@ -18,6 +18,7 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 scratch/
+graphify-out/
 hs_err_pid*.log
 # Правила и конфиги агентов (строго локально на этой машине, исключены из Git)
 .agents/
@@ -27,4 +28,3 @@ GEMINI.md.txt
 .android/
 .gradle_home/
 .rbpo-cache/
-
