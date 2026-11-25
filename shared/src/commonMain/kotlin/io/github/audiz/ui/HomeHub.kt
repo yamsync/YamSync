@@ -101,8 +101,10 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
         viewModel.currentWaveTrack?.let { PlaybackQueueManager.isSameTrack(it, viewModel.playerTrackId) } == true
     val isWavePlaying = isCurrentTrackFromWave && viewModel.playerIsPlaying && !viewModel.playerIsPaused
     val isWavePaused = isCurrentTrackFromWave && viewModel.playerIsPaused
-    val themeTitle = viewModel.currentWaveTitle?.takeIf { viewModel.currentWaveSeeds.isNotEmpty() && it.isNotBlank() }
-        ?: "Персональная"
+    val personalWaveTitle = "Персональная"
+    val hasThematicWave = viewModel.currentWaveSeeds.isNotEmpty()
+    val themeTitle = viewModel.currentWaveTitle?.takeIf { hasThematicWave && it.isNotBlank() }
+        ?: personalWaveTitle
     val status = when {
         isWavePlaying -> "Сейчас играет"
         isWavePaused -> "На паузе"
@@ -166,14 +168,15 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
         }
 
         val recentThemes = viewModel.recentThematicWaves.take(3)
-        if (recentThemes.isNotEmpty()) {
+        val quickThemes = if (hasThematicWave) listOf(null) + recentThemes else recentThemes
+        if (quickThemes.isNotEmpty()) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                recentThemes.forEach { theme ->
-                    val selected = viewModel.isWaveMode && viewModel.currentWaveSeeds == theme.seeds
+                quickThemes.forEach { theme ->
+                    val selected = viewModel.isWaveMode && viewModel.currentWaveSeeds == theme?.seeds.orEmpty()
                     Surface(
                         onClick = { viewModel.selectWaveTheme(theme) },
                         enabled = !viewModel.isWaveLoading,
@@ -184,7 +187,7 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
                     ) {
                         Box(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
                             Text(
-                                theme.title,
+                                theme?.title ?: personalWaveTitle,
                                 color = if (selected) accent else colors.onSurface,
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
