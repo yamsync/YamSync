@@ -64,7 +64,6 @@ private fun cleanUpEmptyDir(dir: File?, basePath: String) {
     }
 }
 
-/** Сохранить трек в структурированную папку: {basePath}/{Artist}/{fileName} */
 actual fun saveTrackFile(basePath: String, artist: String, fileName: String, bytes: ByteArray) {
     val cleanArtist = sanitizeDirName(artist.ifBlank { "Unknown Artist" })
     val artistDir = File(basePath, cleanArtist)
@@ -97,7 +96,6 @@ actual fun openTrackFileWriter(basePath: String, artist: String, fileName: Strin
     }
 }
 
-/** Сохранить файл напрямую в указанную папку: {targetDir}/{fileName} */
 actual fun saveTrackToFolder(targetDir: String, fileName: String, bytes: ByteArray): String? {
     return try {
         val dir = File(targetDir)
@@ -113,7 +111,6 @@ actual fun saveTrackToFolder(targetDir: String, fileName: String, bytes: ByteArr
     }
 }
 
-/** Скопировать существующий файл в указанную папку: {targetDir}/{destFileName} */
 actual fun copyFileToFolder(sourceFilePath: String, targetDir: String, destFileName: String?): String? {
     return try {
         val src = File(sourceFilePath)
@@ -131,7 +128,6 @@ actual fun copyFileToFolder(sourceFilePath: String, targetDir: String, destFileN
     }
 }
 
-/** Сохранить файл по прямому целевому пути: {destFilePath} */
 actual fun saveFileToDirectPath(destFilePath: String, bytes: ByteArray): String? {
     return try {
         val destFile = File(destFilePath)
@@ -145,7 +141,6 @@ actual fun saveFileToDirectPath(destFilePath: String, bytes: ByteArray): String?
     }
 }
 
-/** Скопировать существующий файл по прямому целевому пути: {destFilePath} */
 actual fun copyFileToDirectPath(sourceFilePath: String, destFilePath: String): String? {
     return try {
         val src = File(sourceFilePath)
@@ -161,7 +156,6 @@ actual fun copyFileToDirectPath(sourceFilePath: String, destFilePath: String): S
     }
 }
 
-/** Разрешить локальный путь к файлу с быстрым O(1) поиском в папке музыки и её поддиректориях */
 actual fun resolveLocalPath(path: String): String {
     val clean = path.trim().removePrefix("local:").removePrefix("file://").removePrefix("file:")
     if (clean.isBlank()) return ""
@@ -170,7 +164,6 @@ actual fun resolveLocalPath(path: String): String {
         val rawFile = File(clean)
         if (rawFile.exists() && rawFile.isFile) return rawFile.absolutePath
 
-        // Нормализуем путь для кроссплатформенности (Windows \ vs Unix /)
         val normalized = clean.replace('\\', '/')
         val fileName = normalized.substringAfterLast('/')
         val parentName = normalized.substringBeforeLast('/', "").substringAfterLast('/').takeIf { it.isNotBlank() }
@@ -180,7 +173,6 @@ actual fun resolveLocalPath(path: String): String {
         val baseDir = File(baseMusic)
         if (!baseDir.exists()) return rawFile.absolutePath
 
-        // Кандидаты прямого поиска (директории для O(1) проверок существования файлов)
         val candidateDirs = mutableListOf<File>()
         candidateDirs.add(baseDir)
         candidateDirs.add(File(baseDir, "YamSync"))
@@ -245,7 +237,6 @@ actual fun resolveLocalPath(path: String): String {
     }
 }
 
-/** Проверить, существует ли трек на диске */
 actual fun trackFileExists(basePath: String, artist: String, fileName: String): Boolean {
     return try {
         val cleanArtist = sanitizeDirName(artist.ifBlank { "Unknown Artist" })
@@ -260,7 +251,6 @@ actual fun trackFileExists(basePath: String, artist: String, fileName: String): 
     }
 }
 
-/** Проверить существование файла по прямому пути */
 actual fun localFileExists(filePath: String): Boolean {
     if (filePath.isBlank()) return false
     return try {
@@ -273,7 +263,6 @@ actual fun localFileExists(filePath: String): Boolean {
     }
 }
 
-/** Проверить, является ли путь существующей директорией */
 actual fun isDirectory(path: String): Boolean {
     if (path.isBlank()) return false
     return try {
@@ -284,7 +273,6 @@ actual fun isDirectory(path: String): Boolean {
     }
 }
 
-/** Прочитать содержимое текстового файла (например, плейлиста M3U) */
 actual fun readTextFile(path: String): String? {
     if (path.isBlank()) return null
     return try {
@@ -296,11 +284,6 @@ actual fun readTextFile(path: String): String? {
     }
 }
 
-/**
- * 📁 Сканирует локальную папку с сохранёнными аудиофайлами без обращения в интернет.
- * Распознает M4A, FLAC, MP3, AAC, OPUS, WAV, OGG.
- * Определяет исполнителя, название трека, качество (HQ/LQ) и длительность из структуры папок и заголовков файлов.
- */
 actual fun scanDownloadedTrackPaths(basePath: String): List<String> {
     val rootDir = File(basePath)
     if (!rootDir.exists() || !rootDir.isDirectory) return emptyList()
@@ -406,7 +389,6 @@ actual fun scanDownloadedTracks(basePath: String): List<FullTrackInfo> {
         }
     }
 
-    // Сортировка по исполнителю, затем по названию трека
     return deduplicated.sortedWith(
         compareBy(
             { it.artists.firstOrNull()?.name?.lowercase() ?: "" },
@@ -415,14 +397,10 @@ actual fun scanDownloadedTracks(basePath: String): List<FullTrackInfo> {
     )
 }
 
-/**
- * Быстрое автономное извлечение длительности трека без тяжёлых библиотек и без интернета
- */
 private fun extractAudioDuration(file: File): Long {
     return io.github.audiz.util.AudioHeaderParser.extractAudioDuration(file)
 }
 
-/** Экспортировать локальный плейлист в формат M3U8 */
 actual fun exportPlaylistToM3u8(basePath: String, playlist: LocalPlaylist, tracks: List<FullTrackInfo>): String {
     if (basePath.isBlank()) return ""
     try {
@@ -449,7 +427,6 @@ actual fun exportPlaylistToM3u8(basePath: String, playlist: LocalPlaylist, track
     }
 }
 
-/** Преобразовать список локальных путей к файлам в список объектов FullTrackInfo с проверкой наличия на диске */
 actual fun getTracksFromLocalPaths(paths: List<String>): List<FullTrackInfo> {
     val results = mutableListOf<FullTrackInfo>()
     val delimiters = listOf(" — ", " – ", " - ", "_—_", "_-_", "-")
@@ -534,7 +511,6 @@ actual fun getTracksFromLocalPaths(paths: List<String>): List<FullTrackInfo> {
 /** Удалить аудиофайл трека с диска (и пустую папку артиста, если файлов больше нет) */
 actual fun deleteTrackFile(basePath: String, artist: String, trackTitle: String, localFilePath: String?): Boolean {
     try {
-        // 1. Если передан прямой локальный путь
         val rawLocal = localFilePath?.trim()
             ?.removePrefix("local:")
             ?.removePrefix("file://")
@@ -670,7 +646,6 @@ actual fun deleteTrackFile(basePath: String, artist: String, trackTitle: String,
                 }
             }
 
-            // Проверяем также файлы напрямую в папке quality/base
             for (ext in knownExtensions) {
                 val candidateNames = mutableListOf<String>()
                 if (cleanArtist.isNotEmpty()) {
@@ -708,7 +683,6 @@ actual fun deleteTrackFile(basePath: String, artist: String, trackTitle: String,
     }
 }
 
-/** Удалить все скачанные треки из папок HQ, LQ и корневой директории */
 actual fun clearAllDownloadedMusic(basePath: String): Int {
     if (basePath.isBlank()) return 0
     var count = 0
@@ -724,7 +698,6 @@ actual fun clearAllDownloadedMusic(basePath: String): Int {
                         count++
                     }
                 } else if (file.isDirectory && file != folder && file.name != "playlists_cache" && file.name != "playlists") {
-                    // Удаляем пустые папки
                     if (file.listFiles()?.isEmpty() == true) {
                         file.delete()
                     }
@@ -752,7 +725,6 @@ actual fun appendLogToFile(line: String) {
     } catch (_: Throwable) {}
 }
 
-/** Получить листинг содержимого директории (подпапки и аудиофайлы) для встроенного проводника */
 actual fun listFolderContents(folderPath: String, rootPath: String?): FolderListing {
     val dir = File(folderPath)
     if (!dir.exists() || !dir.isDirectory) {
@@ -843,13 +815,11 @@ actual fun getLocalCoverArtUrl(pathOrUri: String): String? {
         return "file://${file.absolutePath}"
     }
 
-    // 1. Проверяем наличие файла обложки в папке альбома
     val folderCover = io.github.audiz.util.AudioHeaderParser.findFolderCoverFile(file)
     if (folderCover != null && folderCover.exists() && folderCover.length() > 0L) {
         return "file://${folderCover.absolutePath}"
     }
 
-    // 2. Если в папке файла нет, извлекаем встроенную обложку и кэшируем на диск
     val bytes = io.github.audiz.util.AudioHeaderParser.extractCoverArtBytes(file) ?: return null
     return try {
         val baseDir = getDefaultMusicDir().ifBlank { System.getProperty("java.io.tmpdir") ?: "." }

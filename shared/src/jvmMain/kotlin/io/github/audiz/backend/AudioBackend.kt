@@ -2,17 +2,11 @@ package io.github.audiz.backend
 
 import java.io.File
 
-/**
- * 🎵 Источник аудио для воспроизведения бэкендом
- */
 sealed interface PlaybackSource {
     data class Url(val url: String) : PlaybackSource
     data class LocalFile(val file: File) : PlaybackSource
 }
 
-/**
- * 📢 Обратные вызовы событий воспроизведения бэкенда координатору AudioPlayer
- */
 interface AudioBackendCallback {
     fun onPlaybackStarted(sessionId: Long)
     fun onCompletion(sessionId: Long)
@@ -20,17 +14,11 @@ interface AudioBackendCallback {
     fun onNearEnd(sessionId: Long)
 }
 
-/**
- * 🎛️ Унифицированный контракт аудио-движка на платформе JVM
- */
 interface AudioBackend {
     val name: String
 
     fun isAvailable(): Boolean
 
-    /**
-     * Запустить воспроизведение источника
-     */
     fun play(
         source: PlaybackSource,
         sessionId: Long,

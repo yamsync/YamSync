@@ -67,7 +67,6 @@ fun resolveIosLocalPath(path: String): String {
     val currentDocs = (NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true).firstOrNull() as? String) ?: ""
     val currentMusic = getDefaultMusicDir()
 
-    // 1. Проверяем по маркеру /Documents/
     val docMarker = "/Documents/"
     if (clean.contains(docMarker) && currentDocs.isNotBlank()) {
         val relPath = clean.substringAfter(docMarker)
@@ -77,7 +76,6 @@ fun resolveIosLocalPath(path: String): String {
         }
     }
 
-    // 2. Проверяем по маркеру /Music/
     val musicMarker = "/Music/"
     if (clean.contains(musicMarker) && currentMusic.isNotBlank()) {
         val relPath = clean.substringAfter(musicMarker)
@@ -373,7 +371,6 @@ actual fun scanDownloadedTracks(basePath: String): List<FullTrackInfo> {
                 else -> "На диске (${ext.uppercase()})"
             }
 
-            // Длительность трека через AVURLAsset
             val durationMs = try {
                 val asset = AVURLAsset(uRL = NSURL.fileURLWithPath(fullPath), options = null)
                 val sec = CMTimeGetSeconds(asset.duration)
@@ -450,7 +447,6 @@ actual fun exportPlaylistToM3u8(basePath: String, playlist: LocalPlaylist, track
     }
 }
 
-/** Преобразовать список локальных путей к файлам в список объектов FullTrackInfo с проверкой наличия на диске */
 actual fun getTracksFromLocalPaths(paths: List<String>): List<FullTrackInfo> {
     val fileManager = NSFileManager.defaultManager
     val foundTracks = mutableListOf<FullTrackInfo>()
@@ -632,7 +628,6 @@ actual fun appendLogToFile(line: String) {
     } catch (_: Throwable) {}
 }
 
-/** Получить листинг содержимого директории (подпапки и аудиофайлы) для встроенного проводника */
 actual fun listFolderContents(folderPath: String, rootPath: String?): FolderListing {
     val fileManager = NSFileManager.defaultManager
     val exists = fileManager.fileExistsAtPath(folderPath)
@@ -714,7 +709,6 @@ actual fun loadLocalCoverBytes(pathOrUri: String): ByteArray? {
         return data.toByteArray()
     }
 
-    // 1. Извлечение обложки через AVURLAsset
     try {
         val asset = AVURLAsset(uRL = NSURL.fileURLWithPath(cleanPath), options = null)
         val metadata = asset.commonMetadata
@@ -729,7 +723,6 @@ actual fun loadLocalCoverBytes(pathOrUri: String): ByteArray? {
         }
     } catch (_: Throwable) {}
 
-    // 2. Резервный поиск обложки в папке альбома
     val parentDir = cleanPath.substringBeforeLast('/', "")
     if (parentDir.isNotBlank()) {
         val candidates = listOf("cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "album.jpg")

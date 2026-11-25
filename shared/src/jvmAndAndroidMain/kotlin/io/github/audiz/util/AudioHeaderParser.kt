@@ -4,11 +4,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.RandomAccessFile
 
-/**
- * 🎧 Кроссплатформенный (JVM и Android) парсер аудиоформатов и метаданных контейнеров.
- * Извлекает точную длительность, определяет контейнеры MP3, FLAC, M4A/AAC, WAV, OGG
- * и считывает ID3v2 теги (название, артист, альбом) без внешних зависимостей.
- */
 object AudioHeaderParser {
 
     data class AudioMetadata(
@@ -18,9 +13,6 @@ object AudioHeaderParser {
         val durationMs: Long = 0L
     )
 
-    /**
-     * Извлечь метаданные трека (название, артист, длительность) из локального файла
-     */
     fun extractAudioMetadata(file: File): AudioMetadata {
         if (!file.exists() || file.length() <= 0L) return AudioMetadata()
 
@@ -41,9 +33,6 @@ object AudioHeaderParser {
         }
     }
 
-    /**
-     * Быстрое и точное определение длительности любого аудиофайла в миллисекундах
-     */
     fun extractAudioDuration(file: File): Long {
         if (!file.exists() || file.length() <= 0L) return 0L
         val ext = file.extension.lowercase()
@@ -58,7 +47,6 @@ object AudioHeaderParser {
         }
         if (dur > 0L) return dur
 
-        // Если расширение нестандартное, определяем по сигнатуре файла
         return when {
             isMp3File(file) -> getExactMp3DurationMs(file)
             isFlacFile(file) -> getExactFlacDurationMs(file)
@@ -68,8 +56,6 @@ object AudioHeaderParser {
             else -> 0L
         }
     }
-
-    // --- Проверки типов контейнеров ---
 
     fun isMp4Container(file: File): Boolean {
         if (!file.exists() || file.length() < 12) return false
@@ -142,8 +128,6 @@ object AudioHeaderParser {
         }
     }
 
-    // --- Точный парсинг MP3 ---
-
     /**
      * Вычисляет точную длительность MP3 файла.
      * Поддерживает:
@@ -159,7 +143,6 @@ object AudioHeaderParser {
                 val fileLen = raf.length()
                 var audioStartOffset = 0L
 
-                // 1. Проверяем заголовок ID3v2
                 val id3Header = ByteArray(10)
                 raf.seek(0)
                 if (raf.read(id3Header) == 10 && id3Header[0] == 'I'.code.toByte() && id3Header[1] == 'D'.code.toByte() && id3Header[2] == '3'.code.toByte()) {
@@ -241,7 +224,6 @@ object AudioHeaderParser {
                     else -> 1152
                 }
 
-                // 3. Проверяем заголовок Xing / Info
                 val xingOffset = when {
                     ver == 3 -> if (channel == 3) 21 else 36
                     else -> if (channel == 3) 13 else 21
@@ -273,10 +255,8 @@ object AudioHeaderParser {
                     }
                 }
 
-                // 5. Если VBR-заголовков нет — это CBR файл. Считаем по битрейту первого фрейма.
                 if (bitrateKbps > 0) {
                     var audioDataLen = fileLen - frameStartInRaf
-                    // Проверяем наличие 128-байтного ID3v1 в конце файла
                     if (fileLen >= 128) {
                         raf.seek(fileLen - 128)
                         val id3v1 = ByteArray(3)
@@ -305,8 +285,6 @@ object AudioHeaderParser {
         if (exact > 0L) return exact
         return (file.length() * 8L * 1000L) / 256000L
     }
-
-    // --- Точный парсинг FLAC ---
 
     fun getExactFlacDurationMs(file: File): Long {
         return try {
@@ -345,8 +323,6 @@ object AudioHeaderParser {
         if (exact > 0) return exact
         return (file.length() * 8L * 1000L) / 850000L
     }
-
-    // --- Точный парсинг M4A / AAC (MP4 контейнер) ---
 
     fun getExactM4aDurationMs(file: File): Long {
         if (!file.exists() || file.length() < 16) return 0L
@@ -432,8 +408,6 @@ object AudioHeaderParser {
         return (file.length() * 8L * 1000L) / 256000L
     }
 
-    // --- Точный парсинг WAV ---
-
     fun getExactWavDurationMs(file: File): Long {
         if (!file.exists() || file.length() < 44) return 0L
         return try {
@@ -484,8 +458,6 @@ object AudioHeaderParser {
         }
     }
 
-    // --- Точный парсинг OGG / OPUS ---
-
     fun getExactOggDurationMs(file: File): Long {
         if (!file.exists() || file.length() < 128) return 0L
         return try {
@@ -525,8 +497,6 @@ object AudioHeaderParser {
         }
     }
 
-    // --- Чтение ID3v2 тегов ---
-
     /**
      * Считывает ID3v2 теги (TIT2=название, TPE1=артист, TALB=альбом, TLEN=длительность)
      */
@@ -545,7 +515,7 @@ object AudioHeaderParser {
                         ((header[8].toInt() and 0x7F) shl 7) or
                         (header[9].toInt() and 0x7F)
 
-                val readLimit = minOf(tagSize, 262144) // Ограничиваемся первыми 256 КБ тегов
+                val readLimit = minOf(tagSize, 262144)
                 val data = ByteArray(readLimit)
                 raf.readFully(data)
 
@@ -616,11 +586,6 @@ object AudioHeaderParser {
         }
     }
 
-    // --- Извлечение встроенных и локальных обложек треков ---
-
-    /**
-     * Извлечь байты обложки из аудиофайла (MP3 APIC, FLAC Picture, M4A covr, файлы в папке альбома)
-     */
     fun extractCoverArtBytes(file: File): ByteArray? {
         if (!file.exists() || file.length() <= 0L) return null
 
@@ -636,7 +601,6 @@ object AudioHeaderParser {
             return embeddedBytes
         }
 
-        // Резервный поиск обложки в папке альбома (cover.jpg, folder.jpg и т.д.)
         val folderCover = findFolderCoverFile(file)
         if (folderCover != null) {
             try {
@@ -644,13 +608,9 @@ object AudioHeaderParser {
             } catch (_: Exception) {}
         }
 
-        // Если файл MP3/FLAC/M4A не вернул обложку напрямую (или это другой контейнер), пробуем ffmpeg
         return extractCoverViaFfmpeg(file)
     }
 
-    /**
-     * Извлечение фрейма APIC / PIC из ID3v2 тегов (MP3, WAV)
-     */
     fun extractId3CoverBytes(file: File): ByteArray? {
         if (!file.exists() || file.length() < 10) return null
         return try {
@@ -733,7 +693,7 @@ object AudioHeaderParser {
             pos++
         }
         if (pos >= data.size) return null
-        pos++ // пропускаем 0x00
+        pos++
 
         if (pos >= data.size) return null
         pos++ // пропускаем picture type (1 байт)
@@ -795,9 +755,6 @@ object AudioHeaderParser {
         return if (imgStart < data.size) data.copyOfRange(imgStart, data.size) else null
     }
 
-    /**
-     * Извлечение блока METADATA_BLOCK_PICTURE (тип 6) из FLAC
-     */
     fun extractFlacCoverBytes(file: File): ByteArray? {
         if (!file.exists() || file.length() < 42) return null
         return try {
@@ -860,9 +817,6 @@ object AudioHeaderParser {
                 (bytes[offset + 3].toInt() and 0xFF)
     }
 
-    /**
-     * Извлечение атома covr из MP4 / M4A / AAC контейнера
-     */
     fun extractM4aCoverBytes(file: File): ByteArray? {
         if (!file.exists() || file.length() < 16) return null
         return try {
@@ -985,9 +939,6 @@ object AudioHeaderParser {
         return null
     }
 
-    /**
-     * Поиск файла обложки в папке альбома (cover.jpg, folder.jpg и т.д.)
-     */
     fun findFolderCoverFile(file: File): File? {
         val parent = file.parentFile?.canonicalFile ?: return null
         if (!parent.exists() || !parent.isDirectory) return null
@@ -1015,9 +966,6 @@ object AudioHeaderParser {
         return null
     }
 
-    /**
-     * Резервное извлечение обложки через процесс ffmpeg (JVM)
-     */
     fun extractCoverViaFfmpeg(file: File): ByteArray? {
         return try {
             val pb = ProcessBuilder(

@@ -59,7 +59,6 @@ actual fun pickDirectory(): String? {
 actual fun pickAudioOrPlaylistFile(): String? {
     val title = "Выберите аудиофайл или плейлист"
 
-    // 1. Linux: zenity, kdialog
     if (isLinux) {
         when (val res = pickFileZenity(title)) {
             is NativePickerResult.Selected -> return res.path
@@ -73,7 +72,6 @@ actual fun pickAudioOrPlaylistFile(): String? {
         }
     }
 
-    // 2. macOS: родной FileDialog
     if (isMac) {
         when (val res = pickFileMac(title)) {
             is NativePickerResult.Selected -> return res.path
@@ -82,14 +80,12 @@ actual fun pickAudioOrPlaylistFile(): String? {
         }
     }
 
-    // 3. Windows / JavaFX
     when (val res = pickFileJavaFx(title)) {
         is NativePickerResult.Selected -> return res.path
         is NativePickerResult.Cancelled -> return null
         is NativePickerResult.NotAvailable -> {}
     }
 
-    // 4. Резервный вариант: Swing JFileChooser
     return pickFileSwing(title)
 }
 
@@ -121,7 +117,6 @@ private fun appendExtensionIfMissing(path: String, defaultFileName: String): Str
 
 actual fun pickSaveFile(defaultFileName: String, title: String): String? {
     val rawResult: String? = run {
-        // 1. Linux: системный zenity (SAVE mode), затем kdialog
         if (isLinux) {
             when (val res = pickSaveFileZenity(defaultFileName, title)) {
                 is NativePickerResult.Selected -> return@run res.path
@@ -135,7 +130,6 @@ actual fun pickSaveFile(defaultFileName: String, title: String): String? {
             }
         }
 
-        // 2. macOS: родной FileDialog (SAVE)
         if (isMac) {
             when (val res = pickSaveFileMac(defaultFileName, title)) {
                 is NativePickerResult.Selected -> return@run res.path
@@ -144,14 +138,12 @@ actual fun pickSaveFile(defaultFileName: String, title: String): String? {
             }
         }
 
-        // 3. Windows / JavaFX FileChooser (SaveDialog)
         when (val res = pickSaveFileJavaFx(defaultFileName, title)) {
             is NativePickerResult.Selected -> return@run res.path
             is NativePickerResult.Cancelled -> return null
             is NativePickerResult.NotAvailable -> {}
         }
 
-        // 4. Резервный вариант: Swing JFileChooser
         pickSaveFileSwing(defaultFileName, title)
     }
 
@@ -179,8 +171,6 @@ actual fun getPlatformPresetDirectories(): List<Pair<String, String>> {
     }
     return list
 }
-
-// ---------------- Linux: Zenity & KDialog ----------------
 
 private fun pickDirectoryZenity(title: String): NativePickerResult {
     return try {
@@ -353,8 +343,6 @@ private fun pickSaveFileKDialog(defaultFileName: String, title: String): NativeP
     }
 }
 
-// ---------------- macOS: FileDialog ----------------
-
 private fun pickDirectoryMac(title: String): NativePickerResult {
     return try {
         System.setProperty("apple.awt.fileDialogForDirectories", "true")
@@ -419,8 +407,6 @@ private fun pickSaveFileMac(defaultFileName: String, title: String): NativePicke
         NativePickerResult.NotAvailable
     }
 }
-
-// ---------------- JavaFX (Windows & Native Fallback) ----------------
 
 private fun pickDirectoryJavaFx(title: String): NativePickerResult {
     return try {
@@ -538,8 +524,6 @@ private fun pickSaveFileJavaFx(defaultFileName: String, title: String): NativePi
         NativePickerResult.NotAvailable
     }
 }
-
-// ---------------- Swing Fallback ----------------
 
 private fun pickDirectorySwing(title: String): String? {
     return try {

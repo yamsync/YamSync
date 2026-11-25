@@ -98,7 +98,6 @@ actual class SystemMediaControls {
                 MPRemoteCommandHandlerStatusSuccess
             }
 
-            // ⏩ Перемотка ползунком на экране блокировки iOS (Scrubber) остается активной
             commandCenter.changePlaybackPositionCommand.enabled = true
             commandCenter.changePlaybackPositionCommand.addTargetWithHandler { event ->
                 try {

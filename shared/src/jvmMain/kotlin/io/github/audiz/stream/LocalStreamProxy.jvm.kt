@@ -47,7 +47,6 @@ actual object LocalStreamProxy {
 
     private val proxyScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // 🎯 Сессии потокового воспроизведения треков с кэшем чанков
     private val sessions = ConcurrentHashMap<String, TrackStreamSession>()
     private val sessionCreationLocks = ConcurrentHashMap<String, Any>()
 
@@ -58,7 +57,7 @@ actual object LocalStreamProxy {
         private val repository: MusicRepository
     ) {
         val totalSize: Long = meta.totalSizeBytes
-        val chunkSize: Long = 256 * 1024L // 256 КБ — быстрый старт (< 200 мс) и микро-трафик
+        val chunkSize: Long = 256 * 1024L
         val totalChunks: Int = if (totalSize > 0) ((totalSize + chunkSize - 1L) / chunkSize).toInt() else 0
         val chunkCache = ConcurrentHashMap<Int, ByteArray>()
         private val inFlightChunks = ConcurrentHashMap<Int, CompletableDeferred<ByteArray?>>()
@@ -216,9 +215,6 @@ actual object LocalStreamProxy {
         return serverSocket?.isClosed == false && repository != null
     }
 
-    /**
-     * ⚡ Предзагрузка 0-го чанка (256 КБ) для нулевой задержки старта следующего трека
-     */
     actual suspend fun preloadTrack(trackId: String, quality: String): String {
         val repo = repository ?: return ""
         val cleanTrackId = trackId.removePrefix("local:")
@@ -518,7 +514,6 @@ actual object LocalStreamProxy {
             return
         }
 
-        // Догружаем недостающие чанки, если их нет
         for (i in 0 until session.totalChunks) {
             if (!session.chunkCache.containsKey(i)) {
                 session.getChunk(i) ?: return

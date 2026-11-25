@@ -20,7 +20,7 @@ actual fun acquirePlaybackWakeLock() {
                     setReferenceCounted(false)
                 }
             }
-            transitionWakeLock?.acquire(45_000L) // 45 секунд максимальный таймаут
+            transitionWakeLock?.acquire(45_000L)
             AppLogger.d("PlatformWakeLock", "WakeLock захвачен (45s max timeout)")
         }
     } catch (e: Exception) {

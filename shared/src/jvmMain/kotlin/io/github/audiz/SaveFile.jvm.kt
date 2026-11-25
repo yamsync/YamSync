@@ -14,7 +14,7 @@ actual fun saveFilePlatformSpecific(bytes: ByteArray, fileName: String) {
 
     // Если папки Downloads почему-то нет и создать её нельзя (например, ограничения прав в Windows)
     val finalDir = if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
-        File(userHome) // сохраняем просто в корень пользователя или в папку приложения
+        File(userHome)
     } else {
         downloadsDir
     }
@@ -28,7 +28,7 @@ actual fun saveSessionToken(token: String) {
     AppLogger.d("SaveFile", "save sessionKey = $sessionKey")
     prefs.put(sessionKey, token)
     try {
-        prefs.flush() // Принудительно сохраняет данные на диск ПРЯМО СЕЙЧАС
+        prefs.flush()
     } catch (e: Exception) {
         AppLogger.e("SaveFile", "Ошибка сохранения токена сессии: ${e.message}", e)
     }

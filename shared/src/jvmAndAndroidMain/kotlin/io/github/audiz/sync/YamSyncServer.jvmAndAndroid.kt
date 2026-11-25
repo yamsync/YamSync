@@ -52,7 +52,6 @@ actual class YamSyncServer actual constructor(
         val socket = try {
             ServerSocket(initialPort)
         } catch (_: Exception) {
-            // Если порт занят, выбираем любой свободный порт
             ServerSocket(0)
         }
 
@@ -93,7 +92,7 @@ actual class YamSyncServer actual constructor(
 
     private fun handleClient(client: Socket) {
         try {
-            client.soTimeout = 30000 // 30 секунд таймаут
+            client.soTimeout = 30000
             val input = BufferedInputStream(client.getInputStream())
             val output = BufferedOutputStream(client.getOutputStream())
 
@@ -162,7 +161,6 @@ actual class YamSyncServer actual constructor(
 
             val clientToken = headers["x-yamsync-token"] ?: queryParams["token"]
 
-            // Валидация токена для закрытых эндпоинтов
             if (path != "/yamsync/v1/ping" && !constantTimeEquals(clientToken, token)) {
                 val err = """{"error":"Unauthorized"}""".encodeToByteArray()
                 sendResponse(output, 401, "Unauthorized", mapOf("Content-Type" to "application/json"), err)

@@ -13,9 +13,6 @@ import android.os.Build
 import android.os.IBinder
 import io.github.audiz.util.AppLogger
 
-/**
- * 🎵 Bridge-объект для связи MediaPlaybackService с SystemMediaControls и ViewModel
- */
 object MediaPlaybackBridge {
     var onPlay: (() -> Unit)? = null
     var onPause: (() -> Unit)? = null
@@ -215,7 +212,6 @@ class MediaPlaybackService : Service() {
 
         val appIcon = applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.sym_def_app_icon
 
-        // 0: Сердечко (Лайк / В избранное)
         val likeResName = if (MediaPlaybackBridge.isLiked) "ic_notification_heart_filled" else "ic_notification_heart_outline"
         val likeFallback = if (MediaPlaybackBridge.isLiked) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off
         val likeResId = getDrawableResId(likeResName, likeFallback)
@@ -229,7 +225,6 @@ class MediaPlaybackService : Service() {
             Notification.Action.Builder(likeResId, likeTitle, likeIntent).build()
         }
 
-        // 1: Предыдущий трек
         val prevAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val icon = android.graphics.drawable.Icon.createWithResource("android", android.R.drawable.ic_media_previous)
             Notification.Action.Builder(icon, "Назад", prevIntent).build()
@@ -238,7 +233,6 @@ class MediaPlaybackService : Service() {
             Notification.Action.Builder(android.R.drawable.ic_media_previous, "Назад", prevIntent).build()
         }
 
-        // 2: Воспроизведение / Пауза
         val playPauseAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val icon = android.graphics.drawable.Icon.createWithResource("android", playPauseIcon)
             Notification.Action.Builder(icon, playPauseTitle, playPauseIntent).build()
@@ -247,7 +241,6 @@ class MediaPlaybackService : Service() {
             Notification.Action.Builder(playPauseIcon, playPauseTitle, playPauseIntent).build()
         }
 
-        // 3: Следующий трек
         val nextAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val icon = android.graphics.drawable.Icon.createWithResource("android", android.R.drawable.ic_media_next)
             Notification.Action.Builder(icon, "Вперед", nextIntent).build()
@@ -256,7 +249,6 @@ class MediaPlaybackService : Service() {
             Notification.Action.Builder(android.R.drawable.ic_media_next, "Вперед", nextIntent).build()
         }
 
-        // 4: Крестик (Закрыть приложение)
         val closeResId = getDrawableResId("ic_notification_close", android.R.drawable.ic_menu_close_clear_cancel)
         val closeTitle = "Закрыть"
 
@@ -277,25 +269,22 @@ class MediaPlaybackService : Service() {
             .setContentTitle(title)
             .setContentText(artist)
             .setSubText("YamSync")
-            .setColor(0xFFFFCC00.toInt()) // Фирменный жёлтый акцент YamSync
+            .setColor(0xFFFFCC00.toInt())
             .setColorized(true)
             .setSmallIcon(appIcon)
             .setContentIntent(launchIntent)
             .setStyle(mediaStyle)
             .setOngoing(isPlaying)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .addAction(likeAction)       // 0: Сердечко (Лайк)
-            .addAction(prevAction)       // 1: Предыдущий трек
-            .addAction(playPauseAction)  // 2: Воспроизведение / Пауза
-            .addAction(nextAction)       // 3: Следующий трек
-            .addAction(closeAction)      // 4: Крестик (Закрыть приложение)
+            .addAction(likeAction)
+            .addAction(prevAction)
+            .addAction(playPauseAction)
+            .addAction(nextAction)
+            .addAction(closeAction)
             .build()
     }
 }
 
-/**
- * Менеджер для управления запуском и остановкой службы
- */
 object MediaPlaybackServiceManager {
     fun startOrUpdate(context: Context, title: String, artist: String, isPlaying: Boolean) {
         MediaPlaybackBridge.currentTitle = title

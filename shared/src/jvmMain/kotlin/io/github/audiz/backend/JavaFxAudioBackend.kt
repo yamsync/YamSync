@@ -6,9 +6,6 @@ import kotlinx.coroutines.*
 import java.io.File
 import io.github.audiz.util.AppLogger
 
-/**
- * ☕ Аудио-бэкенд на базе JavaFX Media (основной плеер для MP3, AAC/M4A, WAV на Windows, macOS и Linux)
- */
 class JavaFxAudioBackend(
     private val callback: AudioBackendCallback
 ) : AudioBackend {
@@ -231,7 +228,6 @@ class JavaFxAudioBackend(
                             return ((combinedDb - threshold) / (-threshold)).coerceIn(0f, 1f)
                         }
 
-                        // 🎛️ 25 частотных полос (20 Гц .. 20 кГц) для обложки
                         val bandRanges25 = arrayOf(
                             0 to 0,   1 to 1,   2 to 2,   3 to 3,   4 to 4,
                             5 to 5,   6 to 6,   7 to 7,   8 to 8,   9 to 10,
@@ -247,7 +243,6 @@ class JavaFxAudioBackend(
                             spectrum25[k] = calcBandEnergy(startBin, endBin, tiltDb = tilt, peakWeight = 0.75f)
                         }
 
-                        // 5 полос для микро-иконок
                         val b1 = calcBandEnergy(0, 0, tiltDb = -7.0f)
                         val b2 = calcBandEnergy(1, 3, tiltDb = 4.5f, peakWeight = 0.85f)
                         val b3 = calcBandEnergy(4, 12, tiltDb = 3.0f)

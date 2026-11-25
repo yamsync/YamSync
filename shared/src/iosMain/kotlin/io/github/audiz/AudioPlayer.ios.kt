@@ -32,18 +32,6 @@ import kotlinx.coroutines.launch
 import io.github.audiz.util.AppLogger
 import io.github.audiz.dsp.AudioVisualizer
 
-/**
- * 🎵 iOS-реализация аудиоплеера на основе AVFoundation (AVPlayer)
- *
- * Поддерживает:
- * - AAC (M4A / ISO BMFF и ADTS)
- * - MP3
- * - ALAC, FLAC, WAV
- * - Каноничный стриминг чанками через AVAssetResourceLoaderDelegate
- * - Корректную обработку отключения Bluetooth / гарнитуры (Becoming Noisy)
- * - Системные прерывания (входящие вызовы, будильник, Siri)
- * - Нативное событие окончания трека (AVPlayerItemDidPlayToEndTimeNotification)
- */
 @OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
 actual class AudioPlayer actual constructor() {
 
@@ -73,7 +61,6 @@ actual class AudioPlayer actual constructor() {
     }
 
     private fun setupSessionObservers() {
-        // 1. Слушатель прерываний (звонки, будильники, Siri)
         interruptionObserver = NSNotificationCenter.defaultCenter.addObserverForName(
             name = AVAudioSessionInterruptionNotification,
             `object` = null,
@@ -97,7 +84,6 @@ actual class AudioPlayer actual constructor() {
             }
         }
 
-        // 2. Слушатель отключения внешних аудиоустройств (автомобильный Bluetooth, наушники)
         routeChangeObserver = NSNotificationCenter.defaultCenter.addObserverForName(
             name = AVAudioSessionRouteChangeNotification,
             `object` = null,

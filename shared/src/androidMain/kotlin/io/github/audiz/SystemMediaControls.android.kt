@@ -95,7 +95,6 @@ actual class SystemMediaControls {
             session.isActive = true
             mediaSession = session
 
-            // 🔗 Связываем с Foreground Service
             MediaPlaybackBridge.onPlay = onPlay
             MediaPlaybackBridge.onPause = onPause
             MediaPlaybackBridge.onTogglePlayPause = onTogglePlayPause
@@ -143,7 +142,6 @@ actual class SystemMediaControls {
                 .putRating(MediaMetadata.METADATA_KEY_USER_RATING, Rating.newHeartRating(isLiked))
                 .putRating(MediaMetadata.METADATA_KEY_RATING, Rating.newHeartRating(isLiked))
 
-            // Если уже есть закэшированная обложка, сразу устанавливаем
             val cachedArtwork = MediaPlaybackBridge.currentArtworkBitmap
             if (cachedArtwork != null && !cachedArtwork.isRecycled) {
                 metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, cachedArtwork)
@@ -162,7 +160,6 @@ actual class SystemMediaControls {
                 )
             }
 
-            // Асинхронно подгружаем изображение обложки для MediaSession и Notification
             currentCoverJob?.cancel()
             currentCoverJob = scope.launch {
                 val bitmap: Bitmap? = loadArtworkBitmap(coverUri, trackId)
@@ -183,7 +180,6 @@ actual class SystemMediaControls {
 
     private suspend fun loadArtworkBitmap(coverUri: String?, trackId: String?): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            // 1. Проверяем локальный файл
             if (trackId?.startsWith("local:") == true) {
                 val filePath = trackId.removePrefix("local:")
                 val retriever = MediaMetadataRetriever()
@@ -200,7 +196,6 @@ actual class SystemMediaControls {
                 }
             }
 
-            // 2. Проверяем URL обложки (Яндекс Музыка)
             val formattedUrl = CoverImageLoader.formatCoverUrl(coverUri, 600)
             if (!formattedUrl.isNullOrBlank()) {
                 val url = URL(formattedUrl)

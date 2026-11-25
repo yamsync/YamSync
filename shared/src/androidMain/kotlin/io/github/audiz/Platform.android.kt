@@ -8,7 +8,6 @@ import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
-// 🔥 Контекст для доступа к SharedPreferences (инициализируется при старте приложения)
 object AppContextHolder {
     lateinit var appContext: Context
 
@@ -44,7 +43,6 @@ object AppContextHolder {
     }
 }
 
-// 1. Создаем правильную реализацию, возвращающую модель Platform
 class AndroidPlatform : Platform {
     override val name: String = "Android ${android.os.Build.VERSION.SDK_INT}"
     override val isMobile: Boolean = true
@@ -89,7 +87,6 @@ actual fun generateRandomSessionToken(): String =
 
 
 
-// 2. 🔥 ИСПРАВЛЕНО: Убрали параметр fileType, теперь функция строго соответствует expect из commonMain!
 actual fun saveFilePlatformSpecific(bytes: ByteArray, fileName: String) {
     try {
         val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -102,7 +99,6 @@ actual fun saveFilePlatformSpecific(bytes: ByteArray, fileName: String) {
     }
 }
 
-// 3. 🔥 Реализация сохранения токена сессии через SharedPreferences (переживает перезапуск)
 actual fun saveSessionToken(token: String) {
     AppContextHolder.saveToken(token)
 }

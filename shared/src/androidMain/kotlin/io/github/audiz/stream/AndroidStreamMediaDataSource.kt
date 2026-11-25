@@ -33,7 +33,6 @@ class AndroidStreamMediaDataSource(
     @Volatile private var meta: TrackStreamMeta? = null
     private val metaLock = Any()
 
-    // Размер чанка: 256 КБ (быстрый старт и низкая нагрузка на сеть)
     private val chunkSize = 256 * 1024L
     private val chunkCache = ConcurrentHashMap<Long, ByteArray>()
     private val prefetchJobs = ConcurrentHashMap<Long, Job>()
@@ -111,7 +110,6 @@ class AndroidStreamMediaDataSource(
                 currentOffset += toCopy
                 remaining -= toCopy
 
-                // Запускаем упреждающую загрузку следующего чанка в фоне
                 val nextChunkIndex = chunkIndex + 1L
                 val nextStart = nextChunkIndex * chunkSize
                 if (nextStart < totalSize && !chunkCache.containsKey(nextChunkIndex) && !prefetchJobs.containsKey(nextChunkIndex)) {

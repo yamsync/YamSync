@@ -8,11 +8,6 @@ import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 import io.github.audiz.util.AppLogger
 
-/**
- * 🪟 Windows System Media Transport Controls (SMTC) Bridge.
- * Обеспечивает интеграцию со системным оверлеем громкости Windows 10/11,
- * мультимедийными клавишами клавиатуры и Bluetooth-гарнитур.
- */
 class WindowsMediaControls(
     private val onPlay: () -> Unit,
     private val onPause: () -> Unit,

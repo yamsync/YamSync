@@ -4,9 +4,6 @@ import io.github.audiz.util.AudioHeaderParser
 import java.io.File
 import io.github.audiz.util.AppLogger
 
-/**
- * 🛠️ Утилиты поиска и вызова внешних системных утилит (ffmpeg, ffprobe, ffplay, mpv)
- */
 object FfmpegUtils {
     @Volatile private var cachedFfmpegPath: String? = null
     @Volatile private var ffmpegPathChecked: Boolean = false
@@ -30,7 +27,6 @@ object FfmpegUtils {
         val isWin = System.getProperty("os.name", "").lowercase().contains("win")
         val cmds = if (isWin) listOf("ffmpeg.exe", "ffmpeg") else listOf("ffmpeg")
 
-        // 1. Check standard PATH
         for (cmd in cmds) {
             try {
                 val p = ProcessBuilder(cmd, "-version").start()

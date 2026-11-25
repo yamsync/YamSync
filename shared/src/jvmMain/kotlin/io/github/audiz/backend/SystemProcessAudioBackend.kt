@@ -3,9 +3,6 @@ package io.github.audiz.backend
 import io.github.audiz.volumeToGain
 import io.github.audiz.util.AppLogger
 
-/**
- * 🖥️ Запасной аудио-бэкенд для воспроизведения через внешние системные плееры (ffplay / mpv)
- */
 class SystemProcessAudioBackend(
     private val callback: AudioBackendCallback
 ) : AudioBackend {

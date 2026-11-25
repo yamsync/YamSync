@@ -51,7 +51,6 @@ actual class SystemMediaControls {
             tmp.delete()
             return null
         }
-        // Держим в папке только последние обложки
         dir.listFiles { f -> f.isFile && f.name.endsWith(".img") }
             ?.sortedByDescending { it.lastModified() }
             ?.drop(MAX_CACHED_COVERS)

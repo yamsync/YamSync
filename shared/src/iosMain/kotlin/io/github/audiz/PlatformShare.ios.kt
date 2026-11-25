@@ -16,12 +16,10 @@ actual fun shareTrackFile(
 ) {
     val caption = buildTrackShareCaption(title, artist, trackId)
 
-    // 1. Копируем текст в системный буфер обмена iOS
     try {
         UIPasteboard.generalPasteboard.string = caption
     } catch (_: Throwable) {}
 
-    // 2. Открываем системный диалог «Поделиться» (UIActivityViewController)
     try {
         val items = mutableListOf<Any>()
         val fileManager = NSFileManager.defaultManager

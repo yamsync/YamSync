@@ -106,7 +106,6 @@ actual class YamSyncServer actual constructor(
 
             var bindRes = bind(fd, serverAddr.ptr.reinterpret(), sizeOf<sockaddr_in>().toUInt())
             if (bindRes != 0) {
-                // Если занят, привязываемся к 0 (любой свободный порт)
                 serverAddr.sin_port = 0u
                 bindRes = bind(fd, serverAddr.ptr.reinterpret(), sizeOf<sockaddr_in>().toUInt())
             }
@@ -427,7 +426,7 @@ actual class YamSyncServer actual constructor(
             if (headerEnd < 0) {
                 headerEnd = indexOfHeaderEnd(data, size)
                 if (headerEnd < 0) {
-                    if (size > 64 * 1024) return null // слишком длинные заголовки
+                    if (size > 64 * 1024) return null
                     continue
                 }
                 val headerText = data.decodeToString(0, headerEnd)

@@ -36,15 +36,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import io.github.audiz.dsp.VisualizerConstants
 
-/**
- * 🎵 Android-реализация аудиоплеера на основе MediaPlayer
- *
- * Поддерживает:
- * - Корректное управление фокусом воспроизведения (AudioFocus: звонки, уведомления)
- * - Отключение Bluetooth-устройств и проводных гарнитур (ACTION_AUDIO_BECOMING_NOISY)
- * - Аппаратный 19-полосный FFT-спектроанализатор Winamp Pro и 5-полосный визуализатор через Visualizer API
- * - Аппаратный эквалайзер и частотные срезы HPF/LPF через android.media.audiofx.Equalizer API
- */
 actual class AudioPlayer actual constructor() {
 
     private var mediaPlayer: MediaPlayer? = null
@@ -566,7 +557,6 @@ actual class AudioPlayer actual constructor() {
                 }
             }
 
-            // Таймаут на асинхронную буферизацию (12 секунд)
             prepareTimeoutJob = playerScope.launch {
                 delay(12000L)
                 if (sessionId == currentSessionId && preparingMediaPlayer === newPlayer) {
@@ -932,20 +922,15 @@ actual class AudioPlayer actual constructor() {
         // 5 полос для кнопок плеера и микро-иконок
         // 1. Sub-bass / Kick (~30 - 170 Гц): -7.0 дБ
         val b1 = calcBandEnergy(30f, 170f, tiltDb = -7.0f)
-        // 2. Bass & Mid-bass (~170 - 680 Гц): +4.5 дБ (85% пик)
         val b2 = calcBandEnergy(170f, 680f, tiltDb = 4.5f, peakWeight = 0.85f)
-        // 3. Mids (~680 - 2200 Гц): +3.0 дБ
         val b3 = calcBandEnergy(680f, 2200f, tiltDb = 3.0f)
-        // 4. High-Mids (~2200 - 6500 Гц): +9.0 дБ
         val b4 = calcBandEnergy(2200f, 6500f, tiltDb = 9.0f)
-        // 5. Treble (~6500 - 15000 Гц): +15.5 дБ
         val b5 = calcBandEnergy(6500f, 15000f, tiltDb = 15.5f)
 
         AudioVisualizer.updateSpectrum(spectrum25)
     }
 
     companion object {
-        // 🎛️ 25 частотных полос из единого источника VisualizerConstants
         private val FREQ_RANGES_25 get() = VisualizerConstants.FREQ_RANGES_25
     }
 }

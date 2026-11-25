@@ -14,15 +14,6 @@ import java.util.concurrent.TimeUnit
 import javax.sound.sampled.*
 import io.github.audiz.util.AppLogger
 
-/**
- * 🚀 Аудио-бэкенд потокового декодирования через FFmpeg с выводом через JavaSound SourceDataLine.
- * Обеспечивает:
- * - Бесшовный кроссфейд (радио-сведение) двух потоков в реальном времени
- * - Программный эквалайзер EqualizerEngine
- * - Потоковый спектроанализатор AudioVisualizer
- * - Регулировку громкости без артефактов через PcmGainProcessor
- * - Отслеживание порога окончания трека (onNearEnd)
- */
 class FfmpegAudioPumpBackend(
     private val callback: AudioBackendCallback
 ) : AudioBackend {
@@ -274,7 +265,6 @@ class FfmpegAudioPumpBackend(
                 continue
             }
 
-            // Предбуферизация
             if (active != null && fading != null && !fading.isClosed &&
                 active.lineStartMicrosecondPosition == 0L && active.pcmQueue.size < 6 && !active.isEofReached) {
                 val fadingChunk = fading.pcmQueue.poll(20, TimeUnit.MILLISECONDS)

@@ -13,9 +13,6 @@ internal fun SourceDataLine.bufferedMs(): Float {
     return queuedBytes * 1000f / bytesPerSec
 }
 
-/**
- * Передать чанк в спектроанализатор вместе с текущей задержкой вывода линии.
- */
 internal fun SourceDataLine.analyzePcmChunk(chunk: ByteArray, size: Int) {
     AudioVisualizer.reportOutputBufferedMs(bufferedMs())
     AudioVisualizer.processPcmChunk(chunk, size)

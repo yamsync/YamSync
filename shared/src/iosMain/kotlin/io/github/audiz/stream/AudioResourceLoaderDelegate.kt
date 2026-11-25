@@ -76,7 +76,6 @@ class AudioResourceLoaderDelegate(
                     return@launch
                 }
 
-                // 1. Заполняем информацию о контенте (MIME-тип, длина, поддержка Range)
                 contentInfo?.let { info ->
                     info.contentType = getUTI(meta.codec)
                     info.contentLength = meta.totalSizeBytes
@@ -84,7 +83,6 @@ class AudioResourceLoaderDelegate(
                     CoreLogger.d("ResourceLoader", "Отправлен contentInfo: totalSize=${meta.totalSizeBytes}, uti=${info.contentType}")
                 }
 
-                // 2. Обрабатываем запрос байтов
                 if (dataRequest != null) {
                     val totalSize = meta.totalSizeBytes
                     val reqOffset = dataRequest.requestedOffset

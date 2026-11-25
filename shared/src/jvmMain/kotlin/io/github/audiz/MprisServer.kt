@@ -35,7 +35,6 @@ class MprisServer(
     private var socketChannel: SocketChannel? = null
     private val serialCounter = AtomicInteger(1)
 
-    // Текущее состояние медиаплеера
     @Volatile private var trackTitle = "YamSync"
     @Volatile private var artistName = ""
     @Volatile private var albumName = ""
@@ -217,7 +216,6 @@ class MprisServer(
             body = byteArrayOf()
         )
 
-        // Синхронно ожидаем ответ на Hello
         var helloReply: DbusMessage? = null
         while (channel.isOpen) {
             val msg = readDbusMessage(channel) ?: break
@@ -261,7 +259,6 @@ class MprisServer(
             body = reqBody
         )
 
-        // Синхронно ожидаем ответ на RequestName
         var reqReply: DbusMessage? = null
         while (channel.isOpen) {
             val msg = readDbusMessage(channel) ?: break
@@ -295,7 +292,6 @@ class MprisServer(
 
         log("Успешно зарегистрирован на D-Bus как $busName (код: $resultCode)")
 
-        // Если уже есть трек или статус не Stopped, сразу публикуем свойства
         if (trackTitle != "Yandex Music" || playbackStatus != "Stopped") {
             sendPropertiesChanged()
         }
@@ -325,7 +321,6 @@ class MprisServer(
         }
 
         try {
-            // 1. Introspectable
             if (member == "Introspect") {
                 val xml = when (path) {
                     "/org/mpris/MediaPlayer2", "/org/mpris/MediaPlayer2/Player" -> getIntrospectionXml()
@@ -760,10 +755,6 @@ class MprisServer(
         """.trimIndent()
     }
 
-    // ==========================================================
-    // 📦 D-BUS БИНАРНЫЙ ПРОТОКОЛ (НИЗКОУРОВНЕВАЯ СЕРИАЛИЗАЦИЯ)
-    // ==========================================================
-
     private fun sendMethodReturnString(channel: SocketChannel, replySerial: Int, destination: String?, value: String) {
         val body = DbusWriter().apply { writeString(value) }.toByteArray()
         sendMethodReturnRaw(channel, replySerial, destination, "s", body)
@@ -841,7 +832,6 @@ class MprisServer(
         header.writeDbusUInt32(fields.size)
         header.write(fields)
 
-        // Выравнивание заголовка по 8 байт
         val pad = (8 - (header.size() % 8)) % 8
         repeat(pad) { header.write(0) }
 
