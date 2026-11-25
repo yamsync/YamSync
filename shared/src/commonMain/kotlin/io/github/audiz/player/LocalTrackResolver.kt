@@ -3,10 +3,8 @@ package io.github.audiz.player
 import io.github.audiz.localFileExists
 import io.github.audiz.models.isLocalTrackId
 import io.github.audiz.resolveLocalPath
-import io.github.audiz.sanitizeKeepSpaces
 import io.github.audiz.scanDownloadedTrackPaths
 import io.github.audiz.synchronized
-import io.github.audiz.trackFileExists
 
 /**
  * 🔍 Резолвер локальных аудиотреков на диске с мгновенным O(1) in-memory кэшированием.
@@ -91,13 +89,8 @@ class LocalTrackResolver(
                     val cleanRaw = rawName.trim().lowercase()
 
                     if (cleanTitle.isNotBlank()) {
-                        if (cleanArtist.isNotBlank()) {
-                            downloadedIndex["$cleanArtist::$cleanTitle"] = p
-                            downloadedIndex["$cleanArtist — $cleanTitle"] = p
-                            downloadedIndex["$cleanArtist - $cleanTitle"] = p
-                        }
-                        downloadedIndex[cleanTitle] = p
-                        downloadedIndex[cleanRaw] = p
+                        downloadedIndex["$cleanArtist::$cleanTitle"] = p
+                        downloadedIndex["file:$cleanRaw"] = p
                     }
                 }
             } catch (_: Throwable) {}
@@ -133,14 +126,14 @@ class LocalTrackResolver(
     }
 
     /**
-     * Получить абсолютный путь к скачанному треку, если он существует.
+     * Получить абсолютный путь к скачанному треку по исполнителю и названию.
      * Результаты кэшируются в памяти, полностью исключая системные вызовы диска при скролле.
      */
-    fun getDownloadedTrackPath(artist: String, title: String, allowTitleOnlyMatch: Boolean = true): String? {
+    fun getDownloadedTrackPath(artist: String, title: String): String? {
         val cleanArtist = artist.trim()
         val cleanTitle = title.trim()
         if (cleanTitle.isBlank()) return null
-        val cacheKey = if (allowTitleOnlyMatch) "$cleanArtist::$cleanTitle" else "exact:$cleanArtist::$cleanTitle"
+        val cacheKey = "$cleanArtist::$cleanTitle"
 
         synchronized(cacheLock) {
             if (localCacheVersion != globalCacheVersion) {
@@ -153,10 +146,16 @@ class LocalTrackResolver(
             val lowerArtist = cleanArtist.lowercase()
             val lowerTitle = cleanTitle.lowercase()
 
+            val fileArtist = sanitizeKeepSpaces(lowerArtist)
+            val fileTitle = sanitizeKeepSpaces(lowerTitle)
             val found = downloadedIndex["$lowerArtist::$lowerTitle"]
-                ?: (if (allowTitleOnlyMatch) downloadedIndex[lowerTitle] else null)
-                ?: downloadedIndex["$lowerArtist — $lowerTitle"]
-                ?: downloadedIndex["$lowerArtist - $lowerTitle"]
+                ?: downloadedIndex["$fileArtist::$fileTitle"]
+                ?: if (lowerArtist.isBlank()) {
+                    downloadedIndex["unknown artist::$fileTitle"]
+                } else {
+                    downloadedIndex["file:$fileArtist — $fileTitle"]
+                        ?: downloadedIndex["file:$fileArtist - $fileTitle"]
+                }
 
             val result = if (found != null && localFileExists(found)) {
                 found

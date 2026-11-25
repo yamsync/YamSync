@@ -442,7 +442,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
                     .filter { it.isNotBlank() }
                     .distinct()
                     .firstNotNullOfOrNull { artist ->
-                        localTrackResolver.getDownloadedTrackPath(artist, track.title, allowTitleOnlyMatch = false)
+                        localTrackResolver.getDownloadedTrackPath(artist, track.title)
                     }
         }
         val localTrackPaths = setOfNotNull(track.id, track.realId?.takeIf { it.isNotBlank() }, filePath)

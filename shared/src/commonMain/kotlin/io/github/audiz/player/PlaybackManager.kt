@@ -1700,7 +1700,7 @@ class PlaybackManager(
         return preloaded?.filePath != null || preloaded?.audioData != null ||
             next?.id?.startsWith("local:") == true ||
             (currentPlayingFilePath != null && next?.let {
-                localTrackResolver.findLocalTrackFile(it.id, it.artists.firstOrNull()?.name ?: "", it.title, getSelectedQuality())
+                localTrackResolver.findLocalTrackFile(it.id, it.artists.joinToString { artist -> artist.name }, it.title, getSelectedQuality())
             } != null)
     }
 
