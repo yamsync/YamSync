@@ -29,13 +29,14 @@ class AiBlacklistTest {
     fun bundledSnapshotLoadsFromComposeResources() = runBlocking {
         val blacklist = loadBundledAiBlacklist()
 
-        assertEquals(29, blacklist.version)
-        assertTrue(blacklist.containsArtist(8102741))
-        assertTrue(blacklist.containsTrack("69500458:42"))
-        assertFalse(blacklist.containsTrack("local:69500458"))
-        assertFalse(blacklist.containsTrack("/music/69500458.mp3"))
-        assertFalse(blacklist.containsTrack("8102741"))
-        assertFalse(blacklist.containsTrack("1536309"))
+        assertEquals(33, blacklist.version)
+        assertTrue(blacklist.containsArtist(10017896))
+        assertFalse(blacklist.containsArtist(8102741))
+        assertTrue(blacklist.containsTrack("146254487:42"))
+        assertFalse(blacklist.containsTrack("local:146254487"))
+        assertFalse(blacklist.containsTrack("/music/146254487.mp3"))
+        assertFalse(blacklist.containsTrack("10017896"))
+        assertFalse(blacklist.containsTrack("144137423"))
         assertFalse(blacklist.containsArtist(0))
     }
 
