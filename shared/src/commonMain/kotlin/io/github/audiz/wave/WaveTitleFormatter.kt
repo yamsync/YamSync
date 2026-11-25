@@ -131,7 +131,7 @@ object WaveTitleFormatter {
         for (cat in categories) {
             for (opt in cat.items) {
                 for (seed in opt.seeds) {
-                    map.putIfAbsent(seed.trim().lowercase(), opt)
+                    map.getOrPut(seed.trim().lowercase()) { opt }
                 }
             }
         }
@@ -143,7 +143,7 @@ object WaveTitleFormatter {
         val map = mutableMapOf<String, WaveThemeOption>()
         for (cat in categories) {
             for (opt in cat.items) {
-                map.putIfAbsent(opt.title.trim().lowercase(), opt)
+                map.getOrPut(opt.title.trim().lowercase()) { opt }
             }
         }
         return map
