@@ -83,6 +83,12 @@ expect fun saveUserPlaylistsCache(basePath: String, items: List<io.github.audiz.
 /** Загрузить список пользовательских плейлистов из Яндекса из кеша */
 expect fun loadUserPlaylistsCache(basePath: String): List<io.github.audiz.models.PlaylistInfo>
 
+/** Сохранить редакционную витрину (чарты, новые плейлисты и релизы) в локальный кеш */
+expect fun saveEditorialShowcaseCache(basePath: String, showcase: io.github.audiz.models.EditorialShowcaseData)
+
+/** Загрузить редакционную витрину из локального кеша */
+expect fun loadEditorialShowcaseCache(basePath: String): io.github.audiz.models.EditorialShowcaseData?
+
 /** Сохранить список локальных оффлайн-плейлистов на диск: {basePath}/playlists/local_playlists.json */
 expect fun saveLocalPlaylists(basePath: String, playlists: List<io.github.audiz.models.LocalPlaylist>)
 

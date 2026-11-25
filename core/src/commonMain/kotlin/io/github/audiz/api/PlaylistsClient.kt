@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.*
 import kotlin.coroutines.coroutineContext
@@ -425,17 +426,50 @@ class PlaylistsClient(
         }
     }
 
+    private suspend fun fetchJsonTextWithFallback(url: String, timeoutMs: Long = 8_000L): String? {
+        val candidates = if (url.contains("api.music.yandex.ru")) {
+            listOf(url, url.replace("api.music.yandex.ru", "api.music.yandex.net"))
+        } else {
+            listOf(url)
+        }
+        for (candidate in candidates) {
+            try {
+                val response = client.get(candidate) {
+                    applyAuthHeaders()
+                    timeout { requestTimeoutMillis = timeoutMs }
+                }
+                if (response.status.isSuccess()) return response.bodyAsText()
+                if (response.status.value !in 500..599) return null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Пробуем резервный хост
+            }
+        }
+        return null
+    }
+
     /**
      * 🎵 Получаем персональные плейлисты пользователя (Плейлист дня, Премьера, Дежавю и др.)
      * GET https://api.music.yandex.ru/landing-blocks/personal-playlists
      */
     suspend fun getPersonalPlaylists(): List<PersonalPlaylistItemData> = PersonalPlaylistLoader { url ->
-        val response = client.get(url) {
-            applyAuthHeaders()
-            timeout { requestTimeoutMillis = 8_000L }
-        }
-        if (response.status.isSuccess()) response.bodyAsText() else null
+        fetchJsonTextWithFallback(url)
     }.load()
+
+    /**
+     * 🔥 Получаем витрину Яндекс Музыки: чарты, новые плейлисты и новые релизы
+     */
+    suspend fun getEditorialShowcase(): EditorialShowcaseData = EditorialShowcaseLoader { url ->
+        fetchJsonTextWithFallback(url)
+    }.load()
+
+    /**
+     * 📊 Получаем треки конкретного чарта (например, "russia" или "world")
+     */
+    suspend fun getChart(chartId: String = "russia"): ChartCollection? = EditorialShowcaseLoader { url ->
+        fetchJsonTextWithFallback(url)
+    }.loadChart(chartId)
 
     /**
      * 🎵 Получаем пользовательские плейлисты из аккаунта Яндекс Музыки

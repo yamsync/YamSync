@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.audiz.models.ChartPositionInfo
 import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.models.isLocal
 import io.github.audiz.player.PlaybackQueueManager
@@ -81,6 +82,7 @@ fun ArtistTracksList(
     onScrollToTrackHandled: (TrackListScrollRequest) -> Unit = {},
     highlightedTrackId: String? = null,
     isPlaybackQueue: Boolean = true,
+    chartPositions: Map<String, ChartPositionInfo> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -259,6 +261,7 @@ fun ArtistTracksList(
                         val isInPlaylist = isTrackInPlaylist?.invoke(track) ?: false
 
                         val isHighlighted = highlightedTrackId != null && PlaybackQueueManager.isSameTrack(track, highlightedTrackId)
+                        val chartPos = chartPositions[track.id] ?: chartPositions[track.id.substringBefore(":")]
 
                         TrackItemCard(
                             track = track,
@@ -270,7 +273,8 @@ fun ArtistTracksList(
                                 isInPlaylist = isInPlaylist,
                                 playbackPositionMs = playbackPositionMs,
                                 playbackDurationMs = playbackDurationMs,
-                                isHighlighted = isHighlighted
+                                isHighlighted = isHighlighted,
+                                chartPosition = chartPos
                             ),
                             actions = TrackItemActions(
                                 onPlay = { onPlayTrack(track.id, track.title, artistsString) },

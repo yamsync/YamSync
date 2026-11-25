@@ -14,6 +14,7 @@ enum class LastPlaybackType {
     CUSTOM_FOLDER,         // Подпапка, запущенная через встроенный проводник папок
     YANDEX_USER_PLAYLIST,  // Пользовательский плейлист из Яндекс Музыки
     YANDEX_UUID,           // Персональный или кураторский плейлист Яндекс по UUID
+    YANDEX_CHART,          // Чарт Яндекс Музыки (Россия, Мир и т.д.)
     YANDEX_LIKES,          // Плейлист «Мне нравится»
     YANDEX_HISTORY,        // Плейлист «История прослушиваний»
     ALBUM,
@@ -33,6 +34,7 @@ data class LastPlaybackSession(
     val isRecursive: Boolean = true,
     val id: String? = null,
     val uuid: String? = null,
+    val chartId: String? = null,
     val uid: Long? = null,
     val kind: Long? = null,
     val albumId: Long? = null,

@@ -47,7 +47,7 @@ import io.github.audiz.ui.SearchInputField
 import io.github.audiz.ui.SearchResultsList
 import io.github.audiz.ui.ArtistTracksList
 import io.github.audiz.ui.HomeHub
-import io.github.audiz.ui.PersonalCollectionsScreen
+import io.github.audiz.ui.CollectionsShowcaseScreen
 import io.github.audiz.ui.PlaylistsDialog
 import io.github.audiz.ui.UpNextDialog
 import io.github.audiz.ui.AddToPlaylistDialog
@@ -439,18 +439,33 @@ fun App() {
                             ) {
                                 Column(Modifier.padding(top = 12.dp)) {
                                     if (showCollections) {
-                                        PersonalCollectionsScreen(
-                                            items = searchViewModel.personalPlaylists,
-                                            isLoading = searchViewModel.isPersonalPlaylistsLoading,
+                                        CollectionsShowcaseScreen(
+                                            personalPlaylists = searchViewModel.personalPlaylists,
+                                            charts = searchViewModel.editorialCharts,
+                                            editorialPlaylists = searchViewModel.editorialPlaylists,
+                                            newReleases = searchViewModel.editorialNewReleases,
+                                            isLoading = searchViewModel.isPersonalPlaylistsLoading || searchViewModel.isEditorialShowcaseLoading,
                                             gridState = collectionsGridState,
                                             onBack = { showCollections = false },
-                                            onSelect = { playlist, title ->
+                                            onRefresh = {
+                                                searchViewModel.loadPersonalPlaylists()
+                                                searchViewModel.loadEditorialShowcase(forceRefresh = true)
+                                            },
+                                            onSelectPersonal = { playlist, title ->
                                                 if (playlist.playlistUuid.isNotBlank()) {
-                                                    searchViewModel.loadPlaylistByUuid(playlist.playlistUuid, title)
+                                                    searchViewModel.loadPlaylistByUuid(playlist.playlistUuid, title, origin = TracksListOrigin.COLLECTIONS)
                                                 } else {
-                                                    searchViewModel.loadPlaylistTracks(playlist.uid, playlist.kind, title)
+                                                    searchViewModel.loadPlaylistTracks(playlist.uid, playlist.kind, title, origin = TracksListOrigin.COLLECTIONS)
                                                 }
-                                                searchViewModel.tracksListOrigin = TracksListOrigin.COLLECTIONS
+                                            },
+                                            onSelectChart = { chart ->
+                                                searchViewModel.loadChart(chart, origin = TracksListOrigin.COLLECTIONS)
+                                            },
+                                            onSelectPlaylist = { playlist ->
+                                                searchViewModel.loadPlaylist(playlist, origin = TracksListOrigin.COLLECTIONS)
+                                            },
+                                            onSelectRelease = { release ->
+                                                searchViewModel.loadAlbumTracks(release.id, release.title, origin = TracksListOrigin.COLLECTIONS)
                                             },
                                         )
                                     } else {
@@ -470,7 +485,21 @@ fun App() {
                                                 updateShowPlaylistsDialog(true)
                                             },
                                             onOpenDevices = { showYamSyncDialog = true },
-                                            onOpenCollections = { showCollections = true },
+                                            onOpenCollections = {
+                                                showCollections = true
+                                                if (searchViewModel.editorialCharts.isEmpty() &&
+                                                    searchViewModel.editorialPlaylists.isEmpty() &&
+                                                    searchViewModel.editorialNewReleases.isEmpty()
+                                                ) {
+                                                    searchViewModel.loadEditorialShowcase()
+                                                }
+                                                if (searchViewModel.personalPlaylists.isEmpty() &&
+                                                    searchViewModel.currentAccessToken.isNotBlank() &&
+                                                    !searchViewModel.isPersonalPlaylistsLoading
+                                                ) {
+                                                    searchViewModel.loadPersonalPlaylists()
+                                                }
+                                            },
                                         )
                                     }
                                 }
@@ -622,6 +651,7 @@ fun App() {
                         // ==================================================
                         ArtistTracksList(
                             isPlaybackQueue = !searchViewModel.isPreviewingTrackList,
+                            chartPositions = searchViewModel.chartTrackPositions,
                             scrollToTrackRequest = searchViewModel.queueScrollRequest,
                             onScrollToTrackHandled = searchViewModel::consumeQueueScrollRequest,
                             highlightedTrackId = searchViewModel.highlightedTrackId,

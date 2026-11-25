@@ -15,16 +15,21 @@ import io.github.audiz.currentTimeMillis
 import io.github.audiz.download.DownloadManager
 import io.github.audiz.exportPlaylistToM3u8
 import io.github.audiz.getTracksFromLocalPaths
+import io.github.audiz.loadEditorialShowcaseCache
 import io.github.audiz.loadLocalPlaylists
 import io.github.audiz.loadPersonalPlaylistsCache
 import io.github.audiz.loadUserPlaylistsCache
+import io.github.audiz.models.ChartCollection
+import io.github.audiz.models.EditorialShowcaseData
 import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.models.LocalPlaylist
+import io.github.audiz.models.NewReleaseAlbum
 import io.github.audiz.models.PersonalPlaylistItemData
 import io.github.audiz.models.PlaylistInfo
 import io.github.audiz.models.isLocalTrackId
 import io.github.audiz.util.AppLogger
 import io.github.audiz.models.YandexPlaylistDetails
+import io.github.audiz.saveEditorialShowcaseCache
 import io.github.audiz.saveLocalPlaylists
 import io.github.audiz.savePersonalPlaylistsCache
 import io.github.audiz.saveUserPlaylistsCache
@@ -112,6 +117,14 @@ class PlaylistManager(
     var isPersonalPlaylistsLoading by mutableStateOf(false)
         private set
 
+    // 📊 Редакционная витрина: чарты, новые плейлисты и новые релизы
+    val editorialCharts = mutableStateListOf<ChartCollection>()
+    val editorialPlaylists = mutableStateListOf<PlaylistInfo>()
+    val editorialNewReleases = mutableStateListOf<NewReleaseAlbum>()
+    var isEditorialShowcaseLoading by mutableStateOf(false)
+        private set
+    private var editorialShowcaseJob: Job? = null
+
     // 📁 Персональные локальные оффлайн-плейлисты (на диске)
     val localPlaylists = mutableStateListOf<LocalPlaylist>()
     var isLocalPlaylistsLoading by mutableStateOf(false)
@@ -194,6 +207,69 @@ class PlaylistManager(
             } finally {
                 isPersonalPlaylistsLoading = false
             }
+        }
+    }
+
+    /**
+     * 📊 Загрузка витрины: чарты, новые плейлисты и новые релизы
+     */
+    fun loadEditorialShowcase(forceRefresh: Boolean = false) {
+        if (!forceRefresh && editorialShowcaseJob?.isActive == true) return
+        editorialShowcaseJob?.cancel()
+        editorialShowcaseJob = launchSafe {
+            isEditorialShowcaseLoading = true
+            try {
+                val storagePath = getMusicStoragePath()
+                val isCurrentlyEmpty = editorialCharts.isEmpty() && editorialPlaylists.isEmpty() && editorialNewReleases.isEmpty()
+                if (isCurrentlyEmpty) {
+                    val cached = try {
+                        withContext(DispatcherIO) { loadEditorialShowcaseCache(storagePath) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (cached != null && !cached.isEmpty) {
+                        applyEditorialShowcase(cached)
+                    }
+                }
+
+                try {
+                    val showcase = withContext(DispatcherIO) {
+                        repository.getEditorialShowcase()
+                    }
+                    if (!showcase.isEmpty) {
+                        applyEditorialShowcase(showcase)
+                        println(
+                            "PlaylistManager: Загружена витрина (чартов: ${showcase.charts.size}, плейлистов: ${showcase.newPlaylists.size}, релизов: ${showcase.newReleases.size})"
+                        )
+                        withContext(DispatcherIO) {
+                            saveEditorialShowcaseCache(storagePath, showcase)
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    println("PlaylistManager: Ошибка загрузки витрины: ${e.message}")
+                }
+            } finally {
+                isEditorialShowcaseLoading = false
+            }
+        }
+    }
+
+    private fun applyEditorialShowcase(showcase: EditorialShowcaseData) {
+        if (showcase.charts.isNotEmpty()) {
+            editorialCharts.clear()
+            editorialCharts.addAll(showcase.charts)
+        }
+        if (showcase.newPlaylists.isNotEmpty()) {
+            editorialPlaylists.clear()
+            editorialPlaylists.addAll(showcase.newPlaylists)
+        }
+        if (showcase.newReleases.isNotEmpty()) {
+            editorialNewReleases.clear()
+            editorialNewReleases.addAll(showcase.newReleases)
         }
     }
 

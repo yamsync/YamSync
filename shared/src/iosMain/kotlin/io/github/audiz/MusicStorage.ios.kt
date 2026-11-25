@@ -2,6 +2,7 @@
 
 package io.github.audiz
 
+import io.github.audiz.models.EditorialShowcaseData
 import io.github.audiz.models.FolderItem
 import io.github.audiz.models.FolderListing
 import io.github.audiz.models.FullAlbumInfo
@@ -551,6 +552,38 @@ actual fun loadUserPlaylistsCache(basePath: String): List<PlaylistInfo> {
     } catch (e: Throwable) {
         println("iOS Storage: Ошибка чтения кеша пользовательских плейлистов: ${e.message}")
         return emptyList()
+    }
+}
+
+@OptIn(BetaInteropApi::class)
+actual fun saveEditorialShowcaseCache(basePath: String, showcase: EditorialShowcaseData) {
+    if (basePath.isBlank() || showcase.isEmpty) return
+    try {
+        val cacheDir = "$basePath/playlists_cache"
+        val fileManager = NSFileManager.defaultManager
+        if (!fileManager.fileExistsAtPath(cacheDir)) {
+            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
+        }
+        val jsonStr = playlistJson.encodeToString(EditorialShowcaseData.serializer(), showcase)
+        val nsStr = jsonStr as NSString
+        nsStr.writeToFile("$cacheDir/_editorial_showcase.json", atomically = true, encoding = NSUTF8StringEncoding, error = null)
+    } catch (e: Throwable) {
+        println("iOS Storage: Ошибка сохранения кеша витрины: ${e.message}")
+    }
+}
+
+@OptIn(BetaInteropApi::class)
+actual fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? {
+    if (basePath.isBlank()) return null
+    return try {
+        val filePath = "$basePath/playlists_cache/_editorial_showcase.json"
+        val fileManager = NSFileManager.defaultManager
+        if (!fileManager.fileExistsAtPath(filePath)) return null
+        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return null
+        playlistJson.decodeFromString(EditorialShowcaseData.serializer(), nsStr)
+    } catch (e: Throwable) {
+        println("iOS Storage: Ошибка чтения кеша витрины: ${e.message}")
+        null
     }
 }
 

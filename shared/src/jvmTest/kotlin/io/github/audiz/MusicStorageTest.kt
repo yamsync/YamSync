@@ -70,6 +70,34 @@ class MusicStorageTest {
             assertTrue(loadedPersonal.size == 1, "Personal playlist cache should have 1 item")
             assertTrue(loadedPersonal.first().playlist?.title == "Daily Mix")
 
+            // 4b. Editorial showcase cache
+            val editorialShowcase = io.github.audiz.models.EditorialShowcaseData(
+                charts = listOf(
+                    io.github.audiz.models.ChartCollection(
+                        chartId = "russia",
+                        title = "Чарт • Россия",
+                        trackCount = 1,
+                        tracks = listOf(
+                            io.github.audiz.models.ChartTrackEntry(
+                                track = io.github.audiz.models.FullTrackInfo(id = "101", title = "Chart Track"),
+                                chart = io.github.audiz.models.ChartPositionInfo(position = 1, progress = "up", shift = 2)
+                            )
+                        )
+                    )
+                ),
+                newPlaylists = listOf(
+                    io.github.audiz.models.PlaylistInfo(uid = 1L, kind = 2L, title = "Новые хиты", trackCount = 20)
+                ),
+                newReleases = listOf(
+                    io.github.audiz.models.NewReleaseAlbum(id = 99L, title = "Новый релиз", artists = listOf("Исполнитель"), year = 2026)
+                )
+            )
+            saveEditorialShowcaseCache(tempDir.absolutePath, editorialShowcase)
+            val loadedShowcase = loadEditorialShowcaseCache(tempDir.absolutePath)
+            assertTrue(loadedShowcase != null && loadedShowcase.charts.size == 1, "Editorial showcase cache should have 1 chart")
+            assertTrue(loadedShowcase.newPlaylists.firstOrNull()?.title == "Новые хиты")
+            assertTrue(loadedShowcase.newReleases.firstOrNull()?.id == 99L)
+
             // 5. Delete track
             val deleted = deleteTrackFile(tempDir.absolutePath, artist, title, expectedFile.absolutePath)
             assertTrue(deleted, "Track should be deleted")

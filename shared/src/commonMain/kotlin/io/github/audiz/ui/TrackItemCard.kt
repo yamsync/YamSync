@@ -18,9 +18,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.audiz.models.ChartPositionInfo
 import io.github.audiz.models.FullTrackInfo
 
 /**
@@ -34,7 +37,8 @@ data class TrackItemState(
     val isInPlaylist: Boolean = false,
     val playbackPositionMs: Long = 0L,
     val playbackDurationMs: Long = 0L,
-    val isHighlighted: Boolean = false
+    val isHighlighted: Boolean = false,
+    val chartPosition: ChartPositionInfo? = null
 )
 
 /**
@@ -91,7 +95,9 @@ fun TrackItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (state.isPlaying) {
+                    if (state.chartPosition != null) {
+                        ChartPositionBadge(state.chartPosition, isPlaying = state.isPlaying)
+                    } else if (state.isPlaying) {
                         NowPlayingIndicator(isPlaying = true)
                     } else {
                         ContentTypeIcon(ContentType.TRACK, modifier = Modifier.size(18.dp))
@@ -244,6 +250,42 @@ fun TrackItemCard(
                     onSeek = actions.onSeek
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ChartPositionBadge(chart: ChartPositionInfo, isPlaying: Boolean) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (isPlaying) {
+            NowPlayingIndicator(isPlaying = true)
+        }
+        Text(
+            text = "#${chart.position}",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
+        val trend = when (chart.progress?.lowercase()) {
+            "up" -> (if (chart.shift > 0) "↑${chart.shift}" else "↑") to
+                if (isDark) Color(0xFF4ADE80) else Color(0xFF16A34A)
+            "down" -> (if (chart.shift > 0) "↓${chart.shift}" else "↓") to MaterialTheme.colorScheme.error
+            "new" -> "NEW" to MaterialTheme.colorScheme.primary
+            else -> null
+        }
+        if (trend != null) {
+            Text(
+                text = trend.first,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = trend.second,
+                maxLines = 1
+            )
         }
     }
 }

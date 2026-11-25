@@ -80,6 +80,8 @@ class TrackListCoordinator(
     var isBrowsingPreview = false
     var viewedUserPlaylist by mutableStateOf<PlaylistInfo?>(null)
         private set
+    var chartTrackPositions by mutableStateOf<Map<String, ChartPositionInfo>>(emptyMap())
+        private set
 
     private fun recordSession(session: LastPlaybackSession) {
         if (!isBrowsingPreview) playbackSessionManager.recordSession(session)
@@ -114,6 +116,7 @@ class TrackListCoordinator(
     fun resetPagination() {
         loadedTracks.clear()
         allTrackIds = emptyList()
+        chartTrackPositions = emptyMap()
         currentOffset = 0
         canLoadMore = false
         isLoadingAllPages = false
@@ -202,6 +205,7 @@ class TrackListCoordinator(
         origin: TracksListOrigin? = null,
         cacheKey: String? = null,
         updatePlaylistContext: Boolean = true,
+        initialChartPositions: Map<String, ChartPositionInfo> = emptyMap(),
         fetchIdsAndTracksBlock: (suspend () -> Pair<List<String>, List<FullTrackInfo>>)? = null,
         fetchIdsBlock: (suspend () -> List<String>)? = null
     ) {
@@ -222,6 +226,7 @@ class TrackListCoordinator(
         activeQueueFolderName = title
 
         resetPagination()
+        chartTrackPositions = initialChartPositions
         setLoading(true)
 
         paginationJob = launchSafe {
@@ -298,6 +303,13 @@ class TrackListCoordinator(
                         loadedTracks.clear()
                         loadedTracks.addAll(fallbackCached)
                         allTrackIds = fallbackCached.map { it.id }
+                        if (resolvedCacheKey.startsWith("chart_") && chartTrackPositions.isEmpty()) {
+                            chartTrackPositions = buildMap {
+                                fallbackCached.forEachIndexed { idx, track ->
+                                    put(track.id, ChartPositionInfo(position = idx + 1))
+                                }
+                            }
+                        }
                         currentOffset = fallbackCached.size
                         canLoadMore = false
                         currentScreenTitle = "$cleanTitle [Офлайн-кеш]"
@@ -465,7 +477,7 @@ class TrackListCoordinator(
     /**
      * 🎵 Загрузка треков плейлиста из поиска или каталога
      */
-    fun loadPlaylist(playlist: PlaylistInfo, restoreTrackId: String? = null) {
+    fun loadPlaylist(playlist: PlaylistInfo, restoreTrackId: String? = null, origin: TracksListOrigin? = null) {
         val title = playlist.title.ifBlank { "Плейлист" }
         val isUserPlaylist = playlistManager.userPlaylists.any { it.kind == playlist.kind }
         val kind = playlist.kind
@@ -489,6 +501,7 @@ class TrackListCoordinator(
             startPagination(
                 title = title,
                 cacheKey = cacheKey,
+                origin = origin,
                 userPlaylist = if (isUserPlaylist) playlist else null,
                 restoreTrackId = restoreTrackId,
                 fetchIdsAndTracksBlock = {
@@ -501,6 +514,7 @@ class TrackListCoordinator(
             startPagination(
                 title = title,
                 cacheKey = cacheKey,
+                origin = origin,
                 userPlaylist = if (isUserPlaylist) playlist else null,
                 restoreTrackId = restoreTrackId,
                 fetchIdsAndTracksBlock = {
@@ -520,6 +534,7 @@ class TrackListCoordinator(
             startPagination(
                 title = title,
                 cacheKey = cacheKey,
+                origin = origin,
                 userPlaylist = if (isUserPlaylist) playlist else null,
                 restoreTrackId = restoreTrackId,
                 fetchIdsAndTracksBlock = {
@@ -532,9 +547,14 @@ class TrackListCoordinator(
     }
 
     /**
-     * 💿 Загрузка треков альбома из поиска
+     * 💿 Загрузка треков альбома из поиска или витрины
      */
-    fun loadAlbumTracks(albumId: Long, albumTitle: String, restoreTrackId: String? = null) {
+    fun loadAlbumTracks(
+        albumId: Long,
+        albumTitle: String,
+        restoreTrackId: String? = null,
+        origin: TracksListOrigin? = null
+    ) {
         val title = if (albumTitle.isNotBlank()) "Альбом: $albumTitle" else "Альбом"
         val cacheKey = "album_$albumId"
         recordSession(LastPlaybackSession(type = LastPlaybackType.ALBUM, albumId = albumId, title = albumTitle, lastTrackId = restoreTrackId))
@@ -542,7 +562,7 @@ class TrackListCoordinator(
             title = title,
             cacheKey = cacheKey,
             restoreTrackId = restoreTrackId,
-            origin = if (getSearchResult() != null) TracksListOrigin.SEARCH else TracksListOrigin.HOME,
+            origin = origin ?: if (getSearchResult() != null) TracksListOrigin.SEARCH else TracksListOrigin.HOME,
             fetchIdsAndTracksBlock = {
                 withContext(DispatcherIO) {
                     repository.getAlbumWithTracks(albumId)
@@ -551,7 +571,75 @@ class TrackListCoordinator(
         )
     }
 
-    fun loadPlaylistTracks(uid: Long, kind: Long, playlistTitle: String? = null, restoreTrackId: String? = null) {
+    /**
+     * 📊 Загрузка треков чарта (Россия, Мир и т.д.) с сохранением позиций
+     */
+    fun loadChart(
+        chartId: String,
+        chartTitle: String? = null,
+        preloadedChart: ChartCollection? = null,
+        origin: TracksListOrigin? = null,
+        restoreTrackId: String? = null
+    ) {
+        val resolvedChartId = chartId.ifBlank { "russia" }
+        val title = chartTitle?.takeIf { it.isNotBlank() } ?: preloadedChart?.title ?: "Чарт"
+        val cacheKey = "chart_$resolvedChartId"
+        val initialPositions = preloadedChart?.tracks.orEmpty().mapNotNull { entry ->
+            entry.chart?.let { entry.track.id to it }
+        }.toMap()
+        recordSession(
+            LastPlaybackSession(
+                type = LastPlaybackType.YANDEX_CHART,
+                chartId = resolvedChartId,
+                title = title,
+                lastTrackId = restoreTrackId
+            )
+        )
+        startPagination(
+            title = title,
+            cacheKey = cacheKey,
+            origin = origin,
+            restoreTrackId = restoreTrackId,
+            initialChartPositions = initialPositions,
+            fetchIdsAndTracksBlock = {
+                val resolvedChart = withContext(DispatcherIO) {
+                    val fresh = if (preloadedChart != null && preloadedChart.tracks.size >= 15 && restoreTrackId == null) {
+                        preloadedChart
+                    } else {
+                        repository.getChart(resolvedChartId) ?: preloadedChart
+                    }
+                    fresh
+                }
+                if (resolvedChart != null && resolvedChart.tracks.isNotEmpty()) {
+                    val positions = resolvedChart.tracks.mapNotNull { entry ->
+                        entry.chart?.let { entry.track.id to it }
+                    }.toMap()
+                    withContext(Dispatchers.Main.immediate) {
+                        chartTrackPositions = positions
+                    }
+                    val richTracks = resolvedChart.tracks.map { it.track }
+                    Pair(richTracks.map { it.id }, richTracks)
+                } else {
+                    val uuid = resolvedChart?.playlistUuid ?: preloadedChart?.playlistUuid.orEmpty()
+                    val uid = resolvedChart?.uid ?: preloadedChart?.uid ?: 0L
+                    val kind = resolvedChart?.kind ?: preloadedChart?.kind ?: 0L
+                    when {
+                        uuid.isNotBlank() -> withContext(DispatcherIO) { repository.getPlaylistWithTracksByUuid(uuid) }
+                        uid > 0L && kind > 0L -> withContext(DispatcherIO) { repository.getPlaylistWithTracksByUidKind(uid, kind) }
+                        else -> throw IllegalStateException("Чарт '$title' временно недоступен")
+                    }
+                }
+            }
+        )
+    }
+
+    fun loadPlaylistTracks(
+        uid: Long,
+        kind: Long,
+        playlistTitle: String? = null,
+        restoreTrackId: String? = null,
+        origin: TracksListOrigin? = null
+    ) {
         val title = if (!playlistTitle.isNullOrBlank()) playlistTitle else "Треки плейлиста"
         val cacheKey = "playlist_${uid}_${kind}"
         recordSession(
@@ -566,6 +654,7 @@ class TrackListCoordinator(
         startPagination(
             title = title,
             cacheKey = cacheKey,
+            origin = origin,
             restoreTrackId = restoreTrackId,
             fetchIdsAndTracksBlock = {
                 withContext(DispatcherIO) {
@@ -578,7 +667,12 @@ class TrackListCoordinator(
     /**
      * 🔥 Быстрая загрузка плейлиста по UUID (для персональных подборок Яндекса)
      */
-    fun loadPlaylistByUuid(uuid: String, playlistTitle: String? = null, restoreTrackId: String? = null) {
+    fun loadPlaylistByUuid(
+        uuid: String,
+        playlistTitle: String? = null,
+        restoreTrackId: String? = null,
+        origin: TracksListOrigin? = null
+    ) {
         val title = playlistTitle ?: "Плейлист"
         val cacheKey = "playlist_$uuid"
         recordSession(
@@ -592,6 +686,7 @@ class TrackListCoordinator(
         startPagination(
             title = title,
             cacheKey = cacheKey,
+            origin = origin,
             restoreTrackId = restoreTrackId,
             fetchIdsAndTracksBlock = {
                 withContext(DispatcherIO) {
@@ -1109,6 +1204,11 @@ class TrackListCoordinator(
                 }
                 if (!wasTracksListVisible) onSetTracksListVisible(false)
             }
+            LastPlaybackType.YANDEX_CHART -> {
+                val chartId = session.chartId ?: "russia"
+                loadChart(chartId, chartTitle = session.title, restoreTrackId = session.lastTrackId)
+                if (!wasTracksListVisible) onSetTracksListVisible(false)
+            }
             LastPlaybackType.YANDEX_LIKES -> {
                 loadLikesPlaylist(restoreTrackId = session.lastTrackId)
                 if (!wasTracksListVisible) onSetTracksListVisible(false)
@@ -1145,6 +1245,7 @@ class TrackListCoordinator(
         if (isWaveMode && waveTracks.isNotEmpty()) {
             loadedTracks.clear()
             loadedTracks.addAll(waveTracks)
+            chartTrackPositions = emptyMap()
             currentScreenTitle = if (!waveTitle.isNullOrBlank()) {
                 "Моя Волна • $waveTitle"
             } else {

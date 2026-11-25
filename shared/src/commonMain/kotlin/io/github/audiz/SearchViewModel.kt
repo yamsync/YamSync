@@ -158,6 +158,18 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val isPersonalPlaylistsLoading: Boolean
         get() = playlistManager.isPersonalPlaylistsLoading
 
+    // 📊 Редакционная витрина: чарты, новые плейлисты и новые релизы
+    val editorialCharts: androidx.compose.runtime.snapshots.SnapshotStateList<io.github.audiz.models.ChartCollection>
+        get() = playlistManager.editorialCharts
+    val editorialPlaylists: androidx.compose.runtime.snapshots.SnapshotStateList<PlaylistInfo>
+        get() = playlistManager.editorialPlaylists
+    val editorialNewReleases: androidx.compose.runtime.snapshots.SnapshotStateList<io.github.audiz.models.NewReleaseAlbum>
+        get() = playlistManager.editorialNewReleases
+    val isEditorialShowcaseLoading: Boolean
+        get() = playlistManager.isEditorialShowcaseLoading
+    val chartTrackPositions: Map<String, io.github.audiz.models.ChartPositionInfo>
+        get() = trackListCoordinator.chartTrackPositions
+
     // 📁 Персональные локальные оффлайн-плейлисты (на диске)
     val localPlaylists: androidx.compose.runtime.snapshots.SnapshotStateList<LocalPlaylist>
         get() = playlistManager.localPlaylists
@@ -526,12 +538,14 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             likedArtistIds = null
             playlistManager.syncLikedTrackIds()
             playlistManager.loadPersonalPlaylists()
+            playlistManager.loadEditorialShowcase(forceRefresh = true)
             playlistManager.loadUserPlaylists()
             loadInitialWave(autoPlay = false)
             refreshPlusSubscription()
         },
         onStoragePathUpdated = { _ ->
             playlistManager.loadPersonalPlaylists()
+            playlistManager.loadEditorialShowcase()
             playlistManager.loadUserPlaylists()
             playlistManager.loadLocalPlaylistsFromDisk()
         }
@@ -1001,16 +1015,18 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             onDislike = { dislikeCurrentTrackAndSkip() }
         )
 
-        // 🌊 При старте запрашиваем сессию Моей волны, персональные плейлисты и список лайков
+        // 🌊 При старте запрашиваем сессию Моей волны, персональные плейлисты, витрину и список лайков
         loadLocalPlaylistsFromDisk()
         if (currentAccessToken.isNotBlank()) {
             syncLikedTrackIds()
             syncLikedArtistsForAiFilter()
             loadPersonalPlaylists()
+            loadEditorialShowcase()
             loadUserPlaylists()
             launchSafe { settingsManager.checkPlusSubscription() }
         } else {
             loadPersonalPlaylists()
+            loadEditorialShowcase()
             loadUserPlaylists()
         }
         viewModelScope.launch {
@@ -1504,22 +1520,47 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         if (restoreTrackId == null) browseTrackList(session, load) else load(playbackListForNavigation())
     }
 
-    fun loadPlaylist(playlist: PlaylistInfo, restoreTrackId: String? = null) = browseOrRestore(
+    fun loadPlaylist(playlist: PlaylistInfo, restoreTrackId: String? = null, origin: TracksListOrigin? = null) = browseOrRestore(
         LastPlaybackSession(type = LastPlaybackType.YANDEX_USER_PLAYLIST, uid = playlist.uid,
             kind = playlist.kind, uuid = playlist.playlistUuid, title = playlist.title), restoreTrackId
-    ) { it.loadPlaylist(playlist, restoreTrackId) }
+    ) { it.loadPlaylist(playlist, restoreTrackId, origin) }
 
-    fun loadAlbumTracks(albumId: Long, albumTitle: String, restoreTrackId: String? = null) = browseOrRestore(
+    fun loadAlbumTracks(
+        albumId: Long,
+        albumTitle: String,
+        restoreTrackId: String? = null,
+        origin: TracksListOrigin? = null
+    ) = browseOrRestore(
         LastPlaybackSession(type = LastPlaybackType.ALBUM, albumId = albumId, title = albumTitle), restoreTrackId
-    ) { it.loadAlbumTracks(albumId, albumTitle, restoreTrackId) }
+    ) { it.loadAlbumTracks(albumId, albumTitle, restoreTrackId, origin) }
 
-    fun loadPlaylistTracks(uid: Long, kind: Long, playlistTitle: String? = null, restoreTrackId: String? = null) = browseOrRestore(
+    fun loadChart(
+        chart: io.github.audiz.models.ChartCollection,
+        origin: TracksListOrigin? = null,
+        restoreTrackId: String? = null
+    ) = browseOrRestore(
+        LastPlaybackSession(type = LastPlaybackType.YANDEX_CHART, chartId = chart.chartId, title = chart.title),
+        restoreTrackId
+    ) { it.loadChart(chart.chartId, chart.title, preloadedChart = chart, origin = origin, restoreTrackId = restoreTrackId) }
+
+    fun loadPlaylistTracks(
+        uid: Long,
+        kind: Long,
+        playlistTitle: String? = null,
+        restoreTrackId: String? = null,
+        origin: TracksListOrigin? = null
+    ) = browseOrRestore(
         LastPlaybackSession(type = LastPlaybackType.YANDEX_USER_PLAYLIST, uid = uid, kind = kind, title = playlistTitle), restoreTrackId
-    ) { it.loadPlaylistTracks(uid, kind, playlistTitle, restoreTrackId) }
+    ) { it.loadPlaylistTracks(uid, kind, playlistTitle, restoreTrackId, origin) }
 
-    fun loadPlaylistByUuid(uuid: String, playlistTitle: String? = null, restoreTrackId: String? = null) = browseOrRestore(
+    fun loadPlaylistByUuid(
+        uuid: String,
+        playlistTitle: String? = null,
+        restoreTrackId: String? = null,
+        origin: TracksListOrigin? = null
+    ) = browseOrRestore(
         LastPlaybackSession(type = LastPlaybackType.YANDEX_UUID, uuid = uuid, title = playlistTitle), restoreTrackId
-    ) { it.loadPlaylistByUuid(uuid, playlistTitle, restoreTrackId) }
+    ) { it.loadPlaylistByUuid(uuid, playlistTitle, restoreTrackId, origin) }
 
     fun loadLikesPlaylist(restoreTrackId: String? = null) = browseOrRestore(
         LastPlaybackSession(type = LastPlaybackType.YANDEX_LIKES, title = "Мне нравится"), restoreTrackId
@@ -1534,6 +1575,13 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
      */
     fun loadPersonalPlaylists() {
         playlistManager.loadPersonalPlaylists()
+    }
+
+    /**
+     * 📊 Загрузка витрины: чарты, новые плейлисты и новые релизы
+     */
+    fun loadEditorialShowcase(forceRefresh: Boolean = false) {
+        playlistManager.loadEditorialShowcase(forceRefresh = forceRefresh)
     }
 
     /**

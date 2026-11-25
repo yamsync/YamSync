@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -18,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,12 +41,16 @@ import io.github.audiz.SearchViewModel
 import io.github.audiz.TracksListOrigin
 import io.github.audiz.isPlatformPickerSupported
 import io.github.audiz.launchDirectoryPicker
+import io.github.audiz.models.ChartCollection
 import io.github.audiz.models.LastPlaybackType
 import io.github.audiz.models.LocalSourceType
+import io.github.audiz.models.NewReleaseAlbum
 import io.github.audiz.models.PersonalPlaylistInfo
 import io.github.audiz.models.PersonalPlaylistItemData
+import io.github.audiz.models.PlaylistInfo
 import io.github.audiz.player.PlaybackQueueManager
 import io.github.audiz.sync.YamSyncConnectionState
+import io.github.audiz.ui.playlists.formatTrackPlural
 
 @Composable
 internal fun HomeHub(
@@ -78,7 +84,7 @@ internal fun HomeHub(
 
             HomeListSurface {
                 HomeNavigationRow(
-                    "Подборки",
+                    "Подборки и чарты",
                     Icons.Filled.Layers,
                     iconTint = homeIconTint(Color(0xFFC3AEDB)),
                     onClick = onOpenCollections,
@@ -388,34 +394,88 @@ private fun HomeNavigationRow(
     }
 }
 
+private const val SHOWCASE_COMPACT_WIDTH_DP = 540
+
 @Composable
-internal fun PersonalCollectionsScreen(
-    items: List<PersonalPlaylistItemData>,
+internal fun CollectionsShowcaseScreen(
+    personalPlaylists: List<PersonalPlaylistItemData>,
+    charts: List<ChartCollection>,
+    editorialPlaylists: List<PlaylistInfo>,
+    newReleases: List<NewReleaseAlbum>,
     isLoading: Boolean,
     gridState: LazyGridState,
     onBack: () -> Unit,
-    onSelect: (PersonalPlaylistInfo, String) -> Unit,
+    onRefresh: () -> Unit,
+    onSelectPersonal: (PersonalPlaylistInfo, String) -> Unit,
+    onSelectChart: (ChartCollection) -> Unit,
+    onSelectPlaylist: (PlaylistInfo) -> Unit,
+    onSelectRelease: (NewReleaseAlbum) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val collections = items.mapNotNull { item ->
-        item.playlist?.takeIf { it.canOpen }?.let { it to item.displayTitle }
-    }.distinctBy { it.first.stableKey }
+    val personalItems = remember(personalPlaylists) {
+        personalPlaylists.mapNotNull { item ->
+            item.playlist?.takeIf { it.canOpen }?.let { Triple(it, item.displayTitle, item.description) }
+        }.distinctBy { it.first.stableKey }
+    }
+    var showAllEditorialPlaylists by remember { mutableStateOf(false) }
+    var showAllNewReleases by remember { mutableStateOf(false) }
+
+    val hasAnyContent = charts.isNotEmpty() || personalItems.isNotEmpty() ||
+        editorialPlaylists.isNotEmpty() || newReleases.isNotEmpty()
 
     BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        val columns = if (maxWidth < 540.dp) GridCells.Fixed(2) else GridCells.Adaptive(150.dp)
+        val compact = maxWidth < SHOWCASE_COMPACT_WIDTH_DP.dp
+        val columns = if (compact) GridCells.Fixed(2) else GridCells.Adaptive(156.dp)
+        val initialLimit = if (compact) 4 else 8
+        val visibleEditorialPlaylists = if (showAllEditorialPlaylists) editorialPlaylists else editorialPlaylists.take(initialLimit)
+        val visibleNewReleases = if (showAllNewReleases) newReleases else newReleases.take(initialLimit)
+
         Column(Modifier.widthIn(max = 760.dp).fillMaxSize()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(onClick = onBack, modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 }
-                Text("Подборки", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = "Подборки и чарты",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isLoading) {
+                    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    }
+                } else {
+                    IconButton(onClick = onRefresh, modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Обновить")
+                    }
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-            if (collections.isEmpty()) {
+
+            if (!hasAnyContent) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                    else Text("Подборок пока нет", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (isLoading) {
+                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("Подборки и чарты пока недоступны", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(
+                                onClick = onRefresh,
+                                modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
+                            ) {
+                                Text("Обновить")
+                            }
+                        }
+                    }
                 }
             } else {
                 LazyVerticalGrid(
@@ -426,8 +486,94 @@ internal fun PersonalCollectionsScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(collections, key = { it.first.stableKey }) { (playlist, title) ->
-                        PersonalCollectionCard(title, playlist.cover?.uri) { onSelect(playlist, title) }
+                    if (charts.isNotEmpty()) {
+                        item(key = "header_charts", span = { GridItemSpan(maxLineSpan) }) {
+                            ShowcaseSectionHeader(
+                                title = "Чарты и топы",
+                                icon = Icons.AutoMirrored.Filled.TrendingUp,
+                                iconTint = homeIconTint(Color(0xFFE0A4B9))
+                            )
+                        }
+                        items(
+                            items = charts,
+                            key = { "chart_${it.chartId}" },
+                            span = {
+                                val spanCount = if (compact || maxLineSpan % 2 != 0) maxLineSpan else maxLineSpan / 2
+                                GridItemSpan(spanCount)
+                            }
+                        ) { chart ->
+                            ChartShowcaseCard(chart = chart, onClick = { onSelectChart(chart) })
+                        }
+                    }
+
+                    if (personalItems.isNotEmpty()) {
+                        item(key = "header_personal", span = { GridItemSpan(maxLineSpan) }) {
+                            ShowcaseSectionHeader(
+                                title = "Для вас",
+                                icon = Icons.Filled.Layers,
+                                iconTint = homeIconTint(Color(0xFFC3AEDB))
+                            )
+                        }
+                        items(personalItems, key = { "personal_${it.first.stableKey}" }) { (playlist, title, description) ->
+                            ShowcaseSquareCard(
+                                title = title,
+                                subtitle = description?.takeIf { it.isNotBlank() },
+                                coverUri = playlist.cover?.uri,
+                                fallbackIcon = Icons.Filled.Layers,
+                                onClick = { onSelectPersonal(playlist, title) }
+                            )
+                        }
+                    }
+
+                    if (editorialPlaylists.isNotEmpty()) {
+                        item(key = "header_new_playlists", span = { GridItemSpan(maxLineSpan) }) {
+                            ShowcaseSectionHeader(
+                                title = "Новые плейлисты",
+                                icon = Icons.AutoMirrored.Filled.QueueMusic,
+                                iconTint = homeIconTint(Color(0xFF8CC5CA)),
+                                toggleLabel = if (editorialPlaylists.size > initialLimit) {
+                                    if (showAllEditorialPlaylists) "Свернуть" else "Все (${editorialPlaylists.size})"
+                                } else null,
+                                onToggle = { showAllEditorialPlaylists = !showAllEditorialPlaylists }
+                            )
+                        }
+                        items(
+                            items = visibleEditorialPlaylists,
+                            key = { pl -> "editorial_pl_${pl.playlistUuid?.takeIf(String::isNotBlank) ?: "${pl.uid}:${pl.kind ?: 0L}"}" }
+                        ) { playlist ->
+                            val subtitle = playlist.description?.takeIf { it.isNotBlank() }
+                                ?: playlist.trackCount.takeIf { it > 0 }?.let { "$it ${formatTrackPlural(it)}" }
+                            ShowcaseSquareCard(
+                                title = playlist.title,
+                                subtitle = subtitle,
+                                coverUri = playlist.coverUri,
+                                fallbackIcon = Icons.AutoMirrored.Filled.QueueMusic,
+                                onClick = { onSelectPlaylist(playlist) }
+                            )
+                        }
+                    }
+
+                    if (newReleases.isNotEmpty()) {
+                        item(key = "header_new_releases", span = { GridItemSpan(maxLineSpan) }) {
+                            ShowcaseSectionHeader(
+                                title = "Новые релизы",
+                                icon = Icons.Filled.Album,
+                                iconTint = homeIconTint(Color(0xFF8AC8AB)),
+                                toggleLabel = if (newReleases.size > initialLimit) {
+                                    if (showAllNewReleases) "Свернуть" else "Все (${newReleases.size})"
+                                } else null,
+                                onToggle = { showAllNewReleases = !showAllNewReleases }
+                            )
+                        }
+                        items(visibleNewReleases, key = { "release_${it.id}" }) { release ->
+                            ShowcaseSquareCard(
+                                title = release.title,
+                                subtitle = buildReleaseSubtitle(release),
+                                coverUri = release.coverUri,
+                                fallbackIcon = Icons.Filled.Album,
+                                onClick = { onSelectRelease(release) }
+                            )
+                        }
                     }
                 }
             }
@@ -436,8 +582,130 @@ internal fun PersonalCollectionsScreen(
 }
 
 @Composable
-private fun PersonalCollectionCard(title: String, coverUri: String?, onClick: () -> Unit) {
-    // Playlist cover URLs accept named dimensions such as 200x200.
+private fun ShowcaseSectionHeader(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color,
+    toggleLabel: String? = null,
+    onToggle: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (toggleLabel != null && onToggle != null) {
+            Text(
+                text = toggleLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(role = Role.Button, onClick = onToggle)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartShowcaseCard(chart: ChartCollection, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val cover = rememberCoverBitmap(chart.coverUri, size = 200)
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().pointerHoverIcon(PointerIcon.Hand),
+        shape = RoundedCornerShape(14.dp),
+        color = colors.surfaceContainerLow,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(68.dp).clip(RoundedCornerShape(10.dp))
+                    .background(colors.surfaceContainerHigh),
+                contentAlignment = Alignment.Center
+            ) {
+                if (cover != null) {
+                    Image(cover, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Icon(
+                        Icons.AutoMirrored.Filled.TrendingUp,
+                        contentDescription = null,
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = chart.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val previewTracks = chart.tracks.take(3)
+                if (previewTracks.isNotEmpty()) {
+                    previewTracks.forEachIndexed { idx, entry ->
+                        val rank = entry.chart?.position ?: (idx + 1)
+                        val artist = entry.track.artists.joinToString(", ") { it.name }.takeIf { it.isNotBlank() }
+                        val line = if (artist != null) "$rank. $artist — ${entry.track.title}" else "$rank. ${entry.track.title}"
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else {
+                    val fallbackText = chart.description?.takeIf { it.isNotBlank() }
+                        ?: chart.trackCount.takeIf { it > 0 }?.let { "$it ${formatTrackPlural(it)}" }
+                    if (fallbackText != null) {
+                        Text(
+                            text = fallbackText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = colors.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShowcaseSquareCard(
+    title: String,
+    subtitle: String?,
+    coverUri: String?,
+    fallbackIcon: ImageVector,
+    onClick: () -> Unit
+) {
+    // Playlist and album cover URLs accept named dimensions such as 200x200.
     val cover = rememberCoverBitmap(coverUri, size = 200)
     Column(
         Modifier.clip(RoundedCornerShape(14.dp))
@@ -453,12 +721,46 @@ private fun PersonalCollectionCard(title: String, coverUri: String?, onClick: ()
             if (cover != null) {
                 Image(cover, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
-                Icon(Icons.Filled.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(28.dp))
+                Icon(
+                    fallbackIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
-        Text(title, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
-            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(
+            modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
+}
+
+private fun buildReleaseSubtitle(release: NewReleaseAlbum): String? {
+    val artistText = release.artists.joinToString(", ").takeIf { it.isNotBlank() }
+    val typeLabel = when (release.type?.lowercase()) {
+        "single" -> "Сингл"
+        else -> null
+    }
+    val yearLabel = release.year?.takeIf { it > 0 }?.toString()
+    return listOfNotNull(typeLabel, artistText, yearLabel)
+        .joinToString(" · ")
+        .takeIf { it.isNotBlank() }
 }

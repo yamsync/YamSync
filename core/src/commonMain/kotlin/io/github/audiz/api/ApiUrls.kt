@@ -10,4 +10,8 @@ object ApiUrls {
     const val GENERATED_PLAYLIST_BASE_URL = "https://api.music.yandex.ru/playlists/personal"
     const val PERSONAL_PLAYLISTS_URL = "https://api.music.yandex.ru/landing-blocks/personal-playlists"
     const val USER_PLAYLISTS_BASE_URL = "https://api.music.yandex.ru/users"
+    const val LANDING3_URL = "https://api.music.yandex.ru/landing3"
+    const val LANDING3_CHART_URL = "https://api.music.yandex.ru/landing3/chart"
+    const val LANDING3_NEW_RELEASES_URL = "https://api.music.yandex.ru/landing3/new-releases"
+    const val LANDING3_NEW_PLAYLISTS_URL = "https://api.music.yandex.ru/landing3/new-playlists"
 }

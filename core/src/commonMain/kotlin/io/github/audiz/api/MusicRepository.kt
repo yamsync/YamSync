@@ -92,6 +92,12 @@ class MusicRepository(
     suspend fun getPersonalPlaylists(): List<PersonalPlaylistItemData> =
         playlistsClient.getPersonalPlaylists()
 
+    suspend fun getEditorialShowcase(): EditorialShowcaseData =
+        playlistsClient.getEditorialShowcase()
+
+    suspend fun getChart(chartId: String = "russia"): ChartCollection? =
+        playlistsClient.getChart(chartId)
+
     suspend fun getUserPlaylists(): List<PlaylistInfo> =
         playlistsClient.getUserPlaylists()
 

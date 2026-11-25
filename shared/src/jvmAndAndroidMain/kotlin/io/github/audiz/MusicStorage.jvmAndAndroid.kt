@@ -1,5 +1,6 @@
 package io.github.audiz
 
+import io.github.audiz.models.EditorialShowcaseData
 import io.github.audiz.models.FolderItem
 import io.github.audiz.models.FolderListing
 import io.github.audiz.models.FullAlbumInfo
@@ -555,6 +556,32 @@ actual fun loadUserPlaylistsCache(basePath: String): List<PlaylistInfo> {
     } catch (e: Exception) {
         println("MusicStorage: Ошибка чтения кеша пользовательских плейлистов: ${e.message}")
         return emptyList()
+    }
+}
+
+/** Сохранить редакционную витрину (чарты, новые плейлисты и релизы) в локальный кеш */
+actual fun saveEditorialShowcaseCache(basePath: String, showcase: EditorialShowcaseData) {
+    if (basePath.isBlank() || showcase.isEmpty) return
+    try {
+        val cacheDir = getPlaylistCacheDir(basePath)
+        val file = File(cacheDir, "_editorial_showcase.json")
+        file.writeText(playlistJson.encodeToString(EditorialShowcaseData.serializer(), showcase))
+        println("MusicStorage: Сохранен кеш витрины (чартов: ${showcase.charts.size}, плейлистов: ${showcase.newPlaylists.size}, релизов: ${showcase.newReleases.size})")
+    } catch (e: Exception) {
+        println("MusicStorage: Ошибка сохранения кеша витрины: ${e.message}")
+    }
+}
+
+/** Загрузить редакционную витрину из локального кеша */
+actual fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? {
+    if (basePath.isBlank()) return null
+    return try {
+        val file = File(File(basePath, "playlists_cache"), "_editorial_showcase.json")
+        if (!file.exists() || file.length() == 0L) return null
+        playlistJson.decodeFromString(EditorialShowcaseData.serializer(), file.readText())
+    } catch (e: Exception) {
+        println("MusicStorage: Ошибка чтения кеша витрины: ${e.message}")
+        null
     }
 }
 

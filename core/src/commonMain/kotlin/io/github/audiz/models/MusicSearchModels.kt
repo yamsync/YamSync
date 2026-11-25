@@ -326,6 +326,62 @@ data class PersonalPlaylistCover(
     val uri: String? = null
 )
 
+@Serializable
+data class ChartPositionInfo(
+    val position: Int,
+    val progress: String? = null,
+    val shift: Int = 0,
+    val listeners: Long? = null
+)
+
+@Serializable
+data class ChartTrackEntry(
+    val track: FullTrackInfo,
+    val chart: ChartPositionInfo? = null
+)
+
+@Serializable
+data class ChartMenuOption(
+    val title: String,
+    val chartId: String,
+    val selected: Boolean = false
+)
+
+@Serializable
+data class ChartCollection(
+    val chartId: String,
+    val title: String,
+    val description: String? = null,
+    val coverUri: String? = null,
+    val uid: Long = 0L,
+    val kind: Long = 0L,
+    val playlistUuid: String = "",
+    val trackCount: Int = 0,
+    val tracks: List<ChartTrackEntry> = emptyList(),
+    val menu: List<ChartMenuOption> = emptyList()
+)
+
+@Serializable
+data class NewReleaseAlbum(
+    val id: Long,
+    val title: String,
+    val artists: List<String> = emptyList(),
+    val coverUri: String? = null,
+    val year: Int? = null,
+    val trackCount: Int = 0,
+    val type: String? = null
+)
+
+@Serializable
+data class EditorialShowcaseData(
+    val charts: List<ChartCollection> = emptyList(),
+    val newPlaylists: List<PlaylistInfo> = emptyList(),
+    val newReleases: List<NewReleaseAlbum> = emptyList()
+) {
+    val isEmpty: Boolean
+        get() = charts.isEmpty() && newPlaylists.isEmpty() && newReleases.isEmpty()
+}
+
 /**
  * Метаданные прямого аудиопотока для потокового воспроизведения и чанковой загрузки
  */
