@@ -15,6 +15,7 @@ import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import io.github.audiz.util.AppLogger
 
 /**
  * 🌐 Высокопроизводительный локальный HTTP стриминг-прокси для Desktop (Windows / Linux / macOS).
@@ -110,7 +111,7 @@ actual object LocalStreamProxy {
                 }
             } catch (e: Exception) {
                 if (!isClosed) {
-                    println("⚡ [StreamProxy] Ошибка загрузки чанка $chunkIndex: ${e.message}")
+                    AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy] Ошибка загрузки чанка $chunkIndex: ${e.message}", e)
                 }
                 deferred.complete(null)
                 null
@@ -175,7 +176,7 @@ actual object LocalStreamProxy {
                 val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
                 serverSocket = server
                 assignedPort = server.localPort
-                println("⚡ [StreamProxy] Сервер запущен на http://127.0.0.1:$assignedPort")
+                AppLogger.i("LocalStreamProxy", "⚡ [StreamProxy] Сервер запущен на http://127.0.0.1:$assignedPort")
 
                 threadPool.execute {
                     while (!server.isClosed) {
@@ -187,12 +188,12 @@ actual object LocalStreamProxy {
                         } catch (_: SocketException) {
                             break
                         } catch (e: Exception) {
-                            println("⚡ [StreamProxy] Ошибка accept: ${e.message}")
+                            AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy] Ошибка accept: ${e.message}", e)
                         }
                     }
                 }
             } catch (e: Exception) {
-                println("⚡ [StreamProxy] Не удалось запустить локальный сервер: ${e.message}")
+                AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy] Не удалось запустить локальный сервер: ${e.message}", e)
             }
         }
     }
@@ -238,7 +239,7 @@ actual object LocalStreamProxy {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("⚡ [StreamProxy] Ошибка предзагрузки 0-го чанка для $trackId: ${e.message}")
+            AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy] Ошибка предзагрузки 0-го чанка для $trackId: ${e.message}", e)
             ""
         }
     }
@@ -256,11 +257,11 @@ actual object LocalStreamProxy {
                 if (total <= 0) return@launch
                 val cachedCount = session.chunkCache.size
                 if (cachedCount >= (total * 0.75).toInt().coerceAtLeast(1)) {
-                    println("💾 [StreamProxy] Трек $cleanTrackId прослушан ($cachedCount/$total чанков в памяти). Сохраняем на диск...")
+                    AppLogger.d("LocalStreamProxy", "💾 [StreamProxy] Трек $cleanTrackId прослушан ($cachedCount/$total чанков в памяти). Сохраняем на диск...")
                     saveSessionToDisk(session)
                 }
             } catch (e: Exception) {
-                println("💾 [StreamProxy] Ошибка сохранения прослушанного трека: ${e.message}")
+                AppLogger.e("LocalStreamProxy", "💾 [StreamProxy] Ошибка сохранения прослушанного трека: ${e.message}", e)
             }
         }
     }
@@ -302,7 +303,7 @@ actual object LocalStreamProxy {
                 sessions[sessionKey] = newSession
                 newSession
             } catch (e: Exception) {
-                println("⚡ [StreamProxy] Не удалось получить метаданные для $trackId: ${e.message}")
+                AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy] Не удалось получить метаданные для $trackId: ${e.message}", e)
                 null
             } finally {
                 sessionCreationLocks.remove(sessionKey)
@@ -375,7 +376,7 @@ actual object LocalStreamProxy {
             // Нормальное отключение плеера (скип, пауза или смена трека)
         } catch (_: SocketTimeoutException) {
         } catch (e: Exception) {
-            println("⚡ [StreamProxy] Ошибка обработки запроса: ${e.message}")
+            AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy] Ошибка обработки запроса: ${e.message}", e)
         } finally {
             try {
                 socket.close()
@@ -531,7 +532,7 @@ actual object LocalStreamProxy {
         val trackBytes = bos.toByteArray()
         if (trackBytes.size.toLong() == totalSize) {
             saveTrackFile(basePath, cleanArtist, fullFileName, trackBytes)
-            println("💾 [StreamProxy] Трек успешно сохранен на диск из кэша стриминга: $finalPath")
+            AppLogger.i("LocalStreamProxy", "💾 [StreamProxy] Трек успешно сохранен на диск из кэша стриминга: $finalPath")
             onTrackSavedCallback?.invoke(session.trackId, finalPath)
         }
     }

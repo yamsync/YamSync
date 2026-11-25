@@ -1,6 +1,7 @@
 package io.github.audiz
 
 import kotlin.concurrent.Volatile
+import io.github.audiz.util.AppLogger
 
 fun interface QrScanCallback {
     fun onScanned(code: String)
@@ -29,6 +30,6 @@ actual fun launchPlatformQrScanner(onScanned: (String) -> Unit) {
             onScanned(scanned)
         }
     } else {
-        println("⚠️ IosQrScanner: IosQrScannerProvider не зарегистрирован")
+        AppLogger.w("PlatformQrScanner", "⚠️ IosQrScanner: IosQrScannerProvider не зарегистрирован")
     }
 }

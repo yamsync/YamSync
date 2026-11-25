@@ -88,7 +88,7 @@ class MediaStreamClient(
                         ?: resultObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull()
                 }
             } catch (e: Exception) {
-                println("Не удалось распарсить битрейт: ${e.message}")
+                CoreLogger.e("MediaStreamClient", "Не удалось распарсить битрейт: ${e.message}", e)
             }
 
             if (bitrate == null && parsedInfo.type.contains("-")) {
@@ -207,7 +207,7 @@ class MediaStreamClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("MediaStreamClient: Ошибка загрузки изображения $url: ${e.message}")
+            CoreLogger.e("MediaStreamClient", "Ошибка загрузки изображения $url: ${e.message}", e)
             null
         }
     }

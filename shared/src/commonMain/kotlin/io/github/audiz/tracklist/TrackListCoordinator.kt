@@ -290,7 +290,7 @@ class TrackListCoordinator(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                println("TrackListCoordinator: Ошибка загрузки плейлиста '$cleanTitle': ${e.message}")
+                AppLogger.e("TrackListCoordinator", "Ошибка загрузки плейлиста '$cleanTitle': ${e.message}", e)
                 if (loadedTracks.isEmpty()) {
                     val fallbackCached = withContext(DispatcherIO) {
                         try {
@@ -422,7 +422,7 @@ class TrackListCoordinator(
                     loadedTracks.addAll(tracks)
                     allTrackIds = tracks.map { it.id }
                     canLoadMore = false
-                    println("TrackListCoordinator: Загружено с диска ${tracks.size} треков без сетевых запросов")
+                    AppLogger.d("TrackListCoordinator", "Загружено с диска ${tracks.size} треков без сетевых запросов")
                     if (!previewOnly && restoreTrackId != null) {
                         val target = tracks.firstOrNull { it.id == restoreTrackId } ?: tracks.firstOrNull()
                         if (target != null) {
@@ -782,9 +782,9 @@ class TrackListCoordinator(
                     loadedTracks.addAll(tracks)
                     allTrackIds = tracks.map { it.id }
                     canLoadMore = false
-                    println("TrackListCoordinator: Открыт локальный плейлист '${playlist.title}' (${tracks.size} треков)")
+                    AppLogger.d("TrackListCoordinator", "Открыт локальный плейлист '${playlist.title}' (${tracks.size} треков)")
                     if (tracks.size < playlist.trackPaths.size) {
-                        println("TrackListCoordinator: Найдено ${tracks.size} из ${playlist.trackPaths.size} треков плейлиста '${playlist.title}'")
+                        AppLogger.d("TrackListCoordinator", "Найдено ${tracks.size} из ${playlist.trackPaths.size} треков плейлиста '${playlist.title}'")
                     }
                     if (!previewOnly && autoPlayFirst) {
                         val target = restoreTrackId?.let { rid ->
@@ -864,7 +864,7 @@ class TrackListCoordinator(
                     loadedTracks.addAll(tracks)
                     allTrackIds = tracks.map { it.id }
                     canLoadMore = false
-                    println("TrackListCoordinator: Открыт пользовательский источник '${source.name}' (${tracks.size} треков)")
+                    AppLogger.d("TrackListCoordinator", "Открыт пользовательский источник '${source.name}' (${tracks.size} треков)")
                     if (!previewOnly && restoreTrackId != null) {
                         val target = tracks.firstOrNull { it.id == restoreTrackId || it.realId == restoreTrackId } ?: tracks.firstOrNull()
                         if (target != null) {
@@ -931,7 +931,7 @@ class TrackListCoordinator(
                     loadedTracks.addAll(tracks)
                     allTrackIds = tracks.map { it.id }
                     canLoadMore = false
-                    println("TrackListCoordinator: Запущена папка '$folderName' (рекурсивно: $isRecursive, ${tracks.size} треков)")
+                    AppLogger.i("TrackListCoordinator", "Запущена папка '$folderName' (рекурсивно: $isRecursive, ${tracks.size} треков)")
                     val first = tracks.first()
                     onPlayTrack(
                         first.id,
@@ -1002,7 +1002,7 @@ class TrackListCoordinator(
                     loadedTracks.addAll(tracks)
                     allTrackIds = tracks.map { it.id }
                     canLoadMore = false
-                    println("TrackListCoordinator: Восстановлена папка '$folderName' (рекурсивно: $isRecursive, ${tracks.size} треков)")
+                    AppLogger.d("TrackListCoordinator", "Восстановлена папка '$folderName' (рекурсивно: $isRecursive, ${tracks.size} треков)")
                     if (!previewOnly && restoreTrackId != null) {
                         val target = tracks.firstOrNull { it.id == restoreTrackId || it.realId == restoreTrackId } ?: tracks.firstOrNull()
                         if (target != null) {

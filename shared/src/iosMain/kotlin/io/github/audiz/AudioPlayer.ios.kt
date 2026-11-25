@@ -29,6 +29,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import io.github.audiz.util.AppLogger
 
 /**
  * 🎵 iOS-реализация аудиоплеера на основе AVFoundation (AVPlayer)
@@ -65,7 +66,7 @@ actual class AudioPlayer actual constructor() {
             val session = AVAudioSession.sharedInstance()
             session.setCategory(AVAudioSessionCategoryPlayback, error = null)
         } catch (e: Throwable) {
-            println("AudioPlayer iOS: Ошибка настройки AVAudioSession: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка настройки AVAudioSession: ${e.message}", e)
         }
         setupSessionObservers()
     }
@@ -81,17 +82,17 @@ actual class AudioPlayer actual constructor() {
                 val userInfo = notification?.userInfo ?: return@addObserverForName
                 val typeValue = (userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.unsignedLongValue
                 if (typeValue == AVAudioSessionInterruptionTypeBegan) {
-                    println("AudioPlayer iOS: Прерывание аудио (звонок/будильник) началось -> пауза")
+                    AppLogger.d("AudioPlayer", "Прерывание аудио (звонок/будильник) началось -> пауза")
                     avPlayer?.pause()
                     onInterruptionListener?.invoke(true, true)
                 } else if (typeValue == AVAudioSessionInterruptionTypeEnded) {
                     val optionsValue = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)?.unsignedLongValue ?: 0uL
                     val shouldResume = (optionsValue and AVAudioSessionInterruptionOptionShouldResume) != 0uL
-                    println("AudioPlayer iOS: Прерывание аудио закончилось. shouldResume=$shouldResume")
+                    AppLogger.d("AudioPlayer", "Прерывание аудио закончилось. shouldResume=$shouldResume")
                     onInterruptionListener?.invoke(false, shouldResume)
                 }
             } catch (t: Throwable) {
-                println("AudioPlayer iOS: Ошибка обработки interruptionNotification: ${t.message}")
+                AppLogger.e("AudioPlayer", "Ошибка обработки interruptionNotification: ${t.message}", t)
             }
         }
 
@@ -105,12 +106,12 @@ actual class AudioPlayer actual constructor() {
                 val userInfo = notification?.userInfo ?: return@addObserverForName
                 val reasonValue = (userInfo[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.unsignedLongValue
                 if (reasonValue == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) {
-                    println("AudioPlayer iOS: Аудиоустройство отключено (BT/наушники) -> пауза (Becoming Noisy)")
+                    AppLogger.d("AudioPlayer", "Аудиоустройство отключено (BT/наушники) -> пауза (Becoming Noisy)")
                     avPlayer?.pause()
                     onInterruptionListener?.invoke(true, false)
                 }
             } catch (t: Throwable) {
-                println("AudioPlayer iOS: Ошибка обработки routeChangeNotification: ${t.message}")
+                AppLogger.e("AudioPlayer", "Ошибка обработки routeChangeNotification: ${t.message}", t)
             }
         }
     }
@@ -184,7 +185,7 @@ actual class AudioPlayer actual constructor() {
             `object` = playerItem,
             queue = NSOperationQueue.mainQueue
         ) { _ ->
-            println("AudioPlayer iOS: AVPlayerItem завершил воспроизведение трека")
+            AppLogger.d("AudioPlayer", "AVPlayerItem завершил воспроизведение трека")
             onCompletionListener?.invoke()
         }
     }
@@ -307,7 +308,7 @@ actual class AudioPlayer actual constructor() {
                     val asset = AVURLAsset(uRL = nsUrl, options = null)
                     val queue = dispatch_queue_create("io.github.audiz.resourceloader", null)
                     asset.resourceLoader.setDelegate(delegate, queue)
-                    println("AudioPlayer iOS: Запуск воспроизведения через каноничный AVAssetResourceLoaderDelegate для трека $trackId ($quality)")
+                    AppLogger.d("AudioPlayer", "Запуск воспроизведения через каноничный AVAssetResourceLoaderDelegate для трека $trackId ($quality)")
                     AVPlayerItem(asset = asset)
                 } else {
                     AVPlayerItem(uRL = nsUrl)
@@ -329,7 +330,7 @@ actual class AudioPlayer actual constructor() {
             startIosCrossfade(newPlayer, crossfadeMs)
             onPlaybackStartedListener?.invoke()
         } catch (e: Throwable) {
-            println("AudioPlayer iOS: Ошибка воспроизведения url: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка воспроизведения url: ${e.message}", e)
         }
     }
 
@@ -402,7 +403,7 @@ actual class AudioPlayer actual constructor() {
             startIosCrossfade(newPlayer, crossfadeMs)
             onPlaybackStartedListener?.invoke()
         } catch (e: Throwable) {
-            println("AudioPlayer iOS: Ошибка воспроизведения файла: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка воспроизведения файла: ${e.message}", e)
         }
     }
 

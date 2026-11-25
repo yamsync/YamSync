@@ -6,6 +6,7 @@ import io.github.audiz.dsp.EqualizerEngine
 import io.github.audiz.util.AudioHeaderParser
 import java.io.File
 import java.util.Collections
+import io.github.audiz.util.AppLogger
 
 /**
  * 🎵 Кросс-платформенная JVM-реализация аудиоплеера для Windows, Linux и macOS.
@@ -42,13 +43,13 @@ actual class AudioPlayer actual constructor() {
                     val url = currentStreamUrl
                     val file = currentFile
                     if (url != null) {
-                        println("AudioPlayer: Ошибка в ${activeBackend?.name}, переключаемся на FFmpeg URL fallback...")
+                        AppLogger.e("AudioPlayer", "Ошибка в ${activeBackend?.name}, переключаемся на FFmpeg URL fallback...")
                         activeBackend = ffmpegPumpBackend
                         ffmpegPumpBackend.setDurationMs(durationMs)
                         ffmpegPumpBackend.play(PlaybackSource.Url(url), sessionId)
                         return
                     } else if (file != null) {
-                        println("AudioPlayer: Ошибка в ${activeBackend?.name}, переключаемся на File fallback...")
+                        AppLogger.e("AudioPlayer", "Ошибка в ${activeBackend?.name}, переключаемся на File fallback...")
                         isFallbackMode = true
                         playWithFallback(file, sessionId)
                         return
@@ -61,7 +62,7 @@ actual class AudioPlayer actual constructor() {
 
         override fun onNearEnd(sessionId: Long) {
             if (sessionId == currentSessionId) {
-                println("AudioPlayer JVM: 📻 Достигнут порог конца трека, вызываем onNearEndListener")
+                AppLogger.d("AudioPlayer", "📻 Достигнут порог конца трека, вызываем onNearEndListener")
                 try {
                     onNearEndListener?.invoke()
                 } catch (_: Exception) {}
@@ -143,7 +144,7 @@ actual class AudioPlayer actual constructor() {
             registerTempFile(tmp)
             playFileInternal(tmp, crossfadeMs)
         } catch (e: Exception) {
-            println("AudioPlayer: Ошибка сохранения потока во временный файл: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка сохранения потока во временный файл: ${e.message}", e)
             isPlayingState = false
         }
     }
@@ -162,7 +163,7 @@ actual class AudioPlayer actual constructor() {
             file = File(filePath)
         }
         if (!file.exists()) {
-            println("AudioPlayer: Файл не найден: $filePath (разрешенный: $resolvedPath)")
+            AppLogger.w("AudioPlayer", "Файл не найден: $filePath (разрешенный: $resolvedPath)")
             isPlayingState = false
             return
         }
@@ -236,7 +237,7 @@ actual class AudioPlayer actual constructor() {
         }
 
         if (FfmpegUtils.hasFfmpeg()) {
-            println("AudioPlayer Fallback: Воспроизведение через FFmpeg: ${file.name} (crossfade=${crossfadeMs}ms)")
+            AppLogger.d("AudioPlayer", "Воспроизведение через FFmpeg: ${file.name} (crossfade=${crossfadeMs}ms)")
             activeBackend = ffmpegPumpBackend
             ffmpegPumpBackend.setDurationMs(durationMs)
             ffmpegPumpBackend.setVolume(currentVolume)
@@ -245,7 +246,7 @@ actual class AudioPlayer actual constructor() {
         }
 
         if (FfmpegUtils.isMp3File(file)) {
-            println("AudioPlayer Fallback: Воспроизведение MP3 через JLayer: ${file.name}")
+            AppLogger.d("AudioPlayer", "Воспроизведение MP3 через JLayer: ${file.name}")
             activeBackend = jlayerBackend
             jlayerBackend.setVolume(currentVolume)
             jlayerBackend.play(PlaybackSource.LocalFile(file), sessionId, seekPosMs, crossfadeMs)
@@ -253,7 +254,7 @@ actual class AudioPlayer actual constructor() {
         }
 
         if (FfmpegUtils.isFlacFile(file)) {
-            println("AudioPlayer Fallback: Воспроизведение FLAC через JavaSound: ${file.name}")
+            AppLogger.d("AudioPlayer", "Воспроизведение FLAC через JavaSound: ${file.name}")
             activeBackend = jlayerBackend
             jlayerBackend.setVolume(currentVolume)
             jlayerBackend.play(PlaybackSource.LocalFile(file), sessionId, seekPosMs, crossfadeMs)
@@ -262,7 +263,7 @@ actual class AudioPlayer actual constructor() {
 
         val systemPlayer = FfmpegUtils.findSystemPlayer()
         if (systemPlayer != null) {
-            println("AudioPlayer Fallback: Воспроизведение через $systemPlayer: ${file.name}")
+            AppLogger.d("AudioPlayer", "Воспроизведение через $systemPlayer: ${file.name}")
             activeBackend = systemProcessBackend
             systemProcessBackend.setDurationMs(durationMs)
             systemProcessBackend.setVolume(currentVolume)
@@ -270,7 +271,7 @@ actual class AudioPlayer actual constructor() {
             return
         }
 
-        println("AudioPlayer Fallback: Не удалось воспроизвести ${file.name}. Установите ffmpeg, ffplay или mpv.")
+        AppLogger.e("AudioPlayer", "Не удалось воспроизвести ${file.name}. Установите ffmpeg, ffplay или mpv.")
         if (sessionId == currentSessionId) {
             isPlayingState = false
             onErrorListener?.invoke("Не удалось воспроизвести файл: отсутствуют необходимые кодеки")

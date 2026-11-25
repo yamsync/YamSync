@@ -6,6 +6,7 @@ import java.io.File
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
+import io.github.audiz.util.AppLogger
 
 /**
  * 🪟 Windows System Media Transport Controls (SMTC) Bridge.
@@ -34,7 +35,7 @@ class WindowsMediaControls(
         Thread {
             try {
                 val exeFile = ensureExecutableReady() ?: run {
-                    println("WindowsMediaControls: Не удалось подготовить bridge executable")
+                    AppLogger.e("WindowsMediaControls", "Не удалось подготовить bridge executable")
                     return@Thread
                 }
 
@@ -48,7 +49,7 @@ class WindowsMediaControls(
                 writer = w
 
                 val reader = BufferedReader(InputStreamReader(p.inputStream, StandardCharsets.UTF_8))
-                println("🪟 WindowsMediaControls: SMTC мост успешно запущен!")
+                AppLogger.i("WindowsMediaControls", "🪟 SMTC мост успешно запущен!")
 
                 while (isRunning) {
                     val rawLine = reader.readLine() ?: break
@@ -63,7 +64,7 @@ class WindowsMediaControls(
                     }
                 }
             } catch (e: Exception) {
-                println("WindowsMediaControls: Ошибка процесса моста: ${e.message}")
+                AppLogger.e("WindowsMediaControls", "Ошибка процесса моста: ${e.message}", e)
             } finally {
                 isRunning = false
                 writer = null
@@ -178,7 +179,7 @@ class WindowsMediaControls(
                 return targetExe
             }
         } catch (e: Exception) {
-            println("WindowsMediaControls: Не удалось скомпилировать SMTC мост: ${e.message}")
+            AppLogger.e("WindowsMediaControls", "Не удалось скомпилировать SMTC мост: ${e.message}", e)
         } finally {
             try { tempCs.delete() } catch (_: Exception) {}
         }

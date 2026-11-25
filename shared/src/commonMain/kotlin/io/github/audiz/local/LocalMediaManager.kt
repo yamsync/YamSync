@@ -21,6 +21,7 @@ import io.github.audiz.saveAppConfig
 import io.github.audiz.scanDownloadedTracks
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import io.github.audiz.util.AppLogger
 
 /**
  * 📂 Менеджер пользовательских источников медиа (папки, отдельные треки, M3U-плейлисты).
@@ -64,7 +65,7 @@ class LocalMediaManager {
                 customSources.addAll(list)
             }
         } catch (e: Exception) {
-            println("LocalMediaManager: ❌ Ошибка загрузки источников: ${e.message}")
+            AppLogger.e("LocalMediaManager", "❌ Ошибка загрузки источников: ${e.message}", e)
         }
     }
 
@@ -79,7 +80,7 @@ class LocalMediaManager {
             )
             saveAppConfig(AppConfigKeys.CUSTOM_LOCAL_SOURCES, jsonStr)
         } catch (e: Exception) {
-            println("LocalMediaManager: ❌ Ошибка сохранения источников: ${e.message}")
+            AppLogger.e("LocalMediaManager", "❌ Ошибка сохранения источников: ${e.message}", e)
         }
     }
 

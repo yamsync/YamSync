@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import io.github.audiz.util.AppLogger
 
 actual class SystemMediaControls {
     private var mediaSession: MediaSession? = null
@@ -107,12 +108,12 @@ actual class SystemMediaControls {
                     }
                     context.startService(intent)
                 } catch (e: Throwable) {
-                    println("SystemMediaControls: Ошибка вызова ACTION_CLOSE_APP: ${e.message}")
+                    AppLogger.e("SystemMediaControls", "Ошибка вызова ACTION_CLOSE_APP: ${e.message}", e)
                 }
             }
             MediaPlaybackBridge.sessionToken = session.sessionToken
         } catch (e: Exception) {
-            println("Android MediaSession init error: ${e.message}")
+            AppLogger.e("SystemMediaControls", "Android MediaSession init error: ${e.message}", e)
         }
     }
 
@@ -210,7 +211,7 @@ actual class SystemMediaControls {
                 }
             }
         } catch (e: Exception) {
-            println("SystemMediaControls Android: Ошибка загрузки обложки: ${e.message}")
+            AppLogger.e("SystemMediaControls", "Ошибка загрузки обложки: ${e.message}", e)
         }
         null
     }

@@ -16,6 +16,7 @@ import io.github.audiz.ui.CoverImageLoader
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.github.audiz.util.AppLogger
 
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 actual class SystemMediaControls {
@@ -209,7 +210,7 @@ actual class SystemMediaControls {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("SystemMediaControls iOS: Ошибка загрузки обложки: ${e.message}")
+            AppLogger.e("SystemMediaControls", "Ошибка загрузки обложки: ${e.message}", e)
             null
         }
     }

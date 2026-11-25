@@ -312,7 +312,7 @@ object MediaPlaybackServiceManager {
                 context.startService(intent)
             }
         } catch (e: Exception) {
-            println("MediaPlaybackServiceManager: Ошибка запуска foreground service: ${e.message}")
+            AppLogger.e("MediaPlaybackService", "MediaPlaybackServiceManager: Ошибка запуска foreground service: ${e.message}", e)
         }
     }
 
@@ -341,7 +341,7 @@ object MediaPlaybackServiceManager {
         try {
             context.startService(intent)
         } catch (e: Exception) {
-            println("MediaPlaybackServiceManager: Ошибка остановки foreground service: ${e.message}")
+            AppLogger.e("MediaPlaybackService", "MediaPlaybackServiceManager: Ошибка остановки foreground service: ${e.message}", e)
         }
     }
 }

@@ -49,7 +49,7 @@ object AudioMetadataTagger {
                 }
             }
         } catch (e: Exception) {
-            println("AudioMetadataTagger: ⚠️ Ошибка встраивания метаданных: ${e.message}")
+            AppLogger.e("AudioMetadataTagger", "⚠️ Ошибка встраивания метаданных: ${e.message}", e)
             audioBytes
         }
     }

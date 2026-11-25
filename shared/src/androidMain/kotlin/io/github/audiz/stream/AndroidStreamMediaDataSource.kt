@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import io.github.audiz.util.AppLogger
 
 /**
  * 🎵 Нативный Android MediaDataSource для потокового воспроизведения аудио чанками.
@@ -53,7 +54,7 @@ class AndroidStreamMediaDataSource(
                     fetched
                 }
             } catch (e: Exception) {
-                println("AndroidStreamMediaDataSource: Ошибка получения метаданных для $trackId: ${e.message}")
+                AppLogger.e("AndroidStreamMediaDataSource", "Ошибка получения метаданных для $trackId: ${e.message}", e)
                 null
             }
         }
@@ -67,7 +68,7 @@ class AndroidStreamMediaDataSource(
         } catch (e: IOException) {
             throw e
         } catch (t: Throwable) {
-            println("AndroidStreamMediaDataSource: Ошибка getSize: ${t.message}")
+            AppLogger.e("AndroidStreamMediaDataSource", "Ошибка getSize: ${t.message}", t)
             -1L
         }
     }
@@ -122,7 +123,7 @@ class AndroidStreamMediaDataSource(
         } catch (e: IOException) {
             throw e
         } catch (t: Throwable) {
-            println("AndroidStreamMediaDataSource: Ошибка readAt (pos=$position, size=$size): ${t.message}")
+            AppLogger.e("AndroidStreamMediaDataSource", "Ошибка readAt (pos=$position, size=$size): ${t.message}", t)
             -1
         }
     }
@@ -158,7 +159,7 @@ class AndroidStreamMediaDataSource(
                 }
             } catch (e: Exception) {
                 if (!isClosed.get()) {
-                    println("AndroidStreamMediaDataSource: Ошибка загрузки чанка $chunkIndex: ${e.message}")
+                    AppLogger.e("AndroidStreamMediaDataSource", "Ошибка загрузки чанка $chunkIndex: ${e.message}", e)
                 }
                 null
             }

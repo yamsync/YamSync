@@ -14,6 +14,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import io.github.audiz.util.AppLogger
 
 /**
  * Состояния подключения YamSync
@@ -119,7 +120,7 @@ class YamSyncManager(
                 knownDevices.addAll(list.sortedByDescending { it.lastSeenMs })
             }
         } catch (e: Exception) {
-            println("YamSync: Ошибка загрузки известных устройств: ${e.message}")
+            AppLogger.e("YamSyncManager", "YamSync: Ошибка загрузки известных устройств: ${e.message}", e)
         }
     }
 
@@ -131,7 +132,7 @@ class YamSyncManager(
             )
             saveAppConfig(AppConfigKeys.YAMSYNC_KNOWN_DEVICES, jsonStr)
         } catch (e: Exception) {
-            println("YamSync: Ошибка сохранения известных устройств: ${e.message}")
+            AppLogger.e("YamSyncManager", "YamSync: Ошибка сохранения известных устройств: ${e.message}", e)
         }
     }
 
@@ -188,12 +189,12 @@ class YamSyncManager(
         if (isHostingMode && activeServer != null && hostInfo != null && hostQr != null) {
             connectionState = YamSyncConnectionState.Hosting(hostInfo, hostQr)
             statusMessage = "$reason. Ожидание подключения партнёра..."
-            println("YamSync: Сервер вернулся в режим ожидания (Hosting): $reason")
+            AppLogger.d("YamSyncManager", "YamSync: Сервер вернулся в режим ожидания (Hosting): $reason")
         } else {
             stopHosting()
             connectionState = YamSyncConnectionState.Disconnected
             statusMessage = reason
-            println("YamSync: Соединение разорвано: $reason")
+            AppLogger.d("YamSyncManager", "YamSync: Соединение разорвано: $reason")
         }
     }
 
@@ -265,7 +266,7 @@ class YamSyncManager(
                         },
                         onFailure = { err ->
                             consecutivePollFailures++
-                            println("YamSync: Сбой фонового опроса ($consecutivePollFailures/2): ${err.message}")
+                            AppLogger.w("YamSyncManager", "YamSync: Сбой фонового опроса ($consecutivePollFailures/2): ${err.message}")
                             if (consecutivePollFailures >= 2) {
                                 withContext(Dispatchers.Main) {
                                     handleRemotePeerDisconnected("Связь с устройством потеряна")
@@ -1269,7 +1270,7 @@ class YamSyncManager(
                     failCount++
                     val msg = err.message ?: err.toString()
                     errorDetails.add("${track.title}: $msg")
-                    println("YamSync: ❌ Ошибка скачивания файла ${track.fileName}: $msg")
+                    AppLogger.e("YamSyncManager", "YamSync: ❌ Ошибка скачивания файла ${track.fileName}: $msg", err)
                     fileTransfers[track.matchKey] = YamSyncTransferProgress(
                         fileName = track.fileName,
                         trackTitle = "${track.artist} — ${track.title}",

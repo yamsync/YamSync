@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture
 import javax.swing.JFileChooser
 import javax.swing.UIManager
 import javax.swing.filechooser.FileNameExtensionFilter
+import io.github.audiz.util.AppLogger
 
 actual val isPlatformPickerSupported: Boolean = true
 
@@ -556,7 +557,7 @@ private fun pickDirectorySwing(title: String): String? {
             chooser.selectedFile?.absolutePath
         } else null
     } catch (e: Exception) {
-        println("PlatformFilePicker: ❌ Ошибка выбора папки (Swing): ${e.message}")
+        AppLogger.e("PlatformFilePicker", "❌ Ошибка выбора папки (Swing): ${e.message}", e)
         null
     }
 }
@@ -582,7 +583,7 @@ private fun pickFileSwing(title: String): String? {
             chooser.selectedFile?.absolutePath
         } else null
     } catch (e: Exception) {
-        println("PlatformFilePicker: ❌ Ошибка выбора файла (Swing): ${e.message}")
+        AppLogger.e("PlatformFilePicker", "❌ Ошибка выбора файла (Swing): ${e.message}", e)
         null
     }
 }
@@ -606,7 +607,7 @@ private fun pickSaveFileSwing(defaultFileName: String, title: String): String? {
             chooser.selectedFile?.absolutePath
         } else null
     } catch (e: Exception) {
-        println("PlatformFilePicker: ❌ Ошибка Save File (Swing): ${e.message}")
+        AppLogger.e("PlatformFilePicker", "❌ Ошибка Save File (Swing): ${e.message}", e)
         null
     }
 }

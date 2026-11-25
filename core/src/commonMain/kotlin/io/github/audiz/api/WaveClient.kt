@@ -8,6 +8,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
+import io.github.audiz.core.CoreLogger
 
 /**
  * 🌊 Клиент «Моей Волны» (Rotor API и сессии Ynison)
@@ -65,14 +66,14 @@ class WaveClient(
     suspend fun fetchYnisonWaveSessionId(): String? {
         val token = context.accessToken
         if (token.isBlank()) {
-            println("WaveClient: токен пуст, пропускаем Ynison")
+            CoreLogger.w("WaveClient", "токен пуст, пропускаем Ynison")
             return null
         }
         return try {
             val uid = context.getAccountUid() ?: ""
             ynisonService.getWaveSessionId(token, uid)
         } catch (t: Throwable) {
-            println("WaveClient: Не удалось получить сессию Ynison: ${t.message}")
+            CoreLogger.e("WaveClient", "Не удалось получить сессию Ynison: ${t.message}", t)
             null
         }
     }
@@ -90,11 +91,11 @@ class WaveClient(
                 if (response.status.value !in 500..599) {
                     return response
                 }
-                println("WaveClient: $host вернул HTTP ${response.status}, пробуем резервный хост...")
+                CoreLogger.d("WaveClient", "$host вернул HTTP ${response.status}, пробуем резервный хост...")
             } catch (e: Throwable) {
                 if (e is CancellationException) throw e
                 lastException = e
-                println("WaveClient: Ошибка связи с $host: ${e.message}")
+                CoreLogger.e("WaveClient", "Ошибка связи с $host: ${e.message}", e)
             }
         }
         if (lastException != null) throw lastException
@@ -106,10 +107,10 @@ class WaveClient(
      */
     suspend fun cloneRotorSessionRaw(waveSessionId: String): String {
         val safeSid = waveSessionId.encodeURLPathPart()
-        println("WaveClient: POST /rotor/session/$safeSid/clone")
+        CoreLogger.d("WaveClient", "POST /rotor/session/$safeSid/clone")
         val response = postRotorWithFallback("/rotor/session/$safeSid/clone", "{}")
         val text = response.bodyAsText()
-        println("WaveClient: Ответ clone (HTTP ${response.status}), длина: ${text.length}")
+        CoreLogger.d("WaveClient", "Ответ clone (HTTP ${response.status}), длина: ${text.length}")
         if (response.status.value !in 200..299) {
             throw IllegalStateException("Ошибка клонирования сессии Волны (HTTP ${response.status})")
         }
@@ -142,12 +143,12 @@ class WaveClient(
      * 🌊 Создать Rotor-сессию по списку seeds (например, для жанровой Волны: ["genre:metal"])
      */
     suspend fun createRotorSessionRaw(seeds: List<String>): String {
-        println("WaveClient: Создание Rotor-сессии with seeds: $seeds")
+        CoreLogger.d("WaveClient", "Создание Rotor-сессии with seeds: $seeds")
         val seedsJson = JsonArray(seeds.map(::JsonPrimitive)).toString()
         val payload = """{"seeds":$seedsJson,"includeTracksInResponse":true}"""
         val response = postRotorWithFallback("/rotor/session/new", payload)
         val text = response.bodyAsText()
-        println("WaveClient: Ответ session/new (HTTP ${response.status}), длина: ${text.length}")
+        CoreLogger.d("WaveClient", "Ответ session/new (HTTP ${response.status}), длина: ${text.length}")
         if (response.status.value !in 200..299) {
             val json = Json { ignoreUnknownKeys = true }
             val errMsg = try {
@@ -171,7 +172,7 @@ class WaveClient(
         var parsed = parseRotorResponse(raw)
         val sid = parsed.radioSessionId
         if (parsed.sequence.isEmpty() && !sid.isNullOrBlank()) {
-            println("WaveClient: sequence пуст в ответе session/new, запрашиваем tracks напрямую...")
+            CoreLogger.d("WaveClient", "sequence пуст в ответе session/new, запрашиваем tracks напрямую...")
             parsed = getRotorNextTracks(sid, feedbacks = emptyList())
         }
         return parsed
@@ -239,10 +240,10 @@ class WaveClient(
         val payload = """{"queue":[$queueJson],"feedbacks":[$feedbacksJson]}"""
 
         val eventTypes = feedbacks.map { it.eventType }
-        println("WaveClient: POST $path ($eventTypes, queue: ${remainingQueue.size} items)")
+        CoreLogger.d("WaveClient", "POST $path ($eventTypes, queue: ${remainingQueue.size} items)")
         val response = postRotorWithFallback(path, payload)
         val text = response.bodyAsText()
-        println("WaveClient: Ответ next tracks ($eventTypes) [HTTP ${response.status}], длина: ${text.length}")
+        CoreLogger.d("WaveClient", "Ответ next tracks ($eventTypes) [HTTP ${response.status}], длина: ${text.length}")
         if (response.status.value !in 200..299) {
             throw IllegalStateException("Ошибка получения треков Волны (HTTP ${response.status})")
         }
@@ -262,15 +263,15 @@ class WaveClient(
         val safeSid = radioSessionId.encodeURLPathPart()
         val path = "/rotor/session/$safeSid/feedback/"
         val payload = """{"event":{"type":"trackStarted","timestamp":"$timestamp","trackId":"$trackIdWithAlbum"},"batchId":"$batchId","from":"web-wave_landing_screen-my_wave-radio-default"}"""
-        println("WaveClient: POST $path (trackStarted: $trackIdWithAlbum)")
+        CoreLogger.i("WaveClient", "POST $path (trackStarted: $trackIdWithAlbum)")
         return try {
             val response = postRotorWithFallback(path, payload)
             val status = response.status.value in 200..299
-            println("WaveClient: trackStarted response status: ${response.status}")
+            CoreLogger.i("WaveClient", "trackStarted response status: ${response.status}")
             status
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            println("WaveClient: Ошибка при отправке trackStarted: ${e.message}")
+            CoreLogger.e("WaveClient", "Ошибка при отправке trackStarted: ${e.message}", e)
             false
         }
     }
@@ -295,15 +296,15 @@ class WaveClient(
         val path = "/plays?clientNow=$endTimestamp"
         val addTracksTime = "${kotlin.random.Random.nextLong(1000000000000000L, 9999999999999999L)}-${kotlin.random.Random.nextInt(1000000000, 2000000000)}"
         val payload = """{"plays":[{"playId":"$playId","from":"web-wave_landing_screen-my_wave-radio-default","totalPlayedSeconds":$totalPlayedSeconds,"endPositionSeconds":$endPositionSeconds,"trackLengthSeconds":$trackLengthSeconds,"timestamp":"$endTimestamp","albumId":"$albumId","context":"radio","contextItem":"user:onyourwave","addTracksToPlayerTime":"$addTracksTime","fromCache":false,"isRestored":false,"audioAuto":"none","audioOutputName":"Динамик","audioOutputType":"Speaker","trackId":"$trackId","radioSessionId":"$radioSessionId","batchId":"$batchId","isFromAutoflow":false,"isFromPumpkin":false,"seek":true,"pause":false,"startTimestamp":"$startTimestamp","maxPlayerStage":"play","isRepeated":false,"changeReason":"$changeReason","isLivePlayableIndex":true}]}"""
-        println("WaveClient: POST $path ($changeReason, trackId: $trackId, played: ${totalPlayedSeconds}s)")
+        CoreLogger.d("WaveClient", "POST $path ($changeReason, trackId: $trackId, played: ${totalPlayedSeconds}s)")
         return try {
             val response = postRotorWithFallback(path, payload)
             val status = response.status.value in 200..299
-            println("WaveClient: /plays response status: ${response.status}")
+            CoreLogger.d("WaveClient", "/plays response status: ${response.status}")
             status
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            println("WaveClient: Ошибка при отправке /plays: ${e.message}")
+            CoreLogger.e("WaveClient", "Ошибка при отправке /plays: ${e.message}", e)
             false
         }
     }

@@ -1,6 +1,7 @@
 package io.github.audiz.backend
 
 import io.github.audiz.volumeToGain
+import io.github.audiz.util.AppLogger
 
 /**
  * 🖥️ Запасной аудио-бэкенд для воспроизведения через внешние системные плееры (ffplay / mpv)
@@ -92,7 +93,7 @@ class SystemProcessAudioBackend(
                 start()
             }
         } catch (e: Exception) {
-            println("SystemProcessAudioBackend: Ошибка запуска: ${e.message}")
+            AppLogger.e("SystemProcessAudioBackend", "Ошибка запуска: ${e.message}", e)
             if (sessionId == currentSessionId) {
                 isPlayingState = false
                 callback.onError(sessionId, e.message ?: "Process error", canFallback = false)

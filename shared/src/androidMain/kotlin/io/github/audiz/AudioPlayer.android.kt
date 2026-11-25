@@ -81,7 +81,7 @@ actual class AudioPlayer actual constructor() {
     private val becomingNoisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-                println("AudioPlayer Android: ACTION_AUDIO_BECOMING_NOISY (BT/гарнитура отключена) -> пауза")
+                AppLogger.d("AudioPlayer", "ACTION_AUDIO_BECOMING_NOISY (BT/гарнитура отключена) -> пауза")
                 pause()
                 onInterruptionListener?.invoke(true, false)
             }
@@ -91,22 +91,22 @@ actual class AudioPlayer actual constructor() {
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
-                println("AudioPlayer Android: AUDIOFOCUS_LOSS -> постоянная потеря фокуса -> пауза")
+                AppLogger.d("AudioPlayer", "AUDIOFOCUS_LOSS -> постоянная потеря фокуса -> пауза")
                 pause()
                 onInterruptionListener?.invoke(true, false)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                println("AudioPlayer Android: AUDIOFOCUS_LOSS_TRANSIENT (звонок/навигатор) -> пауза")
+                AppLogger.d("AudioPlayer", "AUDIOFOCUS_LOSS_TRANSIENT (звонок/навигатор) -> пауза")
                 pause()
                 onInterruptionListener?.invoke(true, true)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                println("AudioPlayer Android: AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> пауза")
+                AppLogger.d("AudioPlayer", "AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> пауза")
                 pause()
                 onInterruptionListener?.invoke(true, true)
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
-                println("AudioPlayer Android: AUDIOFOCUS_GAIN -> восстановление фокуса")
+                AppLogger.d("AudioPlayer", "AUDIOFOCUS_GAIN -> восстановление фокуса")
                 onInterruptionListener?.invoke(false, true)
             }
         }
@@ -151,7 +151,7 @@ actual class AudioPlayer actual constructor() {
                 audioManager.abandonAudioFocus(audioFocusChangeListener)
             }
         } catch (e: Exception) {
-            println("AudioPlayer Android: Ошибка abandonAudioFocus: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка abandonAudioFocus: ${e.message}", e)
         }
     }
 
@@ -163,7 +163,7 @@ actual class AudioPlayer actual constructor() {
             context.registerReceiver(becomingNoisyReceiver, filter)
             isNoisyReceiverRegistered = true
         } catch (e: Exception) {
-            println("AudioPlayer Android: Ошибка регистрации becomingNoisyReceiver: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка регистрации becomingNoisyReceiver: ${e.message}", e)
         }
     }
 
@@ -173,7 +173,7 @@ actual class AudioPlayer actual constructor() {
             val context = AppContextHolder.appContext
             context.unregisterReceiver(becomingNoisyReceiver)
         } catch (e: Exception) {
-            println("AudioPlayer Android: Ошибка отмены регистрации becomingNoisyReceiver: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка отмены регистрации becomingNoisyReceiver: ${e.message}", e)
         } finally {
             isNoisyReceiverRegistered = false
         }
@@ -363,11 +363,11 @@ actual class AudioPlayer actual constructor() {
                 try {
                     setWakeMode(AppContextHolder.appContext, PowerManager.PARTIAL_WAKE_LOCK)
                 } catch (e: Exception) {
-                    println("AudioPlayer Android: Не удалось установить WakeMode: ${e.message}")
+                    AppLogger.e("AudioPlayer", "Не удалось установить WakeMode: ${e.message}", e)
                 }
                 attachCompletion(this)
                 setOnErrorListener { mp, what, extra ->
-                    println("AudioPlayer Android: Ошибка воспроизведения байтов ($what, $extra)")
+                    AppLogger.e("AudioPlayer", "Ошибка воспроизведения байтов ($what, $extra)")
                     if (sessionId == currentSessionId) {
                         try { mp.reset(); mp.release() } catch (_: Exception) {}
                         onErrorListener?.invoke("Ошибка воспроизведения аудио ($what, $extra)")
@@ -419,11 +419,11 @@ actual class AudioPlayer actual constructor() {
                 try {
                     setWakeMode(AppContextHolder.appContext, PowerManager.PARTIAL_WAKE_LOCK)
                 } catch (e: Exception) {
-                    println("AudioPlayer Android: Не удалось установить WakeMode: ${e.message}")
+                    AppLogger.e("AudioPlayer", "Не удалось установить WakeMode: ${e.message}", e)
                 }
                 attachCompletion(this)
                 setOnErrorListener { mp, what, extra ->
-                    println("AudioPlayer Android: Ошибка воспроизведения файла ($what, $extra)")
+                    AppLogger.e("AudioPlayer", "Ошибка воспроизведения файла ($what, $extra)")
                     if (sessionId == currentSessionId) {
                         try { mp.reset(); mp.release() } catch (_: Exception) {}
                         onErrorListener?.invoke("Ошибка воспроизведения файла ($what, $extra)")
@@ -491,12 +491,12 @@ actual class AudioPlayer actual constructor() {
             try {
                 newPlayer.setWakeMode(AppContextHolder.appContext, PowerManager.PARTIAL_WAKE_LOCK)
             } catch (e: Exception) {
-                println("AudioPlayer Android: Не удалось установить WakeMode: ${e.message}")
+                AppLogger.e("AudioPlayer", "Не удалось установить WakeMode: ${e.message}", e)
             }
             attachCompletion(newPlayer)
 
             newPlayer.setOnErrorListener { mp, what, extra ->
-                println("AudioPlayer Android: Ошибка MediaPlayer для сессии $sessionId (what=$what, extra=$extra)")
+                AppLogger.e("AudioPlayer", "Ошибка MediaPlayer для сессии $sessionId (what=$what, extra=$extra)")
                 prepareTimeoutJob?.cancel()
                 prepareTimeoutJob = null
                 mediaDataSource?.close()
@@ -520,7 +520,7 @@ actual class AudioPlayer actual constructor() {
                 prepareTimeoutJob = null
 
                 if (sessionId != currentSessionId) {
-                    println("AudioPlayer Android: Сессия $sessionId устарела (текущая: $currentSessionId), освобождаем плеер")
+                    AppLogger.d("AudioPlayer", "Сессия $sessionId устарела (текущая: $currentSessionId), освобождаем плеер")
                     mediaDataSource?.close()
                     try { mp.reset(); mp.release() } catch (_: Exception) {}
                     if (preparingMediaPlayer === mp) {
@@ -556,7 +556,7 @@ actual class AudioPlayer actual constructor() {
                     startCrossfade(mp, crossfadeMs)
                     onPlaybackStartedListener?.invoke()
                 } catch (e: Exception) {
-                    println("AudioPlayer Android: Ошибка старта плеера: ${e.message}")
+                    AppLogger.e("AudioPlayer", "Ошибка старта плеера: ${e.message}", e)
                     mediaDataSource?.close()
                     try { mp.reset(); mp.release() } catch (_: Exception) {}
                     onErrorListener?.invoke("Ошибка запуска воспроизведения: ${e.message}")
@@ -567,7 +567,7 @@ actual class AudioPlayer actual constructor() {
             prepareTimeoutJob = playerScope.launch {
                 kotlinx.coroutines.delay(12000L)
                 if (sessionId == currentSessionId && preparingMediaPlayer === newPlayer) {
-                    println("AudioPlayer Android: Таймаут буферизации для сессии $sessionId")
+                    AppLogger.w("AudioPlayer", "Таймаут буферизации для сессии $sessionId")
                     preparingMediaPlayer = null
                     preparingMediaDataSource = null
                     mediaDataSource?.close()
@@ -771,9 +771,9 @@ actual class AudioPlayer actual constructor() {
             val eq = AndroidEqualizer(0, audioSessionId)
             equalizer = eq
             applyEqualizerState(EqualizerEngine.state.value)
-            println("AudioPlayer Android: Equalizer успешно запущен (session=$audioSessionId, bands=${eq.numberOfBands})")
+            AppLogger.i("AudioPlayer", "Equalizer успешно запущен (session=$audioSessionId, bands=${eq.numberOfBands})")
         } catch (e: Throwable) {
-            println("AudioPlayer Android: Не удалось запустить Equalizer: ${e.message}")
+            AppLogger.e("AudioPlayer", "Не удалось запустить Equalizer: ${e.message}", e)
             releaseEqualizer()
         }
     }
@@ -806,7 +806,7 @@ actual class AudioPlayer actual constructor() {
 
             eq.enabled = true
         } catch (e: Throwable) {
-            println("AudioPlayer Android: Ошибка применения настроек эквалайзера: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка применения настроек эквалайзера: ${e.message}", e)
         }
     }
 
@@ -836,7 +836,7 @@ actual class AudioPlayer actual constructor() {
 
         val context = AppContextHolder.appContext
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            println("AudioPlayer Android: RECORD_AUDIO не предоставлено -> Visualizer не активен (fallback волна)")
+            AppLogger.d("AudioPlayer", "RECORD_AUDIO не предоставлено -> Visualizer не активен (fallback волна)")
             return
         }
 
@@ -860,9 +860,9 @@ actual class AudioPlayer actual constructor() {
 
             v.enabled = true
             visualizer = v
-            println("AudioPlayer Android: Visualizer успешно запущен (session=$audioSessionId, captureSize=$captureSize, rate=$maxRate)")
+            AppLogger.i("AudioPlayer", "Visualizer успешно запущен (session=$audioSessionId, captureSize=$captureSize, rate=$maxRate)")
         } catch (e: Throwable) {
-            println("AudioPlayer Android: Ошибка инициализации Visualizer: ${e.message}")
+            AppLogger.e("AudioPlayer", "Ошибка инициализации Visualizer: ${e.message}", e)
             releaseVisualizer()
         }
     }

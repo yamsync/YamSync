@@ -18,6 +18,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import io.github.audiz.util.AppLogger
 
 /**
  * 🖼️ Загрузчик и кэш обложек альбомов и треков.
@@ -122,7 +123,7 @@ object CoverImageLoader {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("CoverImageLoader: Ошибка загрузки обложки $key: ${e.message}")
+            AppLogger.e("CoverImageLoader", "Ошибка загрузки обложки $key: ${e.message}", e)
             null
         }
         if (bytes == null || bytes.isEmpty()) return null
@@ -139,7 +140,7 @@ object CoverImageLoader {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("CoverImageLoader: Ошибка декодирования обложки $key: ${e.message}")
+            AppLogger.e("CoverImageLoader", "Ошибка декодирования обложки $key: ${e.message}", e)
             null
         }
     }

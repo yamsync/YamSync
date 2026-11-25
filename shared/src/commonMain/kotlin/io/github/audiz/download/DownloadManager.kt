@@ -27,6 +27,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.github.audiz.util.AppLogger
 
 /**
  * 💾 Менеджер скачивания и управления аудиофайлами на диске.
@@ -119,7 +120,7 @@ class DownloadManager(
     fun toggleRecordToDisk(active: Boolean = !isRecordToDiskActive) {
         isRecordToDiskActive = active
         saveAppConfig(io.github.audiz.AppConfigKeys.RECORD_TO_DISK, active.toString())
-        println("DownloadManager: Record to disk установлен в: $active")
+        AppLogger.d("DownloadManager", "Record to disk установлен в: $active")
 
         // Если включили сохранение во время воспроизведения несохраненного трека — сохраняем его на диск
         val playingId = getPlayingTrackId()
@@ -154,10 +155,10 @@ class DownloadManager(
         val artist = getPlayingArtistName()
 
         if (isCurrentTrackSavedToDisk) {
-            println("DownloadManager: Кнопка сохранения: удаление трека из библиотеки: $artist — $title")
+            AppLogger.d("DownloadManager", "Кнопка сохранения: удаление трека из библиотеки: $artist — $title")
             deleteTrack(trackId, title, artist)
         } else {
-            println("DownloadManager: Кнопка сохранения: принудительное скачивание трека: $artist — $title")
+            AppLogger.d("DownloadManager", "Кнопка сохранения: принудительное скачивание трека: $artist — $title")
             downloadTrack(trackId, title, artist)
         }
     }
@@ -201,7 +202,7 @@ class DownloadManager(
                 val basePath = "$storagePath/$qualityFolder"
 
                 if (trackFileExists(basePath, cleanArtist, fullFileName)) {
-                    println("⏭️ Трек уже существует: $fullFileName")
+                    AppLogger.d("DownloadManager", "⏭️ Трек уже существует: $fullFileName")
                     onError("✅ Уже скачан: $fullFileName")
                     return@launch
                 }
@@ -217,7 +218,7 @@ class DownloadManager(
                     coverUri = coverUri
                 )
 
-                println("Saving to: $basePath / $cleanArtist / $fullFileName (size: ${taggedBytes.size} bytes)")
+                AppLogger.d("DownloadManager", "Saving to: $basePath / $cleanArtist / $fullFileName (size: ${taggedBytes.size} bytes)")
                 saveTrackFile(basePath, cleanArtist, fullFileName, taggedBytes)
                 downloadVersion++
 
@@ -467,7 +468,7 @@ class DownloadManager(
             }
             targetPath
         } catch (e: Exception) {
-            println("DownloadManager: Ошибка при подготовке файла трека: ${e.message}")
+            AppLogger.e("DownloadManager", "Ошибка при подготовке файла трека: ${e.message}", e)
             null
         }
     }

@@ -94,7 +94,7 @@ actual fun saveFilePlatformSpecific(bytes: ByteArray, fileName: String) {
         val outputFile = File(downloadDir, fileName)
 
         outputFile.writeBytes(bytes)
-        println("Android IO: Файл успешно сохранен в загрузки: ${outputFile.absolutePath}")
+        AppLogger.i("Platform", "Android IO: Файл успешно сохранен в загрузки: ${outputFile.absolutePath}")
     } catch (e: Exception) {
         AppLogger.e("AndroidIO", "Ошибка сохранения файла: ${e.message}")
     }

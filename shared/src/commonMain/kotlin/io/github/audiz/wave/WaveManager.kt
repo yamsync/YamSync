@@ -210,7 +210,7 @@ class WaveManager(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        println("WaveManager: Ошибка загрузки каталога тем Волны: ${e.message}")
+                        AppLogger.e("WaveManager", "Ошибка загрузки каталога тем Волны: ${e.message}", e)
                     }
                 }
             } finally {
@@ -318,7 +318,7 @@ class WaveManager(
                 recentThematicWaves.addAll(list.take(3))
             }
         } catch (e: Throwable) {
-            println("WaveManager: Ошибка загрузки недавних волн: ${e.message}")
+            AppLogger.e("WaveManager", "Ошибка загрузки недавних волн: ${e.message}", e)
         }
     }
 
@@ -338,7 +338,7 @@ class WaveManager(
             val jsonStr = waveJson.encodeToString(updated)
             saveAppConfig(AppConfigKeys.RECENT_THEMATIC_WAVES, jsonStr)
         } catch (e: Throwable) {
-            println("WaveManager: Ошибка сохранения недавних волн: ${e.message}")
+            AppLogger.e("WaveManager", "Ошибка сохранения недавних волн: ${e.message}", e)
         }
 
         // Если запущенная волна была среди пресетов, заменяем её новым стилем
@@ -469,7 +469,7 @@ class WaveManager(
         try {
             saveAppConfig(AppConfigKeys.LAST_WAVE_STYLE, "")
         } catch (e: Throwable) {
-            println("WaveManager: Ошибка сброса стиля волны: ${e.message}")
+            AppLogger.e("WaveManager", "Ошибка сброса стиля волны: ${e.message}", e)
         }
         val token = getAccessToken()
         if (token.isBlank()) return
@@ -488,27 +488,27 @@ class WaveManager(
                     repository.fetchYnisonWaveSessionId()
                 } catch (e: Throwable) {
                     if (e is CancellationException) throw e
-                    println("WaveManager: Ошибка получения Ynison сессии: ${e.message}")
+                    AppLogger.e("WaveManager", "Ошибка получения Ynison сессии: ${e.message}", e)
                     null
                 }
                 ynisonWaveSessionId = sid
                 ynisonHost = repository.lastYnisonHost
                 ynisonError = repository.lastYnisonError
-                println("WaveManager: Ynison Wave Session ID = $sid (host: $ynisonHost, error: $ynisonError)")
+                AppLogger.d("WaveManager", "Ynison Wave Session ID = $sid (host: $ynisonHost, error: $ynisonError)")
 
                 var rotorResponse: RotorSessionResponse? = null
                 if (!sid.isNullOrBlank()) {
                     try {
-                        println("WaveManager: Клонируем сессию Волны: $sid")
+                        AppLogger.d("WaveManager", "Клонируем сессию Волны: $sid")
                         rotorResponse = repository.cloneRotorSession(sid)
                     } catch (e: Throwable) {
                         if (e is CancellationException) throw e
-                        println("WaveManager: Ошибка клонирования Ynison сессии ($sid): ${e.message}, пробуем Rotor fallback...")
+                        AppLogger.e("WaveManager", "Ошибка клонирования Ynison сессии ($sid): ${e.message}, пробуем Rotor fallback...", e)
                     }
                 }
 
                 if (rotorResponse == null || rotorResponse.sequence.isEmpty()) {
-                    println("WaveManager: Ynison недоступен или пуст. Запрашиваем Rotor user:onyourwave...")
+                    AppLogger.d("WaveManager", "Ynison недоступен или пуст. Запрашиваем Rotor user:onyourwave...")
                     rotorResponse = repository.createRotorSession(listOf("user:onyourwave"))
                 }
 
@@ -535,7 +535,7 @@ class WaveManager(
                         onTrackLiked?.invoke(t.id)
                     }
                 }
-                println("WaveManager: Волна инициализирована! Загружено треков: ${waveTracks.size}, batchId: $waveBatchId")
+                AppLogger.d("WaveManager", "Волна инициализирована! Загружено треков: ${waveTracks.size}, batchId: $waveBatchId")
 
                 if (autoPlay && waveTracks.isNotEmpty()) {
                     playFirstRecommendation(source = source)
@@ -579,7 +579,7 @@ class WaveManager(
             val jsonStr = waveJson.encodeToString(ThematicWavePreset(title?.takeIf { it.isNotBlank() } ?: "Моя Волна", seeds))
             saveAppConfig(AppConfigKeys.LAST_WAVE_STYLE, jsonStr)
         } catch (e: Throwable) {
-            println("WaveManager: Ошибка сохранения последнего стиля волны: ${e.message}")
+            AppLogger.e("WaveManager", "Ошибка сохранения последнего стиля волны: ${e.message}", e)
         }
 
         val token = getAccessToken()
@@ -597,14 +597,14 @@ class WaveManager(
         scope.launch {
             isWaveLoading = true
             try {
-                println("WaveManager: Запуск тематической Волны '$title', seeds=$seeds")
+                AppLogger.d("WaveManager", "Запуск тематической Волны '$title', seeds=$seeds")
                 var initial = try {
                     repository.createRotorSession(seeds)
                 } catch (e: Throwable) {
                     if (e is CancellationException) throw e
                     val isAuthOrPlusError = e.message?.contains("Яндекс Плюс", ignoreCase = true) == true
                     if (seeds.size > 1 && !isAuthOrPlusError) {
-                        println("WaveManager: Комбинация seeds=$seeds не сработала (${e.message}), пробуем базовый seed ${seeds.first()}")
+                        AppLogger.d("WaveManager", "Комбинация seeds=$seeds не сработала (${e.message}), пробуем базовый seed ${seeds.first()}")
                         repository.createRotorSession(listOf(seeds.first()))
                     } else {
                         throw e
@@ -645,7 +645,7 @@ class WaveManager(
                         onTrackLiked?.invoke(t.id)
                     }
                 }
-                println("WaveManager: Тематическая Волна запущена! Загружено треков: ${waveTracks.size}, radioSessionId: $waveRadioSessionId, batchId: $waveBatchId")
+                AppLogger.i("WaveManager", "Тематическая Волна запущена! Загружено треков: ${waveTracks.size}, radioSessionId: $waveRadioSessionId, batchId: $waveBatchId")
 
                 if (autoPlay && waveTracks.isNotEmpty()) {
                     playFirstRecommendation(source = source)
@@ -680,7 +680,7 @@ class WaveManager(
         try {
             saveAppConfig(AppConfigKeys.LAST_WAVE_STYLE, "")
         } catch (e: Throwable) {
-            println("WaveManager: Ошибка сброса стиля волны: ${e.message}")
+            AppLogger.e("WaveManager", "Ошибка сброса стиля волны: ${e.message}", e)
         }
         loadInitialWave(autoPlay = autoPlay, source = TrackPlaySource.PLAY)
     }
@@ -710,7 +710,7 @@ class WaveManager(
         isWaveMode = true
         activeWaveTrack = track
         onTrackPlaybackStarted(track)
-        println("🌊 Волна: Воспроизведение трека [$index/${waveTracks.size}]: ${track.title}")
+        AppLogger.d("WaveManager", "🌊 Волна: Воспроизведение трека [$index/${waveTracks.size}]: ${track.title}")
 
         // 🌊 Превентивная дозагрузка: если впереди осталось <= 4 треков, сразу пополняем очередь в фоне
         val remainingAhead = waveTracks.size - (index + 1)
@@ -745,7 +745,7 @@ class WaveManager(
             waveCurrentIndex = insertIdx
         }
         onTrackPlaybackStarted(track)
-        println("🌊 Волна: Воспроизведение трека из истории: ${track.title}")
+        AppLogger.d("WaveManager", "🌊 Волна: Воспроизведение трека из истории: ${track.title}")
         playbackManager?.playTrack(
             targetTrackId = track.id,
             targetTrackTitle = track.title,
@@ -794,7 +794,7 @@ class WaveManager(
             }
 
             if (wavePastTracks.isEmpty()) {
-                println("🌊 Волна: История назад пуста (достигнут лимит 5 треков)")
+                AppLogger.d("WaveManager", "🌊 Волна: История назад пуста (достигнут лимит 5 треков)")
                 val currentPos = playbackManager?.positionMs ?: 0L
                 if (currentPos > 2000L) {
                     playbackManager?.seekTo(0L)
@@ -814,12 +814,12 @@ class WaveManager(
             }
 
             val prevTrack = wavePastTracks.removeLastOrNull() ?: run {
-                println("🌊 Волна: Не удалось извлечь предыдущий трек из истории")
+                AppLogger.e("WaveManager", "🌊 Волна: Не удалось извлечь предыдущий трек из истории")
                 playbackManager?.setLoadingFlags(next = false, prev = false, play = false)
                 return
             }
             waveFutureTracks.removeAll { it.id == prevTrack.id }
-            println("🌊 Волна: Назад к треку [в истории назад: ${wavePastTracks.size}, вперед: ${waveFutureTracks.size}]: ${prevTrack.title}")
+            AppLogger.d("WaveManager", "🌊 Волна: Назад к треку [в истории назад: ${wavePastTracks.size}, вперед: ${waveFutureTracks.size}]: ${prevTrack.title}")
             playWaveTrackDirect(prevTrack, source = TrackPlaySource.PREV)
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
@@ -849,7 +849,7 @@ class WaveManager(
                 }
             }
             val nextTrack = waveFutureTracks.removeAt(0)
-            println("🌊 Волна: Вперед по истории к треку [в истории вперед: ${waveFutureTracks.size}]: ${nextTrack.title}")
+            AppLogger.d("WaveManager", "🌊 Волна: Вперед по истории к треку [в истории вперед: ${waveFutureTracks.size}]: ${nextTrack.title}")
             playWaveTrackDirect(nextTrack, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
         } else {
             skipWaveTrack(crossfadeMs = crossfadeMs)
@@ -976,7 +976,7 @@ class WaveManager(
                     val nextTrackIdWithAlbum = "${nextTrack.id}:$nextAlbumId"
                     val transitionQueue = listOf(nextTrackIdWithAlbum)
 
-                    println("🌊 Волна: отправка ${feedbacksToSend.size} фидбеков (skip: ${oldTrack?.title}), обновляем очередь после ${nextTrack.title}...")
+                    AppLogger.d("WaveManager", "🌊 Волна: отправка ${feedbacksToSend.size} фидбеков (skip: ${oldTrack?.title}), обновляем очередь после ${nextTrack.title}...")
                     val nextResponse = repository.getRotorNextTracks(
                         radioSessionId = radioSessionId,
                         feedbacks = feedbacksToSend,
@@ -1014,12 +1014,12 @@ class WaveManager(
                             onTrackLiked?.invoke(t.id)
                         }
                     }
-                    println("🌊 Волна: Очередь обновлена новыми рекомендациями (${newTracks.size} шт). Всего в очереди: ${waveTracks.size}")
+                    AppLogger.d("WaveManager", "🌊 Волна: Очередь обновлена новыми рекомендациями (${newTracks.size} шт). Всего в очереди: ${waveTracks.size}")
                     playbackManager?.onQueueUpdated()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    println("WaveManager: Ошибка обновления очереди после skip: ${e.message}")
+                    AppLogger.e("WaveManager", "Ошибка обновления очереди после skip: ${e.message}", e)
                 }
             }
             return
@@ -1029,7 +1029,7 @@ class WaveManager(
         val radioSessionId = waveRadioSessionId ?: ynisonWaveSessionId
         val batchId = waveBatchId
         if (radioSessionId == null) {
-            println("WaveManager: skipWaveTrack - сессия не готова, перезапускаем")
+            AppLogger.w("WaveManager", "skipWaveTrack - сессия не готова, перезапускаем")
             loadInitialWave(autoPlay = true, source = TrackPlaySource.NEXT)
             return
         }
@@ -1086,7 +1086,7 @@ class WaveManager(
 
                 val transitionQueue = emptyList<String>()
 
-                println("🌊 Волна: очередь пуста, отправка ${feedbacksToSend.size} фидбеков, запрашиваем новую пачку...")
+                AppLogger.d("WaveManager", "🌊 Волна: очередь пуста, отправка ${feedbacksToSend.size} фидбеков, запрашиваем новую пачку...")
                 val initial = repository.getRotorNextTracks(
                     radioSessionId = radioSessionId,
                     feedbacks = feedbacksToSend,
@@ -1120,7 +1120,7 @@ class WaveManager(
                 }
                 waveCurrentIndex = 0
                 isWaveMode = true
-                println("🌊 Волна: Новая пачка из ${waveTracks.size} треков загружена после skip! Запуск первого трека.")
+                AppLogger.i("WaveManager", "🌊 Волна: Новая пачка из ${waveTracks.size} треков загружена после skip! Запуск первого трека.")
 
                 if (waveTracks.isNotEmpty()) {
                     playFirstRecommendation(source = TrackPlaySource.NEXT)
@@ -1149,7 +1149,7 @@ class WaveManager(
         if (!isWaveMode) return
         // Доиграл трек из очереди «Далее»: он не относится к Волне, переход определяет очередь.
         if (playbackManager?.isPlayingUpNextTrack == true) {
-            println("🌊 Волна: доиграл трек очереди, фидбек Волне не отправляется")
+            AppLogger.d("WaveManager", "🌊 Волна: доиграл трек очереди, фидбек Волне не отправляется")
             playbackManager?.playNextTrack(source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
             return
         }
@@ -1164,14 +1164,14 @@ class WaveManager(
 
         if (waveFutureTracks.isNotEmpty()) {
             val nextTrack = waveFutureTracks.removeAt(0)
-            println("🌊 Волна: трек доиграл. Переход к следующему из истории: ${nextTrack.title}")
+            AppLogger.d("WaveManager", "🌊 Волна: трек доиграл. Переход к следующему из истории: ${nextTrack.title}")
             playWaveTrackDirect(nextTrack, source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)
             return
         }
 
         val nextIndex = recommendedIndex(waveCurrentIndex + 1, current?.id)
         if (nextIndex != null) {
-            println("🌊 Волна: трек доиграл. Переходим к следующему треку пачки ($nextIndex/${waveTracks.size})")
+            AppLogger.d("WaveManager", "🌊 Волна: трек доиграл. Переходим к следующему треку пачки ($nextIndex/${waveTracks.size})")
             playWaveTrack(nextIndex, TrackPlaySource.PLAY, crossfadeMs)
             val remainingAhead = waveTracks.size - (waveCurrentIndex + 1)
             if (remainingAhead <= 4) {
@@ -1180,7 +1180,7 @@ class WaveManager(
             return
         }
 
-        println("🌊 Волна: вся пачка из ${waveTracks.size} треков доиграла. Запрашиваем следующую пачку...")
+        AppLogger.d("WaveManager", "🌊 Волна: вся пачка из ${waveTracks.size} треков доиграла. Запрашиваем следующую пачку...")
         loadNextWaveBatchAfterNaturalCompletion(current, crossfadeMs = crossfadeMs)
     }
 
@@ -1255,7 +1255,7 @@ class WaveManager(
                 val currentAlbumId = currentPlayingTrack.albums.firstOrNull()?.id ?: 0
                 val queueTransition = listOf("${currentPlayingTrack.id}:$currentAlbumId")
 
-                println("🌊 Волна: фоновое пополнение очереди (${feedbacksToSend.size} фидбеков, queue: $queueTransition)...")
+                AppLogger.d("WaveManager", "🌊 Волна: фоновое пополнение очереди (${feedbacksToSend.size} фидбеков, queue: $queueTransition)...")
                 val nextResponse = repository.getRotorNextTracks(
                     radioSessionId = radioSessionId,
                     feedbacks = feedbacksToSend,
@@ -1288,12 +1288,12 @@ class WaveManager(
                         onTrackLiked?.invoke(t.id)
                     }
                 }
-                println("🌊 Волна: Очередь успешно пополнена! Всего треков: ${waveTracks.size}")
+                AppLogger.i("WaveManager", "🌊 Волна: Очередь успешно пополнена! Всего треков: ${waveTracks.size}")
                 playbackManager?.onQueueUpdated()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                println("WaveManager: Ошибка при фоновом пополнении Волны: ${e.message}")
+                AppLogger.e("WaveManager", "Ошибка при фоновом пополнении Волны: ${e.message}", e)
             }
         }
     }
@@ -1316,7 +1316,7 @@ class WaveManager(
 
                 val queueList = emptyList<String>()
 
-                println("🌊 Волна: пачка завершена, отправка ${feedbacksToSend.size} накопленных фидбеков...")
+                AppLogger.d("WaveManager", "🌊 Волна: пачка завершена, отправка ${feedbacksToSend.size} накопленных фидбеков...")
                 val initial = repository.getRotorNextTracks(
                     radioSessionId = radioSessionId,
                     feedbacks = feedbacksToSend,
@@ -1350,7 +1350,7 @@ class WaveManager(
                 }
                 waveCurrentIndex = 0
                 isWaveMode = true
-                println("🌊 Волна: Новая пачка из ${waveTracks.size} треков получена после завершения предыдущей! Запуск.")
+                AppLogger.d("WaveManager", "🌊 Волна: Новая пачка из ${waveTracks.size} треков получена после завершения предыдущей! Запуск.")
 
                 if (waveTracks.isNotEmpty()) {
                     playFirstRecommendation(source = TrackPlaySource.PLAY, crossfadeMs = crossfadeMs)

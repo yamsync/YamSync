@@ -2,6 +2,7 @@ package io.github.audiz.backend
 
 import io.github.audiz.util.AudioHeaderParser
 import java.io.File
+import io.github.audiz.util.AppLogger
 
 /**
  * 🛠️ Утилиты поиска и вызова внешних системных утилит (ffmpeg, ffprobe, ffplay, mpv)
@@ -121,7 +122,7 @@ object FfmpegUtils {
                 null
             }
         } catch (e: Exception) {
-            println("FfmpegUtils: Ошибка декодирования через ffmpeg - ${e.message}")
+            AppLogger.e("FfmpegUtils", "Ошибка декодирования через ffmpeg - ${e.message}", e)
             null
         }
     }
@@ -206,7 +207,7 @@ object FfmpegUtils {
                 }
                 return tempM4a
             } catch (e: Exception) {
-                println("FfmpegUtils: Не удалось создать временный .m4a файл: ${e.message}")
+                AppLogger.e("FfmpegUtils", "Не удалось создать временный .m4a файл: ${e.message}", e)
             }
         }
         return file

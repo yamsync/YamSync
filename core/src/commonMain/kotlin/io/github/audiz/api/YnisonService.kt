@@ -85,7 +85,7 @@ class YnisonService(private val client: HttpClient) {
         val encodedMetadata = rfc3986Encode(metadataJson)
         val protocolHeader = "Bearer, v2, $encodedMetadata"
 
-        println("YnisonService: Подключение к редиректору...")
+        CoreLogger.d("YnisonService", "Подключение к редиректору...")
         var result: RedirectInfo? = null
         lastYnisonError = null
 
@@ -103,7 +103,7 @@ class YnisonService(private val client: HttpClient) {
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
                             val text = frame.readText()
-                            println("YnisonService: Ответ редиректора: $text")
+                            CoreLogger.d("YnisonService", "Ответ редиректора: $text")
                             try {
                                 val json = Json { ignoreUnknownKeys = true }
                                 val root = json.parseToJsonElement(text).jsonObject
@@ -115,7 +115,7 @@ class YnisonService(private val client: HttpClient) {
                                     lastYnisonHost = host
                                 }
                             } catch (e: Exception) {
-                                println("YnisonService: Ошибка парсинга редиректора: ${e.message}")
+                                CoreLogger.e("YnisonService", "Ошибка парсинга редиректора: ${e.message}", e)
                                 lastYnisonError = "Ошибка парсинга ответа редиректора: ${e.message}"
                             }
                             break
@@ -169,7 +169,7 @@ class YnisonService(private val client: HttpClient) {
         val protocolHeader = "Bearer, v2, $encodedMetadata"
         val stateUrl = "wss://${redirect.host}/ynison_state.YnisonStateService/PutYnisonState"
 
-        println("YnisonService: Подключение к $stateUrl...")
+        CoreLogger.d("YnisonService", "Подключение к $stateUrl...")
         var waveSessionId: String? = null
 
         val rid = generateUuid()
@@ -189,13 +189,13 @@ class YnisonService(private val client: HttpClient) {
                         header("Sec-WebSocket-Protocol", protocolHeader)
                     }
                 ) {
-                    println("YnisonService: Соединение установлено. Отправка update_full_state...")
+                    CoreLogger.d("YnisonService", "Соединение установлено. Отправка update_full_state...")
                     send(Frame.Text(updateStatePayload))
 
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
                             val text = frame.readText()
-                            println("YnisonService: Получен ответ от PutYnisonState (длина ${text.length})")
+                            CoreLogger.d("YnisonService", "Получен ответ от PutYnisonState (длина ${text.length})")
                             
                             // 1. Попытка распарсить через Json
                             try {
@@ -222,11 +222,11 @@ class YnisonService(private val client: HttpClient) {
                                 if (!foundId.isNullOrBlank()) {
                                     waveSessionId = foundId
                                     lastYnisonError = null
-                                    println("YnisonService: Успешно распарсен wave session_id (JSON): $waveSessionId")
+                                    CoreLogger.i("YnisonService", "Успешно распарсен wave session_id (JSON): $waveSessionId")
                                     break
                                 }
                             } catch (e: Exception) {
-                                println("YnisonService: Ошибка парсинга JSON ответа: ${e.message}")
+                                CoreLogger.e("YnisonService", "Ошибка парсинга JSON ответа: ${e.message}", e)
                             }
 
                             // 2. Fallback через регулярное выражение
@@ -235,7 +235,7 @@ class YnisonService(private val client: HttpClient) {
                             if (matchRadio != null) {
                                 waveSessionId = matchRadio.groupValues[1]
                                 lastYnisonError = null
-                                println("YnisonService: Успешно распарсен wave session_id (Regex Radio): $waveSessionId")
+                                CoreLogger.i("YnisonService", "Успешно распарсен wave session_id (Regex Radio): $waveSessionId")
                                 break
                             }
 
@@ -244,7 +244,7 @@ class YnisonService(private val client: HttpClient) {
                             if (matchWave != null) {
                                 waveSessionId = matchWave.groupValues[1]
                                 lastYnisonError = null
-                                println("YnisonService: Успешно распарсен wave session_id (Regex Wave): $waveSessionId")
+                                CoreLogger.i("YnisonService", "Успешно распарсен wave session_id (Regex Wave): $waveSessionId")
                                 break
                             }
                         }

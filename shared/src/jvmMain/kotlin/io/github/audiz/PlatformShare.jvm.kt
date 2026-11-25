@@ -4,6 +4,7 @@ import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.io.File
+import io.github.audiz.util.AppLogger
 
 actual fun shareTrackFile(
     filePath: String,
@@ -19,14 +20,14 @@ actual fun shareTrackFile(
         if (file.exists()) {
             val transferable = FileTransferable(listOf(file), caption)
             Toolkit.getDefaultToolkit().systemClipboard.setContents(transferable, null)
-            println("📤 [YamSync] Файл '${file.name}' и ссылка скопированы в буфер обмена для вставки в чат (Ctrl+V)")
+            AppLogger.d("PlatformShare", "📤 [YamSync] Файл '${file.name}' и ссылка скопированы в буфер обмена для вставки в чат (Ctrl+V)")
         } else {
             val stringSelection = java.awt.datatransfer.StringSelection(caption)
             Toolkit.getDefaultToolkit().systemClipboard.setContents(stringSelection, null)
-            println("📤 [YamSync] Ссылка на трек скопирована в буфер обмена: $caption")
+            AppLogger.d("PlatformShare", "📤 [YamSync] Ссылка на трек скопирована в буфер обмена: $caption")
         }
     } catch (e: Exception) {
-        println("Ошибка копирования в буфер обмена: ${e.message}")
+        AppLogger.e("PlatformShare", "Ошибка копирования в буфер обмена: ${e.message}", e)
     }
 }
 

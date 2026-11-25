@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.*
 import kotlin.coroutines.coroutineContext
+import io.github.audiz.core.CoreLogger
 
 /**
  * 📂 Клиент плейлистов, альбомов, отметок мне нравится/не нравится и истории прослушиваний
@@ -62,7 +63,7 @@ class PlaylistsClient(
     suspend fun likeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
-            println("PlaylistsClient: Не удалось поставить лайк: userId неизвестен")
+            CoreLogger.e("PlaylistsClient", "Не удалось поставить лайк: userId неизвестен")
             return false
         }
         val cleanTrackId = trackIdWithAlbum.removePrefix("local:").substringBefore(":")
@@ -76,7 +77,7 @@ class PlaylistsClient(
                 parameter("track-id", trackKey)
             }
             if (response.status.value in 200..299) {
-                println("PlaylistsClient: Лайк отправлен (POST $url?track-id=$trackKey) -> статус ${response.status}")
+                CoreLogger.d("PlaylistsClient", "Лайк отправлен (POST $url?track-id=$trackKey) -> статус ${response.status}")
                 true
             } else {
                 val fallbackUrl = "https://api.music.yandex.ru/users/$userId/likes/tracks/add-multiple"
@@ -84,11 +85,11 @@ class PlaylistsClient(
                     applyAuthHeaders()
                     parameter("track-ids", cleanTrackId)
                 }
-                println("PlaylistsClient: Фолбэк лайка (POST $fallbackUrl?track-ids=$cleanTrackId) -> статус ${fallbackResponse.status}")
+                CoreLogger.d("PlaylistsClient", "Фолбэк лайка (POST $fallbackUrl?track-ids=$cleanTrackId) -> статус ${fallbackResponse.status}")
                 fallbackResponse.status.value in 200..299
             }
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка при отправке лайка: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка при отправке лайка: ${e.message}", e)
             false
         }
     }
@@ -101,7 +102,7 @@ class PlaylistsClient(
     suspend fun unlikeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
-            println("PlaylistsClient: Не удалось снять лайк: userId неизвестен")
+            CoreLogger.e("PlaylistsClient", "Не удалось снять лайк: userId неизвестен")
             return false
         }
         val cleanTrackId = trackIdWithAlbum.removePrefix("local:").substringBefore(":")
@@ -113,18 +114,18 @@ class PlaylistsClient(
                 parameter("track-id", cleanTrackId)
             }
             if (response.status.value in 200..299) {
-                println("PlaylistsClient: Лайк снят (POST $removeUrl?track-ids=$cleanTrackId) -> статус ${response.status}")
+                CoreLogger.d("PlaylistsClient", "Лайк снят (POST $removeUrl?track-ids=$cleanTrackId) -> статус ${response.status}")
                 true
             } else {
                 val pathUrl = "https://api.music.yandex.ru/users/$userId/likes/tracks/$cleanTrackId/remove"
                 val pathResponse: HttpResponse = client.post(pathUrl) {
                     applyAuthHeaders()
                 }
-                println("PlaylistsClient: Фолбэк снятия лайка (POST $pathUrl) -> статус ${pathResponse.status}")
+                CoreLogger.d("PlaylistsClient", "Фолбэк снятия лайка (POST $pathUrl) -> статус ${pathResponse.status}")
                 pathResponse.status.value in 200..299
             }
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка при снятии лайка: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка при снятии лайка: ${e.message}", e)
             try {
                 val pathUrl = "https://api.music.yandex.ru/users/$userId/likes/tracks/$cleanTrackId/remove"
                 val pathResponse: HttpResponse = client.post(pathUrl) {
@@ -144,7 +145,7 @@ class PlaylistsClient(
     suspend fun dislikeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
-            println("PlaylistsClient: Не удалось поставить дизлайк: userId неизвестен")
+            CoreLogger.e("PlaylistsClient", "Не удалось поставить дизлайк: userId неизвестен")
             return false
         }
         val cleanTrackId = trackIdWithAlbum.removePrefix("local:").substringBefore(":")
@@ -158,18 +159,18 @@ class PlaylistsClient(
                 parameter("track-id", trackKey)
             }
             if (response.status.value in 200..299) {
-                println("PlaylistsClient: Дизлайк отправлен (POST $url?track-id=$trackKey) -> статус ${response.status}")
+                CoreLogger.d("PlaylistsClient", "Дизлайк отправлен (POST $url?track-id=$trackKey) -> статус ${response.status}")
                 true
             } else {
                 val fallbackResponse: HttpResponse = client.post(url) {
                     applyAuthHeaders()
                     parameter("track-id", cleanTrackId)
                 }
-                println("PlaylistsClient: Фолбэк дизлайка (POST $url?track-id=$cleanTrackId) -> статус ${fallbackResponse.status}")
+                CoreLogger.d("PlaylistsClient", "Фолбэк дизлайка (POST $url?track-id=$cleanTrackId) -> статус ${fallbackResponse.status}")
                 fallbackResponse.status.value in 200..299
             }
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка при отправке дизлайка: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка при отправке дизлайка: ${e.message}", e)
             false
         }
     }
@@ -182,7 +183,7 @@ class PlaylistsClient(
     suspend fun undislikeTrack(trackIdWithAlbum: String): Boolean {
         val userId = context.getUserId()
         if (userId.isNullOrBlank()) {
-            println("PlaylistsClient: Не удалось снять дизлайк: userId неизвестен")
+            CoreLogger.e("PlaylistsClient", "Не удалось снять дизлайк: userId неизвестен")
             return false
         }
         val cleanTrackId = trackIdWithAlbum.removePrefix("local:").substringBefore(":")
@@ -194,18 +195,18 @@ class PlaylistsClient(
                 parameter("track-id", cleanTrackId)
             }
             if (response.status.value in 200..299) {
-                println("PlaylistsClient: Дизлайк снят (POST $removeUrl?track-ids=$cleanTrackId) -> статус ${response.status}")
+                CoreLogger.d("PlaylistsClient", "Дизлайк снят (POST $removeUrl?track-ids=$cleanTrackId) -> статус ${response.status}")
                 true
             } else {
                 val pathUrl = "https://api.music.yandex.ru/users/$userId/dislikes/tracks/$cleanTrackId/remove"
                 val pathResponse: HttpResponse = client.post(pathUrl) {
                     applyAuthHeaders()
                 }
-                println("PlaylistsClient: Фолбэк снятия дизлайка (POST $pathUrl) -> статус ${pathResponse.status}")
+                CoreLogger.d("PlaylistsClient", "Фолбэк снятия дизлайка (POST $pathUrl) -> статус ${pathResponse.status}")
                 pathResponse.status.value in 200..299
             }
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка при снятии дизлайка: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка при снятии дизлайка: ${e.message}", e)
             try {
                 val pathUrl = "https://api.music.yandex.ru/users/$userId/dislikes/tracks/$cleanTrackId/remove"
                 val pathResponse: HttpResponse = client.post(pathUrl) {
@@ -272,7 +273,7 @@ class PlaylistsClient(
                         richTracks.add(if (fullTrack.id.isBlank()) fullTrack.copy(id = effectiveId) else fullTrack)
                     }
                 } catch (e: Exception) {
-                    println("PlaylistsClient: Не удалось распарсить rich-трек: ${e.message}")
+                    CoreLogger.e("PlaylistsClient", "Не удалось распарсить rich-трек: ${e.message}", e)
                 }
             }
         }
@@ -345,7 +346,7 @@ class PlaylistsClient(
                         richTracks.add(if (fullTrack.id.isBlank()) fullTrack.copy(id = effectiveId) else fullTrack)
                     }
                 } catch (e: Exception) {
-                    println("PlaylistsClient: Не удалось распарсить rich-трек: ${e.message}")
+                    CoreLogger.e("PlaylistsClient", "Не удалось распарсить rich-трек: ${e.message}", e)
                 }
             }
         }
@@ -405,7 +406,7 @@ class PlaylistsClient(
                     richTracks.add(if (fullTrack.id.isBlank()) fullTrack.copy(id = effectiveId) else fullTrack)
                 }
             } catch (e: Exception) {
-                println("PlaylistsClient: Не удалось распарсить трек альбома: ${e.message}")
+                CoreLogger.e("PlaylistsClient", "Не удалось распарсить трек альбома: ${e.message}", e)
             }
         }
         return Pair(allIds, richTracks)
@@ -496,7 +497,7 @@ class PlaylistsClient(
                 applyAuthHeaders(ApiSessionContext.ACCEPT_LANGUAGE_RU)
             }
             if (response.status.value !in 200..299) {
-                println("PlaylistsClient: Ошибка получения пользовательских плейлистов: статус ${response.status}")
+                CoreLogger.e("PlaylistsClient", "Ошибка получения пользовательских плейлистов: статус ${response.status}")
                 return emptyList()
             }
             val rawText = response.bodyAsText()
@@ -530,12 +531,12 @@ class PlaylistsClient(
                         revision = revision
                     )
                 } catch (e: Exception) {
-                    println("PlaylistsClient: Ошибка разбора плейлиста: ${e.message}")
+                    CoreLogger.e("PlaylistsClient", "Ошибка разбора плейлиста: ${e.message}", e)
                     null
                 }
             }
         } catch (e: Exception) {
-            println("PlaylistsClient: Исключение при получении плейлистов пользователя: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Исключение при получении плейлистов пользователя: ${e.message}", e)
             emptyList()
         }
     }
@@ -554,7 +555,7 @@ class PlaylistsClient(
                 parameter("richTracks", true)
             }
             if (response.status.value !in 200..299) {
-                println("PlaylistsClient: Ошибка getPlaylistDetails $url: статус ${response.status}")
+                CoreLogger.e("PlaylistsClient", "Ошибка getPlaylistDetails $url: статус ${response.status}")
                 return null
             }
             val rawText = response.bodyAsText()
@@ -595,7 +596,7 @@ class PlaylistsClient(
                 tracks = items
             )
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка getPlaylistDetails: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка getPlaylistDetails: ${e.message}", e)
             null
         }
     }
@@ -625,7 +626,7 @@ class PlaylistsClient(
                 val firstTrack = details.result.firstOrNull()
                 resolvedAlbumId = firstTrack?.albums?.firstOrNull()?.id
             } catch (e: Exception) {
-                println("PlaylistsClient: Не удалось получить albumId для трека $cleanTrackId: ${e.message}")
+                CoreLogger.e("PlaylistsClient", "Не удалось получить albumId для трека $cleanTrackId: ${e.message}", e)
             }
         }
 
@@ -633,7 +634,7 @@ class PlaylistsClient(
         val revision = details?.revision ?: 1
 
         if (details != null && details.tracks.any { it.id == cleanTrackId }) {
-            println("PlaylistsClient: Трек $cleanTrackId уже есть в плейлисте $kind")
+            CoreLogger.d("PlaylistsClient", "Трек $cleanTrackId уже есть в плейлисте $kind")
             return true
         }
 
@@ -641,7 +642,7 @@ class PlaylistsClient(
         val albumPart = if (resolvedAlbumId != null && resolvedAlbumId > 0L) """, "albumId": $resolvedAlbumId""" else ""
         val idValue = if (cleanTrackId.toLongOrNull() != null) cleanTrackId else "\"$cleanTrackId\""
         val diff = """[{"op": "insert", "at": 0, "tracks": [{"id": $idValue$albumPart}]}]"""
-        println("PlaylistsClient: Добавление трека в плейлист $kind (rev: $revision, diff: $diff)")
+        CoreLogger.d("PlaylistsClient", "Добавление трека в плейлист $kind (rev: $revision, diff: $diff)")
 
         return try {
             val response: HttpResponse = client.submitForm(
@@ -656,13 +657,13 @@ class PlaylistsClient(
             }
             val body = response.bodyAsText()
             val status = response.status.value in 200..299
-            println("PlaylistsClient: Ответ добавления в плейлист: ${response.status} ($body)")
+            CoreLogger.d("PlaylistsClient", "Ответ добавления в плейлист: ${response.status} ($body)")
 
             if (!status && body.contains("revision", ignoreCase = true)) {
                 val freshDetails = getPlaylistDetails(numericUid, kind)
                 val freshRevision = freshDetails?.revision
                 if (freshRevision != null && freshRevision != revision) {
-                    println("PlaylistsClient: Повторяем добавление с актуальной ревизией: $freshRevision")
+                    CoreLogger.d("PlaylistsClient", "Повторяем добавление с актуальной ревизией: $freshRevision")
                     val retryResp: HttpResponse = client.submitForm(
                         url = url,
                         formParameters = Parameters.build {
@@ -675,13 +676,13 @@ class PlaylistsClient(
                     }
                     val retryStatus = retryResp.status.value in 200..299
                     val retryBody = retryResp.bodyAsText()
-                    println("PlaylistsClient: Ответ повторного добавления: ${retryResp.status} ($retryBody)")
+                    CoreLogger.d("PlaylistsClient", "Ответ повторного добавления: ${retryResp.status} ($retryBody)")
                     return retryStatus
                 }
             }
             status
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка добавления трека в плейлист: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка добавления трека в плейлист: ${e.message}", e)
             false
         }
     }
@@ -698,13 +699,13 @@ class PlaylistsClient(
         val details = getPlaylistDetails(numericUid, kind) ?: return false
         val index = details.tracks.indexOfFirst { it.id == cleanTrackId }
         if (index < 0) {
-            println("PlaylistsClient: Трек $cleanTrackId не найден в плейлисте $kind")
+            CoreLogger.w("PlaylistsClient", "Трек $cleanTrackId не найден в плейлисте $kind")
             return false
         }
 
         val url = "${ApiUrls.USER_PLAYLISTS_BASE_URL}/$uid/playlists/$kind/change"
         val diff = """[{"op": "delete", "from": $index, "to": ${index + 1}}]"""
-        println("PlaylistsClient: Удаление трека $cleanTrackId (индекс $index) из плейлиста $kind (rev: ${details.revision}, diff: $diff)")
+        CoreLogger.d("PlaylistsClient", "Удаление трека $cleanTrackId (индекс $index) из плейлиста $kind (rev: ${details.revision}, diff: $diff)")
 
         return try {
             val response: HttpResponse = client.submitForm(
@@ -719,14 +720,14 @@ class PlaylistsClient(
             }
             val body = response.bodyAsText()
             val status = response.status.value in 200..299
-            println("PlaylistsClient: Ответ удаления из плейлиста: ${response.status} ($body)")
+            CoreLogger.d("PlaylistsClient", "Ответ удаления из плейлиста: ${response.status} ($body)")
 
             if (!status && body.contains("revision", ignoreCase = true)) {
                 val freshDetails = getPlaylistDetails(numericUid, kind)
                 val freshIndex = freshDetails?.tracks?.indexOfFirst { it.id == cleanTrackId } ?: -1
                 val freshRev = freshDetails?.revision
                 if (freshRev != null && freshIndex >= 0) {
-                    println("PlaylistsClient: Повторяем удаление с ревизией $freshRev (индекс $freshIndex)")
+                    CoreLogger.d("PlaylistsClient", "Повторяем удаление с ревизией $freshRev (индекс $freshIndex)")
                     val retryDiff = """[{"op": "delete", "from": $freshIndex, "to": ${freshIndex + 1}}]"""
                     val retryResp: HttpResponse = client.submitForm(
                         url = url,
@@ -740,13 +741,13 @@ class PlaylistsClient(
                     }
                     val retryStatus = retryResp.status.value in 200..299
                     val retryBody = retryResp.bodyAsText()
-                    println("PlaylistsClient: Ответ повторного удаления: ${retryResp.status} ($retryBody)")
+                    CoreLogger.d("PlaylistsClient", "Ответ повторного удаления: ${retryResp.status} ($retryBody)")
                     return retryStatus
                 }
             }
             status
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка удаления трека из плейлиста: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка удаления трека из плейлиста: ${e.message}", e)
             false
         }
     }
@@ -759,7 +760,7 @@ class PlaylistsClient(
         val uid = context.getAccountUid() ?: context.cachedUserId ?: return null
         val cleanTitle = title.trim().ifBlank { "Новый плейлист" }
         val url = "${ApiUrls.USER_PLAYLISTS_BASE_URL}/$uid/playlists/create"
-        println("PlaylistsClient: Создание плейлиста в аккаунте '$cleanTitle'")
+        CoreLogger.d("PlaylistsClient", "Создание плейлиста в аккаунте '$cleanTitle'")
         return try {
             val response: HttpResponse = client.submitForm(
                 url = url,
@@ -771,7 +772,7 @@ class PlaylistsClient(
                 applyAuthHeaders()
             }
             if (response.status.value !in 200..299) {
-                println("PlaylistsClient: Ошибка создания плейлиста: статус ${response.status}")
+                CoreLogger.e("PlaylistsClient", "Ошибка создания плейлиста: статус ${response.status}")
                 return null
             }
             val rawText = response.bodyAsText()
@@ -795,7 +796,7 @@ class PlaylistsClient(
                 revision = revision
             )
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка создания плейлиста: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка создания плейлиста: ${e.message}", e)
             null
         }
     }
@@ -809,18 +810,18 @@ class PlaylistsClient(
             ?: context.getAccountUid() ?: context.cachedUserId ?: return null
         val cleanTitle = newTitle.trim().ifBlank { "Плейлист" }
         val url = "${ApiUrls.USER_PLAYLISTS_BASE_URL}/$targetUid/playlists/$kind/name"
-        println("PlaylistsClient: Переименование плейлиста $kind в '$cleanTitle' (uid: $targetUid)")
+        CoreLogger.d("PlaylistsClient", "Переименование плейлиста $kind в '$cleanTitle' (uid: $targetUid)")
         return try {
             val response: HttpResponse = client.post(url) {
                 parameter("value", cleanTitle)
                 applyAuthHeaders()
             }
             if (response.status.value !in 200..299) {
-                println("PlaylistsClient: Ошибка переименования плейлиста: статус ${response.status} (${response.bodyAsText()})")
+                CoreLogger.e("PlaylistsClient", "Ошибка переименования плейлиста: статус ${response.status} (${response.bodyAsText()})")
                 return null
             }
             val rawText = response.bodyAsText()
-            println("PlaylistsClient: Ответ переименования плейлиста: $rawText")
+            CoreLogger.d("PlaylistsClient", "Ответ переименования плейлиста: $rawText")
             val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
             val root = json.parseToJsonElement(rawText).jsonObject
             val obj = root["result"]?.jsonObject ?: root
@@ -848,7 +849,7 @@ class PlaylistsClient(
                 revision = revision
             )
         } catch (e: Exception) {
-            println("PlaylistsClient: Ошибка переименования плейлиста: ${e.message}")
+            CoreLogger.e("PlaylistsClient", "Ошибка переименования плейлиста: ${e.message}", e)
             null
         }
     }

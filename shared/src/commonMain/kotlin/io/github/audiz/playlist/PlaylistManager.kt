@@ -177,7 +177,7 @@ class PlaylistManager(
                             personalPlaylists.clear()
                             personalPlaylists.addAll(playlists)
                             loadedFromNetwork = true
-                            println("PlaylistManager: Загружено персональных плейлистов: ${playlists.size}")
+                            AppLogger.d("PlaylistManager", "Загружено персональных плейлистов: ${playlists.size}")
                             withContext(DispatcherIO) {
                                 savePersonalPlaylistsCache(storagePath, playlists)
                             }
@@ -185,7 +185,7 @@ class PlaylistManager(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        println("PlaylistManager: Ошибка загрузки персональных плейлистов: ${e.message}")
+                        AppLogger.e("PlaylistManager", "Ошибка загрузки персональных плейлистов: ${e.message}", e)
                     }
                 }
                 if (!loadedFromNetwork && personalPlaylists.isEmpty()) {
@@ -196,12 +196,12 @@ class PlaylistManager(
                         if (cached.isNotEmpty()) {
                             personalPlaylists.clear()
                             personalPlaylists.addAll(cached)
-                            println("PlaylistManager: Загружено персональных плейлистов из кеша: ${cached.size}")
+                            AppLogger.d("PlaylistManager", "Загружено персональных плейлистов из кеша: ${cached.size}")
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        println("PlaylistManager: Ошибка загрузки персональных плейлистов из кеша: ${e.message}")
+                        AppLogger.e("PlaylistManager", "Ошибка загрузки персональных плейлистов из кеша: ${e.message}", e)
                     }
                 }
             } finally {
@@ -240,9 +240,7 @@ class PlaylistManager(
                     }
                     if (!showcase.isEmpty) {
                         applyEditorialShowcase(showcase)
-                        println(
-                            "PlaylistManager: Загружена витрина (чартов: ${showcase.charts.size}, плейлистов: ${showcase.newPlaylists.size}, релизов: ${showcase.newReleases.size})"
-                        )
+                        AppLogger.d("PlaylistManager", "Загружена витрина (чартов: ${showcase.charts.size}, плейлистов: ${showcase.newPlaylists.size}, релизов: ${showcase.newReleases.size})")
                         withContext(DispatcherIO) {
                             saveEditorialShowcaseCache(storagePath, showcase)
                         }
@@ -250,7 +248,7 @@ class PlaylistManager(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    println("PlaylistManager: Ошибка загрузки витрины: ${e.message}")
+                    AppLogger.e("PlaylistManager", "Ошибка загрузки витрины: ${e.message}", e)
                 }
             } finally {
                 isEditorialShowcaseLoading = false
@@ -291,7 +289,7 @@ class PlaylistManager(
                         userPlaylists.clear()
                         userPlaylists.addAll(playlists)
                         loadedFromNetwork = true
-                        println("PlaylistManager: Загружено пользовательских плейлистов из Яндекса: ${playlists.size}")
+                        AppLogger.d("PlaylistManager", "Загружено пользовательских плейлистов из Яндекса: ${playlists.size}")
                         withContext(DispatcherIO) {
                             saveUserPlaylistsCache(storagePath, playlists)
                         }
@@ -316,7 +314,7 @@ class PlaylistManager(
                         }
                     }
                 } catch (e: Throwable) {
-                    println("PlaylistManager: Ошибка загрузки пользовательских плейлистов: ${e.message}")
+                    AppLogger.e("PlaylistManager", "Ошибка загрузки пользовательских плейлистов: ${e.message}", e)
                 }
             }
             if (!loadedFromNetwork && userPlaylists.isEmpty()) {
@@ -327,10 +325,10 @@ class PlaylistManager(
                     if (cached.isNotEmpty()) {
                         userPlaylists.clear()
                         userPlaylists.addAll(cached)
-                        println("PlaylistManager: Загружено пользовательских плейлистов из кеша: ${cached.size}")
+                        AppLogger.d("PlaylistManager", "Загружено пользовательских плейлистов из кеша: ${cached.size}")
                     }
                 } catch (e: Throwable) {
-                    println("PlaylistManager: Ошибка загрузки пользовательских плейлистов из кеша: ${e.message}")
+                    AppLogger.e("PlaylistManager", "Ошибка загрузки пользовательских плейлистов из кеша: ${e.message}", e)
                 }
             }
             isUserPlaylistsLoading = false
@@ -351,9 +349,9 @@ class PlaylistManager(
                 localPlaylists.clear()
                 localPlaylists.addAll(list)
                 notifyPlaylistsChanged()
-                println("PlaylistManager: Загружено локальных плейлистов: ${list.size}")
+                AppLogger.d("PlaylistManager", "Загружено локальных плейлистов: ${list.size}")
             } catch (e: Throwable) {
-                println("PlaylistManager: Ошибка загрузки локальных плейлистов: ${e.message}")
+                AppLogger.e("PlaylistManager", "Ошибка загрузки локальных плейлистов: ${e.message}", e)
             } finally {
                 isLocalPlaylistsLoading = false
             }
@@ -753,7 +751,7 @@ class PlaylistManager(
                         }
                     }
                 } catch (e: Exception) {
-                    println("PlaylistManager: Ошибка сопоставления локального трека в Яндекс Музыке: ${e.message}")
+                    AppLogger.e("PlaylistManager", "Ошибка сопоставления локального трека в Яндекс Музыке: ${e.message}", e)
                 }
             }
 
@@ -820,7 +818,7 @@ class PlaylistManager(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    println("PlaylistManager: Ошибка сопоставления трека при удалении: ${e.message}")
+                    AppLogger.e("PlaylistManager", "Ошибка сопоставления трека при удалении: ${e.message}", e)
                 }
             }
 
@@ -1164,9 +1162,9 @@ class PlaylistManager(
                 }
                 likedTrackIds.clear()
                 likedTrackIds.addAll(ids.map { it.removePrefix("local:").substringBefore(":") })
-                println("PlaylistManager: Синхронизировано ${likedTrackIds.size} лайкнутых треков")
+                AppLogger.d("PlaylistManager", "Синхронизировано ${likedTrackIds.size} лайкнутых треков")
             } catch (e: Throwable) {
-                println("PlaylistManager: Ошибка синхронизации лайкнутых треков: ${e.message}")
+                AppLogger.e("PlaylistManager", "Ошибка синхронизации лайкнутых треков: ${e.message}", e)
             }
         }
     }
@@ -1188,16 +1186,16 @@ class PlaylistManager(
             likedTrackIds.remove(trackId)
             val legacy = likedTrackIds.filter { it.removePrefix("local:").substringBefore(":") == cleanTrackId }
             likedTrackIds.removeAll(legacy)
-            println("PlaylistManager: Трек $cleanTrackId удален из лайков (локально)")
+            AppLogger.d("PlaylistManager", "Трек $cleanTrackId удален из лайков (локально)")
         } else {
             likedTrackIds.add(cleanTrackId)
-            println("PlaylistManager: Трек $cleanTrackId добавлен в лайки (локально)")
+            AppLogger.d("PlaylistManager", "Трек $cleanTrackId добавлен в лайки (локально)")
             if (wasDisliked) {
                 dislikedTrackIds.remove(cleanTrackId)
                 dislikedTrackIds.remove(trackId)
                 val legacyDislikes = dislikedTrackIds.filter { it.removePrefix("local:").substringBefore(":") == cleanTrackId }
                 dislikedTrackIds.removeAll(legacyDislikes)
-                println("PlaylistManager: Трек $cleanTrackId удален из дизлайков из-за лайка")
+                AppLogger.d("PlaylistManager", "Трек $cleanTrackId удален из дизлайков из-за лайка")
             }
         }
 
@@ -1208,9 +1206,9 @@ class PlaylistManager(
                 val success = repository.unlikeTrack(trackKey)
                 if (!success) {
                     likedTrackIds.add(cleanTrackId)
-                    println("PlaylistManager: ❌ Ошибка изменения статуса лайка на сервере для $trackKey, состояние откатано")
+                    AppLogger.e("PlaylistManager", "❌ Ошибка изменения статуса лайка на сервере для $trackKey, состояние откатано")
                 } else {
-                    println("PlaylistManager: ✅ Статус лайка для $trackKey успешно обновлен на сервере")
+                    AppLogger.i("PlaylistManager", "✅ Статус лайка для $trackKey успешно обновлен на сервере")
                 }
             } else {
                 if (wasDisliked) {
@@ -1225,9 +1223,9 @@ class PlaylistManager(
                     if (wasDisliked) {
                         dislikedTrackIds.add(cleanTrackId)
                     }
-                    println("PlaylistManager: ❌ Ошибка изменения статуса лайка на сервере для $trackKey, состояние откатано")
+                    AppLogger.e("PlaylistManager", "❌ Ошибка изменения статуса лайка на сервере для $trackKey, состояние откатано")
                 } else {
-                    println("PlaylistManager: ✅ Статус лайка для $trackKey успешно обновлен на сервере")
+                    AppLogger.i("PlaylistManager", "✅ Статус лайка для $trackKey успешно обновлен на сервере")
                 }
             }
         }
@@ -1250,16 +1248,16 @@ class PlaylistManager(
             dislikedTrackIds.remove(trackId)
             val legacy = dislikedTrackIds.filter { it.removePrefix("local:").substringBefore(":") == cleanTrackId }
             dislikedTrackIds.removeAll(legacy)
-            println("PlaylistManager: Трек $cleanTrackId удален из дизлайков (локально)")
+            AppLogger.d("PlaylistManager", "Трек $cleanTrackId удален из дизлайков (локально)")
         } else {
             dislikedTrackIds.add(cleanTrackId)
-            println("PlaylistManager: Трек $cleanTrackId добавлен в дизлайки (локально)")
+            AppLogger.d("PlaylistManager", "Трек $cleanTrackId добавлен в дизлайки (локально)")
             if (wasLiked) {
                 likedTrackIds.remove(cleanTrackId)
                 likedTrackIds.remove(trackId)
                 val legacyLikes = likedTrackIds.filter { it.removePrefix("local:").substringBefore(":") == cleanTrackId }
                 likedTrackIds.removeAll(legacyLikes)
-                println("PlaylistManager: Трек $cleanTrackId удален из лайков из-за дизлайка")
+                AppLogger.d("PlaylistManager", "Трек $cleanTrackId удален из лайков из-за дизлайка")
             }
         }
 
@@ -1269,9 +1267,9 @@ class PlaylistManager(
                     val success = repository.undislikeTrack(trackKey)
                     if (!success) {
                         dislikedTrackIds.add(cleanTrackId)
-                        println("PlaylistManager: ❌ Ошибка снятия дизлайка на сервере для $trackKey, состояние откатано")
+                        AppLogger.e("PlaylistManager", "❌ Ошибка снятия дизлайка на сервере для $trackKey, состояние откатано")
                     } else {
-                        println("PlaylistManager: ✅ Статус дизлайка для $trackKey успешно обновлен на сервере (снят)")
+                        AppLogger.i("PlaylistManager", "✅ Статус дизлайка для $trackKey успешно обновлен на сервере (снят)")
                     }
                 } else {
                     if (wasLiked) {
@@ -1286,9 +1284,9 @@ class PlaylistManager(
                         if (wasLiked) {
                             likedTrackIds.add(cleanTrackId)
                         }
-                        println("PlaylistManager: ❌ Ошибка добавления дизлайка на сервере для $trackKey, состояние откатано")
+                        AppLogger.e("PlaylistManager", "❌ Ошибка добавления дизлайка на сервере для $trackKey, состояние откатано")
                     } else {
-                        println("PlaylistManager: ✅ Дизлайк для $trackKey успешно отправлен на сервер")
+                        AppLogger.i("PlaylistManager", "✅ Дизлайк для $trackKey успешно отправлен на сервер")
                     }
                 }
             }
@@ -1312,7 +1310,7 @@ class PlaylistManager(
 
         if (!wasDisliked) {
             dislikedTrackIds.add(cleanTrackId)
-            println("PlaylistManager: Трек $cleanTrackId добавлен в дизлайки")
+            AppLogger.d("PlaylistManager", "Трек $cleanTrackId добавлен в дизлайки")
             if (wasLiked) {
                 likedTrackIds.remove(cleanTrackId)
                 likedTrackIds.remove(trackId)
@@ -1334,9 +1332,9 @@ class PlaylistManager(
                         if (wasLiked) {
                             likedTrackIds.add(cleanTrackId)
                         }
-                        println("PlaylistManager: ❌ Ошибка добавления дизлайка на сервере для $trackKey, состояние откатано")
+                        AppLogger.e("PlaylistManager", "❌ Ошибка добавления дизлайка на сервере для $trackKey, состояние откатано")
                     } else {
-                        println("PlaylistManager: ✅ Дизлайк для $trackKey успешно отправлен на сервер")
+                        AppLogger.i("PlaylistManager", "✅ Дизлайк для $trackKey успешно отправлен на сервер")
                     }
                 }
             }

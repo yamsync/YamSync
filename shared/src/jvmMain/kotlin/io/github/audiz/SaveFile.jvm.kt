@@ -21,11 +21,11 @@ actual fun saveFilePlatformSpecific(bytes: ByteArray, fileName: String) {
 
     val outputFile = File(finalDir, fileName)
     outputFile.writeBytes(bytes)
-    println("Десктоп успешно сохранил файл: ${outputFile.absolutePath}")
+    AppLogger.i("SaveFile", "Десктоп успешно сохранил файл: ${outputFile.absolutePath}")
 }
 
 actual fun saveSessionToken(token: String) {
-    println("save sessionKey = $sessionKey")
+    AppLogger.d("SaveFile", "save sessionKey = $sessionKey")
     prefs.put(sessionKey, token)
     try {
         prefs.flush() // Принудительно сохраняет данные на диск ПРЯМО СЕЙЧАС

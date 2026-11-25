@@ -11,6 +11,7 @@ import java.net.Socket
 import java.net.SocketException
 import java.net.URLDecoder
 import java.util.concurrent.Executors
+import io.github.audiz.util.AppLogger
 
 private val syncJson = Json {
     ignoreUnknownKeys = true
@@ -58,7 +59,7 @@ actual class YamSyncServer actual constructor(
         serverSocket = socket
         activePort = socket.localPort
         running = true
-        println("⚡ [YamSyncServer] Запущен на порту $activePort (токен: $token)")
+        AppLogger.i("YamSyncServer", "⚡ [YamSyncServer] Запущен на порту $activePort (токен: $token)")
 
         threadPool.execute {
             while (running && !socket.isClosed) {
@@ -72,7 +73,7 @@ actual class YamSyncServer actual constructor(
                     try { Thread.sleep(50) } catch (_: InterruptedException) { break }
                 } catch (e: Throwable) {
                     if (!running || socket.isClosed) break
-                    println("⚡ [YamSyncServer] Ошибка accept: ${e.message}")
+                    AppLogger.e("YamSyncServer", "⚡ [YamSyncServer] Ошибка accept: ${e.message}", e)
                     try { Thread.sleep(50) } catch (_: InterruptedException) { break }
                 }
             }
@@ -87,7 +88,7 @@ actual class YamSyncServer actual constructor(
             serverSocket?.close()
         } catch (_: Exception) {}
         serverSocket = null
-        println("⚡ [YamSyncServer] Остановлен")
+        AppLogger.d("YamSyncServer", "⚡ [YamSyncServer] Остановлен")
     }
 
     private fun handleClient(client: Socket) {
@@ -182,7 +183,7 @@ actual class YamSyncServer actual constructor(
                             val clientDev = syncJson.decodeFromString(YamSyncDevice.serializer(), bodyStr)
                             onClientConnected(clientDev)
                         } catch (t: Throwable) {
-                            println("⚡ [YamSyncServer] Ошибка декодирования client device: ${t.message}")
+                            AppLogger.e("YamSyncServer", "⚡ [YamSyncServer] Ошибка декодирования client device: ${t.message}", t)
                         }
                     }
 
@@ -199,7 +200,7 @@ actual class YamSyncServer actual constructor(
                                 val clientManifest = syncJson.decodeFromString(YamSyncManifest.serializer(), bodyStr)
                                 onManifestReceived?.invoke(clientManifest)
                             } catch (t: Throwable) {
-                                println("⚡ [YamSyncServer] Ошибка декодирования client manifest: ${t.message}")
+                                AppLogger.e("YamSyncServer", "⚡ [YamSyncServer] Ошибка декодирования client manifest: ${t.message}", t)
                             }
                         }
                     }

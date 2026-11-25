@@ -12,6 +12,7 @@ import java.io.FileOutputStream
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import io.github.audiz.util.AppLogger
 
 actual object LocalStreamProxy {
     @Volatile private var isStarted: Boolean = false
@@ -35,7 +36,7 @@ actual object LocalStreamProxy {
         this.isRecordToDiskFunc = isRecordToDisk
         this.onTrackSavedCallback = onTrackSaved
         this.isStarted = true
-        println("⚡ [StreamProxy] Android LocalStreamProxy активирован (MediaDataSource)")
+        AppLogger.d("LocalStreamProxy", "⚡ [StreamProxy] Android LocalStreamProxy активирован (MediaDataSource)")
     }
 
     actual fun stop() {
@@ -45,7 +46,7 @@ actual object LocalStreamProxy {
         activeDownloadJobs.clear()
         activeDataSources.values.forEach { it.close() }
         activeDataSources.clear()
-        println("⚡ [StreamProxy] Android LocalStreamProxy остановлен")
+        AppLogger.d("LocalStreamProxy", "⚡ [StreamProxy] Android LocalStreamProxy остановлен")
     }
 
     actual fun isRunning(): Boolean = isStarted && repository != null
@@ -135,7 +136,7 @@ actual object LocalStreamProxy {
 
                 val finalPath = "$basePath/${sanitizeKeepSpaces(cleanArtist)}/$fullFileName"
                 if (localFileExists(finalPath)) {
-                    println("⚡ [StreamProxy Android] Трек уже сохранен на диске: $finalPath")
+                    AppLogger.d("LocalStreamProxy", "⚡ [StreamProxy Android] Трек уже сохранен на диске: $finalPath")
                     onTrackSavedCallback?.invoke(trackId, finalPath)
                     return@launch
                 }
@@ -144,7 +145,7 @@ actual object LocalStreamProxy {
                 val totalSize = meta.totalSizeBytes
                 if (totalSize <= 0L) return@launch
 
-                println("⚡ [StreamProxy Android] Старт фонового сохранения трека: $fullFileName")
+                AppLogger.d("LocalStreamProxy", "⚡ [StreamProxy Android] Старт фонового сохранения трека: $fullFileName")
                 val tempFile = File.createTempFile("ya_save_", ".$ext").apply {
                     setReadable(true, true)
                     setWritable(true, true)
@@ -167,13 +168,13 @@ actual object LocalStreamProxy {
                 if (isActive && tempFile.length() == totalSize) {
                     val bytes = tempFile.readBytes()
                     saveTrackFile(basePath, cleanArtist, fullFileName, bytes)
-                    println("⚡ [StreamProxy Android] Трек успешно сохранен на диск в фоне: $finalPath")
+                    AppLogger.i("LocalStreamProxy", "⚡ [StreamProxy Android] Трек успешно сохранен на диск в фоне: $finalPath")
                     onTrackSavedCallback?.invoke(trackId, finalPath)
                 }
                 tempFile.delete()
             } catch (_: CancellationException) {
             } catch (e: Exception) {
-                println("⚡ [StreamProxy Android] Ошибка фонового сохранения трека: ${e.message}")
+                AppLogger.e("LocalStreamProxy", "⚡ [StreamProxy Android] Ошибка фонового сохранения трека: ${e.message}", e)
             } finally {
                 activeDownloadJobs.remove(saveKey)
             }

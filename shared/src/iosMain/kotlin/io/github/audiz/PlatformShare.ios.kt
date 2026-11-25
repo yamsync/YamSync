@@ -5,6 +5,7 @@ package io.github.audiz
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSURL
 import platform.UIKit.*
+import io.github.audiz.util.AppLogger
 
 actual fun shareTrackFile(
     filePath: String,
@@ -40,6 +41,6 @@ actual fun shareTrackFile(
             rootVC.presentViewController(activityVC, animated = true, completion = null)
         }
     } catch (e: Throwable) {
-        println("PlatformShare iOS: Ошибка вызова UIActivityViewController: ${e.message}")
+        AppLogger.e("PlatformShare", "Ошибка вызова UIActivityViewController: ${e.message}", e)
     }
 }

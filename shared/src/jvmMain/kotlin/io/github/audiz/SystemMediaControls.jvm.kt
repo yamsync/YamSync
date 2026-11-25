@@ -9,6 +9,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import io.github.audiz.util.AppLogger
 
 private const val MAX_CACHED_COVERS = 20
 
@@ -84,7 +85,7 @@ actual class SystemMediaControls {
                     start()
                 }
             } catch (e: Exception) {
-                println("SystemMediaControls JVM: Не удалось запустить MPRIS: ${e.message}")
+                AppLogger.e("SystemMediaControls", "Не удалось запустить MPRIS: ${e.message}", e)
             }
         } else if (isWindows) {
             try {
@@ -99,7 +100,7 @@ actual class SystemMediaControls {
                     start()
                 }
             } catch (e: Exception) {
-                println("SystemMediaControls JVM: Не удалось запустить Windows SMTC: ${e.message}")
+                AppLogger.e("SystemMediaControls", "Не удалось запустить Windows SMTC: ${e.message}", e)
             }
         }
     }

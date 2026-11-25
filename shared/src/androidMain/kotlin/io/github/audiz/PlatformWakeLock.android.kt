@@ -2,6 +2,7 @@ package io.github.audiz
 
 import android.content.Context
 import android.os.PowerManager
+import io.github.audiz.util.AppLogger
 
 private var transitionWakeLock: PowerManager.WakeLock? = null
 private val wakeLockSync = Any()
@@ -20,10 +21,10 @@ actual fun acquirePlaybackWakeLock() {
                 }
             }
             transitionWakeLock?.acquire(45_000L) // 45 секунд максимальный таймаут
-            println("PlatformWakeLock Android: WakeLock захвачен (45s max timeout)")
+            AppLogger.d("PlatformWakeLock", "WakeLock захвачен (45s max timeout)")
         }
     } catch (e: Exception) {
-        println("PlatformWakeLock Android: Ошибка захвата WakeLock: ${e.message}")
+        AppLogger.e("PlatformWakeLock", "Ошибка захвата WakeLock: ${e.message}", e)
     }
 }
 
@@ -32,11 +33,11 @@ actual fun releasePlaybackWakeLock() {
         synchronized(wakeLockSync) {
             if (transitionWakeLock?.isHeld == true) {
                 transitionWakeLock?.release()
-                println("PlatformWakeLock Android: WakeLock освобожден")
+                AppLogger.d("PlatformWakeLock", "WakeLock освобожден")
             }
         }
     } catch (e: Exception) {
-        println("PlatformWakeLock Android: Ошибка освобождения WakeLock: ${e.message}")
+        AppLogger.e("PlatformWakeLock", "Ошибка освобождения WakeLock: ${e.message}", e)
     }
 }
 

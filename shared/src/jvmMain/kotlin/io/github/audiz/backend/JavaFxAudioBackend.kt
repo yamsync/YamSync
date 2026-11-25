@@ -4,6 +4,7 @@ import io.github.audiz.dsp.AudioVisualizer
 import io.github.audiz.volumeToGain
 import kotlinx.coroutines.*
 import java.io.File
+import io.github.audiz.util.AppLogger
 
 /**
  * ☕ Аудио-бэкенд на базе JavaFX Media (основной плеер для MP3, AAC/M4A, WAV на Windows, macOS и Linux)
@@ -26,11 +27,11 @@ class JavaFxAudioBackend(
                         try {
                             javafx.application.Platform.startup {}
                             available = true
-                            println("JavaFxAudioBackend: JavaFX Media успешно инициализирован.")
+                            AppLogger.i("JavaFxAudioBackend", "JavaFX Media успешно инициализирован.")
                         } catch (_: IllegalStateException) {
                             available = true
                         } catch (t: Throwable) {
-                            println("JavaFxAudioBackend: JavaFX Platform.startup недоступен: ${t.message}")
+                            AppLogger.d("JavaFxAudioBackend", "JavaFX Platform.startup недоступен: ${t.message}")
                             available = false
                         }
                         isInitialized = true
@@ -151,7 +152,7 @@ class JavaFxAudioBackend(
                 player.setOnError {
                     if (sessionId == currentSessionId && fxPlayer == player) {
                         val err = player.error?.message ?: "Unknown JavaFX error"
-                        println("JavaFxAudioBackend: Ошибка JavaFX: $err. Вызываем fallback...")
+                        AppLogger.e("JavaFxAudioBackend", "Ошибка JavaFX: $err. Вызываем fallback...")
                         fxPlayer = null
                         player.dispose()
                         isPlayingState = false
@@ -163,7 +164,7 @@ class JavaFxAudioBackend(
             } catch (e: Throwable) {
                 if (sessionId == currentSessionId) {
                     val msg = e.message ?: "JavaFX initialization error"
-                    println("JavaFxAudioBackend: Исключение запуска JavaFX: $msg. Вызываем fallback...")
+                    AppLogger.w("JavaFxAudioBackend", "Исключение запуска JavaFX: $msg. Вызываем fallback...")
                     fxPlayer = null
                     isPlayingState = false
                     callback.onError(sessionId, msg, canFallback = true)
@@ -258,7 +259,7 @@ class JavaFxAudioBackend(
                 }
             }
         } catch (e: Throwable) {
-            println("JavaFxAudioBackend: Не удалось настроить AudioSpectrumListener: ${e.message}")
+            AppLogger.e("JavaFxAudioBackend", "Не удалось настроить AudioSpectrumListener: ${e.message}", e)
         }
     }
 

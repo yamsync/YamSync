@@ -11,6 +11,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import platform.posix.*
 import platform.Foundation.*
+import io.github.audiz.util.AppLogger
 
 private val syncJson = Json {
     ignoreUnknownKeys = true
@@ -85,7 +86,7 @@ actual class YamSyncServer actual constructor(
 
         val fd = socket(AF_INET, SOCK_STREAM, 0)
         if (fd < 0) {
-            println("⚡ [YamSyncServer iOS] Ошибка создания сокета")
+            AppLogger.e("YamSyncServer", "⚡ [YamSyncServer iOS] Ошибка создания сокета")
             return 0
         }
         disableSigPipe(fd)
@@ -111,7 +112,7 @@ actual class YamSyncServer actual constructor(
             }
 
             if (bindRes != 0) {
-                println("⚡ [YamSyncServer iOS] Ошибка bind: $bindRes")
+                AppLogger.e("YamSyncServer", "⚡ [YamSyncServer iOS] Ошибка bind: $bindRes")
                 close(fd)
                 return 0
             }
@@ -123,14 +124,14 @@ actual class YamSyncServer actual constructor(
         }
 
         if (listen(fd, 10) != 0) {
-            println("⚡ [YamSyncServer iOS] Ошибка listen")
+            AppLogger.e("YamSyncServer", "⚡ [YamSyncServer iOS] Ошибка listen")
             close(fd)
             return 0
         }
 
         serverFd = fd
         running = true
-        println("⚡ [YamSyncServer iOS] Запущен на порту $activePort (токен: $token)")
+        AppLogger.i("YamSyncServer", "⚡ [YamSyncServer iOS] Запущен на порту $activePort (токен: $token)")
 
         serverScope.launch(Dispatchers.Default) {
             while (running && serverFd >= 0) {
@@ -156,7 +157,7 @@ actual class YamSyncServer actual constructor(
             serverFd = -1
         }
         serverScope.cancel()
-        println("⚡ [YamSyncServer iOS] Остановлен")
+        AppLogger.d("YamSyncServer", "⚡ [YamSyncServer iOS] Остановлен")
     }
 
     private fun handleClient(clientFd: Int) {
@@ -199,7 +200,7 @@ actual class YamSyncServer actual constructor(
                             val clientDev = syncJson.decodeFromString(YamSyncDevice.serializer(), bodyStr)
                             onClientConnected(clientDev)
                         } catch (t: Throwable) {
-                            println("⚡ [YamSyncServer iOS] Ошибка декодирования client device: ${t.message}")
+                            AppLogger.e("YamSyncServer", "⚡ [YamSyncServer iOS] Ошибка декодирования client device: ${t.message}", t)
                         }
                     }
                     val body = syncJson.encodeToString(YamSyncDevice.serializer(), localDevice).encodeToByteArray()
@@ -215,7 +216,7 @@ actual class YamSyncServer actual constructor(
                                 val clientManifest = syncJson.decodeFromString(YamSyncManifest.serializer(), bodyStr)
                                 onManifestReceived?.invoke(clientManifest)
                             } catch (t: Throwable) {
-                                println("⚡ [YamSyncServer iOS] Ошибка декодирования client manifest: ${t.message}")
+                                AppLogger.e("YamSyncServer", "⚡ [YamSyncServer iOS] Ошибка декодирования client manifest: ${t.message}", t)
                             }
                         }
                     }

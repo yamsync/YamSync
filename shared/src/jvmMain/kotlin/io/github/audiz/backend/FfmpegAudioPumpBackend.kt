@@ -12,6 +12,7 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.sound.sampled.*
+import io.github.audiz.util.AppLogger
 
 /**
  * 🚀 Аудио-бэкенд потокового декодирования через FFmpeg с выводом через JavaSound SourceDataLine.
@@ -118,7 +119,7 @@ class FfmpegAudioPumpBackend(
             outgoingSession.isFadingOut = true
             outgoingSession.crossfadeDurationMs = crossfadeMs
             activeSession = session
-            println("FfmpegAudioPumpBackend: 📻 Кроссфейд (${crossfadeMs}мс) между сессиями ${outgoingSession.id} -> ${session.id}")
+            AppLogger.d("FfmpegAudioPumpBackend", "📻 Кроссфейд (${crossfadeMs}мс) между сессиями ${outgoingSession.id} -> ${session.id}")
         } else {
             activeSession = session
             fadingSession = null
@@ -180,7 +181,7 @@ class FfmpegAudioPumpBackend(
                 session.isEofReached = true
             } catch (e: Exception) {
                 if (sessionId == currentSessionId && session == activeSession) {
-                    println("FfmpegAudioPumpBackend: Ошибка потока ffmpeg: ${e.message}")
+                    AppLogger.e("FfmpegAudioPumpBackend", "Ошибка потока ffmpeg: ${e.message}", e)
                 }
             } finally {
                 session.isEofReached = true

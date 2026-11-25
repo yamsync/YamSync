@@ -16,6 +16,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import io.github.audiz.util.AppLogger
 
 /**
  * 💾 Менеджер сохранения и восстановления последней сессии воспроизведения.
@@ -65,7 +66,7 @@ class PlaybackSessionManager(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("PlaybackSessionManager: ⚠️ Ошибка десериализации последней сессии: ${e.message}")
+            AppLogger.e("PlaybackSessionManager", "⚠️ Ошибка десериализации последней сессии: ${e.message}", e)
             null
         }
     }
@@ -142,7 +143,7 @@ class PlaybackSessionManager(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("PlaybackSessionManager: ❌ Ошибка сохранения сессии: ${e.message}")
+            AppLogger.e("PlaybackSessionManager", "❌ Ошибка сохранения сессии: ${e.message}", e)
         }
     }
 }
