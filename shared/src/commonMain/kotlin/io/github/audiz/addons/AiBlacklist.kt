@@ -69,12 +69,14 @@ internal class AiBlacklist(
         else -> null
     }
 
-    fun matchTrack(trackId: String?, trackArtists: List<FullArtistInfo>): AiMatch? = when {
-        containsTrack(trackId) -> AiMatch.TRACK
-        trackArtists.any { containsArtist(it.id) } -> AiMatch.ARTIST
-        trackArtists.any { isSuspectArtist(it.id) } -> AiMatch.SUSPECT_ARTIST
+    fun matchArtists(artists: List<FullArtistInfo>): AiMatch? = when {
+        artists.any { containsArtist(it.id) } -> AiMatch.ARTIST
+        artists.any { isSuspectArtist(it.id) } -> AiMatch.SUSPECT_ARTIST
         else -> null
     }
+
+    fun matchTrack(trackId: String?, trackArtists: List<FullArtistInfo>): AiMatch? =
+        if (containsTrack(trackId)) AiMatch.TRACK else matchArtists(trackArtists)
 
     fun shouldSkipInWave(track: FullTrackInfo, likedArtistIds: Set<Long>?, isTrackLiked: () -> Boolean): Boolean =
         likedArtistIds != null &&

@@ -38,6 +38,12 @@ internal fun AiArtistBadge(artistId: String?, modifier: Modifier = Modifier) {
 }
 
 @Composable
+internal fun AiArtistBadge(artists: List<FullArtistInfo>, modifier: Modifier = Modifier) {
+    val match = LocalAiBlacklist.current?.matchArtists(artists) ?: return
+    AiBadge(match, modifier)
+}
+
+@Composable
 internal fun AiTrackBadge(trackId: String?, artists: List<FullArtistInfo>, modifier: Modifier = Modifier) {
     val match = LocalAiBlacklist.current?.matchTrack(trackId, artists) ?: return
     AiBadge(match, modifier)

@@ -844,36 +844,39 @@ fun MobileFullPlayerSheet(
                 Column(
                     modifier = Modifier.weight(1f).padding(end = 12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        BouncingMarqueeText(
-                            text = state.trackTitle,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 22.sp
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
-                        AiTrackBadge(state.trackId, state.trackArtists)
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (state.artistName.isNotBlank()) state.artistName else "Яндекс Музыка",
-                        modifier = Modifier
-                            .then(
-                                if (actions.onOpenArtist != null) Modifier
-                                    .pointerHoverIcon(PointerIcon.Hand)
-                                    .then(controlModifier)
-                                    .clickable(onClick = actions.onOpenArtist)
-                                else Modifier
-                            ),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 15.sp
+                    BouncingMarqueeText(
+                        text = state.trackTitle,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp
                         ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = state.artistName.ifBlank { "Яндекс Музыка" },
+                            modifier = Modifier.weight(1f, fill = false)
+                                .then(
+                                    if (actions.onOpenArtist != null) Modifier
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .then(controlModifier)
+                                        .clickable(onClick = actions.onOpenArtist)
+                                    else Modifier
+                                ),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 15.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        AiArtistBadge(state.trackArtists)
+                    }
                 }
 
                 // Кнопка Лайк (48 dp)
@@ -1416,8 +1419,8 @@ fun CoverSpectrumVisualizer(
 
             val barBrush = Brush.horizontalGradient(
                 colors = listOf(
-                    lerp(glowLeft, Color(0xFFFFF3D4), 0.55f).copy(alpha = 0.92f),
-                    lerp(glowRight, Color(0xFFFFF3D4), 0.55f).copy(alpha = 0.92f)
+                    lerp(glowLeft, Color(0xFFFFF3D4), 0.55f).copy(alpha = 0.98f),
+                    lerp(glowRight, Color(0xFFFFF3D4), 0.55f).copy(alpha = 0.98f)
                 ),
                 startX = startX,
                 endX = startX + totalBarsW
@@ -1448,7 +1451,7 @@ fun CoverSpectrumVisualizer(
                     .coerceIn(0f, (maxH - taperedPeakH).coerceAtLeast(0f))
                 val peakY = targetPeakY.coerceAtMost(y - 2.dp.toPx() * envelope).coerceAtLeast(0f)
                 drawRect(
-                    color = Color.White.copy(alpha = 0.88f * opacity),
+                    color = Color.White.copy(alpha = 0.94f * opacity),
                     topLeft = Offset(x, peakY),
                     size = Size(barW, taperedPeakH)
                 )
@@ -1459,10 +1462,10 @@ fun CoverSpectrumVisualizer(
                         topLeft = Offset(x, reflectionTop),
                         size = Size(barW, h * reflectionScale),
                         cornerRadius = barRadius,
-                        alpha = opacity * 0.26f
+                        alpha = opacity * 0.32f
                     )
                     drawRect(
-                        color = Color.White.copy(alpha = 0.18f * opacity),
+                        color = Color.White.copy(alpha = 0.22f * opacity),
                         topLeft = Offset(x, reflectionTop + (maxH - peakY - taperedPeakH) * reflectionScale),
                         size = Size(barW, taperedPeakH * reflectionScale)
                     )
