@@ -10,10 +10,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalPointerSlopOrCancellation
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.awaitVerticalPointerSlopOrCancellation
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -53,8 +58,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -376,9 +385,58 @@ private fun MiniPlayerProgressBar(
     }
 }
 
-private fun Modifier.blockPlayerSwipes() = pointerInput(Unit) {
-    // The detector consumes drags after touch slop and leaves taps to the button.
-    detectDragGestures { _, _ -> }
+private class PlayerSwipeGuard {
+    val controlPointers = mutableSetOf<PointerId>()
+
+    val controlModifier: Modifier = Modifier.pointerInput(this) {
+        awaitEachGesture {
+            // Controls receive the Main pass before the enclosing player.
+            val down = awaitFirstDown(requireUnconsumed = false)
+            controlPointers.add(down.id)
+            try {
+                // Use touch tolerance for mouse clicks too. Only a deliberate drag cancels a tap.
+                awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
+            } finally {
+                controlPointers.remove(down.id)
+            }
+        }
+    }
+}
+
+private suspend fun PointerInputScope.detectPlayerDrag(
+    guard: PlayerSwipeGuard,
+    orientation: Orientation,
+    onDragStart: () -> Unit = {},
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+    onDrag: (Float) -> Unit,
+) {
+    val horizontal = orientation == Orientation.Horizontal
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        if (down.id in guard.controlPointers) return@awaitEachGesture
+
+        var overSlop = 0f
+        val acceptDrag: (PointerInputChange, Float) -> Unit = { change, distance ->
+            change.consume()
+            overSlop = distance
+        }
+        val firstDrag = if (horizontal) {
+            awaitHorizontalPointerSlopOrCancellation(down.id, down.type, acceptDrag)
+        } else {
+            awaitVerticalPointerSlopOrCancellation(down.id, down.type, acceptDrag)
+        } ?: return@awaitEachGesture
+
+        onDragStart()
+        onDrag(overSlop)
+        val move: (PointerInputChange) -> Unit = { change ->
+            val delta = change.positionChange()
+            onDrag(if (horizontal) delta.x else delta.y)
+            change.consume()
+        }
+        val completed = if (horizontal) horizontalDrag(firstDrag.id, move) else verticalDrag(firstDrag.id, move)
+        if (completed) onDragEnd() else onDragCancel()
+    }
 }
 
 /**
@@ -453,8 +511,10 @@ fun MobileFullPlayerSheet(
 
     val currentActions by rememberUpdatedState(actions)
     val currentState by rememberUpdatedState(state)
+    val swipeGuard = remember { PlayerSwipeGuard() }
+    val controlModifier = swipeGuard.controlModifier
     val trackDragOffsetX = remember { mutableFloatStateOf(0f) }
-    val trackSwipeModifier = Modifier.pointerInput(Unit) {
+    val trackSwipeModifier = Modifier.pointerInput(swipeGuard) {
         val swipeThreshold = 64.dp.toPx()
         var dragDistance = 0f
         var startingOffset = 0f
@@ -468,14 +528,15 @@ fun MobileFullPlayerSheet(
             }
         }
 
-        detectHorizontalDragGestures(
+        detectPlayerDrag(
+            guard = swipeGuard,
+            orientation = Orientation.Horizontal,
             onDragStart = {
                 settleJob?.cancel()
                 startingOffset = trackDragOffsetX.floatValue
                 dragDistance = 0f
             },
-            onHorizontalDrag = { change, dragAmount ->
-                change.consume()
+            onDrag = { dragAmount ->
                 dragDistance += dragAmount
                 trackDragOffsetX.floatValue = startingOffset + dragDistance
             },
@@ -492,12 +553,13 @@ fun MobileFullPlayerSheet(
         )
     }
 
-    val dismissDragModifier = Modifier.pointerInput(Unit) {
-        detectVerticalDragGestures(
-            onVerticalDrag = { change, dragAmount ->
+    val dismissDragModifier = Modifier.pointerInput(swipeGuard) {
+        detectPlayerDrag(
+            guard = swipeGuard,
+            orientation = Orientation.Vertical,
+            onDrag = { dragAmount ->
                 if (dragAmount > 0 || dragOffsetY > 0) {
                     dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
-                    change.consume()
                 }
             },
             onDragEnd = {
@@ -575,7 +637,7 @@ fun MobileFullPlayerSheet(
                 ) {
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(44.dp).blockPlayerSwipes()
+                        modifier = Modifier.size(44.dp).then(controlModifier)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.KeyboardArrowDown,
@@ -613,7 +675,7 @@ fun MobileFullPlayerSheet(
                                     .size(22.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
-                                    .blockPlayerSwipes()
+                                    .then(controlModifier)
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
@@ -636,7 +698,7 @@ fun MobileFullPlayerSheet(
                     if (actions.onConfigClick != null) {
                         IconButton(
                             onClick = { actions.onConfigClick.invoke() },
-                            modifier = Modifier.size(44.dp).blockPlayerSwipes()
+                            modifier = Modifier.size(44.dp).then(controlModifier)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
@@ -766,7 +828,7 @@ fun MobileFullPlayerSheet(
                         onOpenEqualizer = actions.onOpenEqualizer,
                         coverCornerRadius = coverCornerRadius,
                         modifier = Modifier.align(Alignment.BottomCenter)
-                            .then(if (actions.onOpenEqualizer != null) Modifier.blockPlayerSwipes() else Modifier)
+                            .then(if (actions.onOpenEqualizer != null) controlModifier else Modifier)
                     )
                 }
             }
@@ -800,7 +862,7 @@ fun MobileFullPlayerSheet(
                             .then(
                                 if (actions.onOpenArtist != null) Modifier
                                     .pointerHoverIcon(PointerIcon.Hand)
-                                    .blockPlayerSwipes()
+                                    .then(controlModifier)
                                     .clickable(onClick = actions.onOpenArtist)
                                 else Modifier
                             ),
@@ -817,7 +879,7 @@ fun MobileFullPlayerSheet(
                 // Кнопка Лайк (48 dp)
                 FavoriteButton(
                     isFavorite = state.isFavorite,
-                    modifier = Modifier.blockPlayerSwipes(),
+                    modifier = controlModifier,
                     size = 48.dp,
                     onClick = { actions.onToggleFavorite?.invoke() }
                 )
@@ -906,7 +968,7 @@ fun MobileFullPlayerSheet(
                     GhostIconButton(
                         icon = Icons.Filled.Shuffle,
                         contentDescription = "Случайный порядок",
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         size = sideSlotButtonSize,
                         iconSize = if (isNarrow) 20.dp else 24.dp,
                         contentColor = if (state.isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -922,7 +984,7 @@ fun MobileFullPlayerSheet(
                     OutlineIconButton(
                         icon = Icons.Filled.SkipPrevious,
                         contentDescription = "Предыдущий",
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         size = skipButtonSize,
                         isLoading = state.isPrevLoading,
                         onClick = { actions.onPrev?.invoke() }
@@ -931,7 +993,7 @@ fun MobileFullPlayerSheet(
                     FilledIconButton(
                         icon = if (state.isPlaying && !state.isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (state.isPlaying && !state.isPaused) "Пауза" else "Воспроизведение",
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         size = playButtonSize,
                         isLoading = state.isPlayLoading,
                         onClick = actions.onPlayPause
@@ -940,7 +1002,7 @@ fun MobileFullPlayerSheet(
                     OutlineIconButton(
                         icon = Icons.Filled.SkipNext,
                         contentDescription = "Следующий",
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         size = skipButtonSize,
                         isLoading = state.isNextLoading,
                         onClick = { actions.onNext?.invoke() }
@@ -955,7 +1017,7 @@ fun MobileFullPlayerSheet(
                     DesktopVolumeControl(
                         volume = state.volume,
                         onVolumeChange = actions.onVolumeChange,
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         buttonSize = sideSlotButtonSize,
                         bottomPlayerPadding = 0.dp
                     )
@@ -997,7 +1059,7 @@ fun MobileFullPlayerSheet(
                     GhostIconButton(
                         icon = Icons.Filled.Delete,
                         contentDescription = "Удалить трек",
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         size = actionButtonSize,
                         iconSize = actionIconSize,
                         contentColor = dislikeTint,
@@ -1017,7 +1079,7 @@ fun MobileFullPlayerSheet(
                         GhostIconButton(
                             icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                             contentDescription = "Очередь воспроизведения",
-                            modifier = Modifier.blockPlayerSwipes(),
+                            modifier = controlModifier,
                             size = actionButtonSize,
                             iconSize = actionIconSize,
                             contentColor = if (state.isQueueOpen) MaterialTheme.colorScheme.primary else defaultActionTint,
@@ -1037,7 +1099,7 @@ fun MobileFullPlayerSheet(
                     GhostIconButton(
                         icon = Icons.Default.Tune,
                         contentDescription = "Эквалайзер",
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         size = actionButtonSize,
                         iconSize = actionIconSize,
                         contentColor = if (state.isEqualizerActive) MaterialTheme.colorScheme.primary else defaultActionTint,
@@ -1052,7 +1114,7 @@ fun MobileFullPlayerSheet(
                 ) {
                     if (state.isSavingToDisk) {
                         Box(
-                            modifier = Modifier.size(actionButtonSize).blockPlayerSwipes(),
+                            modifier = Modifier.size(actionButtonSize).then(controlModifier),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
@@ -1065,7 +1127,7 @@ fun MobileFullPlayerSheet(
                         GhostIconButton(
                             icon = Icons.Filled.Save,
                             contentDescription = if (state.isRecordToDisk) "Сохранено на диск (нажмите для удаления)" else "Сохранить на диск",
-                            modifier = Modifier.blockPlayerSwipes(),
+                            modifier = controlModifier,
                             size = actionButtonSize,
                             iconSize = actionIconSize,
                             contentColor = if (state.isRecordToDisk) MaterialTheme.colorScheme.primary else defaultActionTint,
@@ -1095,7 +1157,7 @@ fun MobileFullPlayerSheet(
                     }
                     GhostIconButton(
                         icon = playlistIcon,
-                        modifier = Modifier.blockPlayerSwipes(),
+                        modifier = controlModifier,
                         contentDescription = when {
                             !state.isInPlaylist -> "Добавить в плейлист"
                             state.playlistCount > 1 -> "В плейлистах (${state.playlistCount})"
@@ -1119,7 +1181,7 @@ fun MobileFullPlayerSheet(
                 ) {
                     if (state.isSharing) {
                         Box(
-                            modifier = Modifier.size(actionButtonSize).blockPlayerSwipes(),
+                            modifier = Modifier.size(actionButtonSize).then(controlModifier),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
@@ -1134,7 +1196,7 @@ fun MobileFullPlayerSheet(
                         GhostIconButton(
                             icon = shareIcon,
                             contentDescription = if (justCopiedShare) "Ссылка скопирована" else "Поделиться треком",
-                            modifier = Modifier.blockPlayerSwipes(),
+                            modifier = controlModifier,
                             size = actionButtonSize,
                             iconSize = actionIconSize,
                             contentColor = shareTint,
