@@ -298,15 +298,38 @@ data class PersonalPlaylistItemData(
     val notify: Boolean = false,
     val idForFrom: String? = null
 ) {
-    val displayTitle: String get() = playlist?.title?.takeIf { it.isNotBlank() } ?: when (playlistType) {
-        "playlistOfTheDay", "daily" -> "Плейлист дня"
-        "recentTracks" -> "Премьера"
-        "neverHeard" -> "Дежавю"
-        "missedLikes" -> "Тайник"
-        "podcasts" -> "Подкасты недели"
-        "origin" -> "Плейлист с Алисой"
-        else -> "Подборка"
-    }
+    val displayTitle: String
+        get() {
+            val raw = playlist?.title?.trim().orEmpty()
+            val localizedByType = localizedPersonalTitle(playlistType)
+            if (raw.isBlank() || (localizedByType != null && raw.lowercase() in ENGLISH_SYSTEM_TITLES)) {
+                return localizedByType ?: "Подборка"
+            }
+            return raw
+        }
+}
+
+private val ENGLISH_SYSTEM_TITLES = setOf(
+    "playlist of the day",
+    "daily playlist",
+    "premiere",
+    "deja vu",
+    "déjà vu",
+    "missed likes",
+    "stash",
+    "podcasts of the week",
+    "origin",
+    "playlist with alice"
+)
+
+private fun localizedPersonalTitle(type: String): String? = when (type) {
+    "playlistOfTheDay", "daily" -> "Плейлист дня"
+    "recentTracks" -> "Премьера"
+    "neverHeard" -> "Дежавю"
+    "missedLikes" -> "Тайник"
+    "podcasts" -> "Подкасты недели"
+    "origin" -> "Плейлист с Алисой"
+    else -> null
 }
 
 @Serializable

@@ -1,5 +1,7 @@
 package io.github.audiz.api
 
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -80,36 +82,10 @@ class EditorialShowcaseLoaderTest {
         }
     """.trimIndent()
 
-    private val landingBlocksJson = """
+    private val playlistsLandingJson = """
         {
           "result": {
             "blocks": [
-              {
-                "id": "new-releases",
-                "type": "new-releases",
-                "entities": [
-                  {
-                    "type": "album",
-                    "data": {
-                      "id": 555,
-                      "title": "Новый альбом",
-                      "metaType": "single",
-                      "year": 2026,
-                      "tracksCount": 3,
-                      "coverUri": "avatars.yandex.net/album555/%%",
-                      "artists": [{"id": 10, "name": "Певец"}]
-                    }
-                  },
-                  {
-                    "type": "album",
-                    "data": {
-                      "id": 556,
-                      "title": "Недоступный",
-                      "available": false
-                    }
-                  }
-                ]
-              },
               {
                 "id": "new-playlists",
                 "type": "new-playlists",
@@ -142,6 +118,41 @@ class EditorialShowcaseLoaderTest {
         }
     """.trimIndent()
 
+    private val releasesLandingJson = """
+        {
+          "result": {
+            "blocks": [
+              {
+                "id": "new-releases",
+                "type": "new-releases",
+                "entities": [
+                  {
+                    "type": "album",
+                    "data": {
+                      "id": 555,
+                      "title": "Новый альбом",
+                      "metaType": "single",
+                      "year": 2026,
+                      "tracksCount": 3,
+                      "coverUri": "avatars.yandex.net/album555/%%",
+                      "artists": [{"id": 10, "name": "Певец"}]
+                    }
+                  },
+                  {
+                    "type": "album",
+                    "data": {
+                      "id": 556,
+                      "title": "Недоступный",
+                      "available": false
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+    """.trimIndent()
+
     @Test
     fun loadsPrimaryAndMenuChartsPlusLandingReleasesAndPlaylists() = runBlocking {
         val requested = mutableListOf<String>()
@@ -150,7 +161,8 @@ class EditorialShowcaseLoaderTest {
             when (url) {
                 ApiUrls.LANDING3_CHART_URL -> primaryChartJson
                 "${ApiUrls.LANDING3_CHART_URL}/world" -> worldChartJson
-                "${ApiUrls.LANDING3_URL}?blocks=new-releases,new-playlists,chart" -> landingBlocksJson
+                "${ApiUrls.LANDING3_URL}?blocks=new-playlists,chart" -> playlistsLandingJson
+                "${ApiUrls.LANDING3_URL}?blocks=new-releases" -> releasesLandingJson
                 else -> null
             }
         }
@@ -181,7 +193,7 @@ class EditorialShowcaseLoaderTest {
         assertEquals("Громкие новинки", playlist.title)
         assertEquals("avatars.yandex.net/pl11/%%", playlist.coverUri)
         assertEquals("editorial-11", playlist.playlistUuid)
-        assertEquals(3, requested.size)
+        assertEquals(4, requested.size)
     }
 
     @Test
@@ -213,7 +225,7 @@ class EditorialShowcaseLoaderTest {
         val loader = EditorialShowcaseLoader { url ->
             when (url) {
                 ApiUrls.LANDING3_CHART_URL -> error("chart endpoint down")
-                "${ApiUrls.LANDING3_URL}?blocks=new-releases,new-playlists,chart" -> landingWithChartOnly
+                "${ApiUrls.LANDING3_URL}?blocks=new-playlists,chart" -> landingWithChartOnly
                 ApiUrls.LANDING3_NEW_RELEASES_URL -> releasesFallback
                 ApiUrls.LANDING3_NEW_PLAYLISTS_URL -> playlistsFallback
                 else -> null
@@ -226,6 +238,64 @@ class EditorialShowcaseLoaderTest {
         assertEquals("301", showcase.charts.single().tracks.single().track.id)
         assertEquals(777L, showcase.newReleases.single().id)
         assertEquals("Плейлист фолбэк", showcase.newPlaylists.single().title)
+    }
+
+    @Test
+    fun localizesEnglishChartMetadataWhileKeepingTrackMetadata() {
+        val englishChartJson = """
+            {
+              "result": {
+                "menu": {
+                  "items": [
+                    {"title": "Russia", "url": "russia", "selected": true},
+                    {"title": "World", "url": "world", "selected": false}
+                  ]
+                },
+                "chart": {
+                  "id": "russia",
+                  "title": "Chart",
+                  "description": "Tracks popular on Yandex Music right now",
+                  "tracks": [
+                    {"id": "1", "track": {"id": "1", "title": "YOASOBI - Idol", "durationMs": 180000}}
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val parsed = EditorialShowcaseCatalog.parseChart(englishChartJson)
+        assertNotNull(parsed)
+        assertEquals("Чарт • Россия", parsed.title)
+        assertEquals(listOf("Россия", "Мир"), parsed.menu.map { it.title })
+        assertEquals("Россия", parsed.description)
+        assertEquals("YOASOBI - Idol", parsed.tracks.single().track.title)
+    }
+
+    @Test
+    fun usesRussianAcceptLanguageForEditorialPlaylistsAndEnglishForTracksAndCharts() {
+        assertEquals(
+            ApiSessionContext.ACCEPT_LANGUAGE_RU,
+            EditorialShowcaseCatalog.acceptLanguageForUrl("${ApiUrls.LANDING3_URL}?blocks=new-playlists,chart")
+        )
+        assertEquals(
+            ApiSessionContext.ACCEPT_LANGUAGE_RU,
+            EditorialShowcaseCatalog.acceptLanguageForUrl(ApiUrls.LANDING3_NEW_PLAYLISTS_URL)
+        )
+        assertEquals(
+            ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA,
+            EditorialShowcaseCatalog.acceptLanguageForUrl(ApiUrls.LANDING3_CHART_URL)
+        )
+        assertEquals(
+            ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA,
+            EditorialShowcaseCatalog.acceptLanguageForUrl("${ApiUrls.LANDING3_URL}?blocks=new-releases")
+        )
+
+        val ctx = ApiSessionContext()
+        val defaultReq = HttpRequestBuilder().apply { with(ctx) { applyAuthHeaders() } }
+        assertEquals(ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA, defaultReq.headers[HttpHeaders.AcceptLanguage])
+
+        val ruReq = HttpRequestBuilder().apply { with(ctx) { applyAuthHeaders(ApiSessionContext.ACCEPT_LANGUAGE_RU) } }
+        assertEquals(ApiSessionContext.ACCEPT_LANGUAGE_RU, ruReq.headers[HttpHeaders.AcceptLanguage])
     }
 
     @Test

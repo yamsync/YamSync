@@ -122,4 +122,18 @@ class PersonalPlaylistLoaderTest {
         }
         Unit
     }
+
+    @Test fun normalizesEnglishSystemTitlesToRussianWhilePreservingCustomTitles() {
+        val items = PersonalPlaylistCatalog.parseFeed("""{"generatedPlaylists":[
+            {"type":"playlistOfTheDay","ready":true,"data":{"playlistUuid":"d","title":"Playlist of the Day"}},
+            {"type":"recentTracks","ready":true,"data":{"playlistUuid":"p","title":"Premiere"}},
+            {"type":"neverHeard","ready":true,"data":{"playlistUuid":"n","title":"Deja Vu"}},
+            {"type":"missedLikes","ready":true,"data":{"playlistUuid":"m","title":"Stash"}},
+            {"type":"annual","ready":true,"data":{"playlistUuid":"y","title":"Мой 2025"}}
+        ]}""")
+        assertEquals(
+            listOf("Плейлист дня", "Премьера", "Дежавю", "Тайник", "Мой 2025"),
+            items.map { it.displayTitle }
+        )
+    }
 }

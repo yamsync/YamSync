@@ -58,14 +58,16 @@ class ApiSessionContext(
         this.accessToken = extracted
     }
 
-    fun HttpRequestBuilder.applyAuthHeaders() {
+    fun HttpRequestBuilder.applyAuthHeaders(
+        acceptLanguage: String = ACCEPT_LANGUAGE_TRACK_METADATA
+    ) {
         val auth = getAuthHeader()
         if (auth != null) {
             header(HttpHeaders.Authorization, auth)
         }
         header(HttpHeaders.UserAgent, baseUserAgent)
         header("X-Yandex-Music-Client", clientHeader)
-        header(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9,ru;q=0.8")
+        header(HttpHeaders.AcceptLanguage, acceptLanguage)
     }
 
     /**
@@ -129,6 +131,9 @@ class ApiSessionContext(
     }
 
     companion object {
+        const val ACCEPT_LANGUAGE_TRACK_METADATA = "en-US,en;q=0.9,ru;q=0.8"
+        const val ACCEPT_LANGUAGE_RU = "ru-RU,ru;q=0.9,en;q=0.8"
+
         fun createDefaultHttpClient(): HttpClient = HttpClient {
             followRedirects = false
             expectSuccess = false

@@ -21,8 +21,10 @@ class PlaylistsClient(
     private val client get() = context.client
     private val playlistJson get() = context.json
 
-    private fun HttpRequestBuilder.applyAuthHeaders() {
-        with(context) { applyAuthHeaders() }
+    private fun HttpRequestBuilder.applyAuthHeaders(
+        acceptLanguage: String = ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA
+    ) {
+        with(context) { applyAuthHeaders(acceptLanguage) }
     }
 
     suspend fun getLikedArtistIds(): Set<Long> {
@@ -426,7 +428,11 @@ class PlaylistsClient(
         }
     }
 
-    private suspend fun fetchJsonTextWithFallback(url: String, timeoutMs: Long = 8_000L): String? {
+    private suspend fun fetchJsonTextWithFallback(
+        url: String,
+        timeoutMs: Long = 8_000L,
+        acceptLanguage: String = ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA
+    ): String? {
         val candidates = if (url.contains("api.music.yandex.ru")) {
             listOf(url, url.replace("api.music.yandex.ru", "api.music.yandex.net"))
         } else {
@@ -435,7 +441,7 @@ class PlaylistsClient(
         for (candidate in candidates) {
             try {
                 val response = client.get(candidate) {
-                    applyAuthHeaders()
+                    applyAuthHeaders(acceptLanguage)
                     timeout { requestTimeoutMillis = timeoutMs }
                 }
                 if (response.status.isSuccess()) return response.bodyAsText()
@@ -451,24 +457,25 @@ class PlaylistsClient(
 
     /**
      * 🎵 Получаем персональные плейлисты пользователя (Плейлист дня, Премьера, Дежавю и др.)
-     * GET https://api.music.yandex.ru/landing-blocks/personal-playlists
+     * Запрашивается с русской локалью, чтобы заголовки и описания подборок приходили на русском.
      */
     suspend fun getPersonalPlaylists(): List<PersonalPlaylistItemData> = PersonalPlaylistLoader { url ->
-        fetchJsonTextWithFallback(url)
+        fetchJsonTextWithFallback(url, acceptLanguage = ApiSessionContext.ACCEPT_LANGUAGE_RU)
     }.load()
 
     /**
-     * 🔥 Получаем витрину Яндекс Музыки: чарты, новые плейлисты и новые релизы
+     * 🔥 Получаем витрину Яндекс Музыки: чарты, новые плейлисты и новые релизы.
+     * Плейлисты и подборки запрашиваются на русском, а чарты и новые релизы — в международной локали для метаданных треков.
      */
     suspend fun getEditorialShowcase(): EditorialShowcaseData = EditorialShowcaseLoader { url ->
-        fetchJsonTextWithFallback(url)
+        fetchJsonTextWithFallback(url, acceptLanguage = EditorialShowcaseCatalog.acceptLanguageForUrl(url))
     }.load()
 
     /**
      * 📊 Получаем треки конкретного чарта (например, "russia" или "world")
      */
     suspend fun getChart(chartId: String = "russia"): ChartCollection? = EditorialShowcaseLoader { url ->
-        fetchJsonTextWithFallback(url)
+        fetchJsonTextWithFallback(url, acceptLanguage = EditorialShowcaseCatalog.acceptLanguageForUrl(url))
     }.loadChart(chartId)
 
     /**
@@ -480,7 +487,7 @@ class PlaylistsClient(
         val url = "${ApiUrls.USER_PLAYLISTS_BASE_URL}/$uid/playlists/list"
         return try {
             val response: HttpResponse = client.get(url) {
-                applyAuthHeaders()
+                applyAuthHeaders(ApiSessionContext.ACCEPT_LANGUAGE_RU)
             }
             if (response.status.value !in 200..299) {
                 println("PlaylistsClient: Ошибка получения пользовательских плейлистов: статус ${response.status}")

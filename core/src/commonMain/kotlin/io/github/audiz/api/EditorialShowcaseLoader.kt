@@ -33,14 +33,20 @@ class EditorialShowcaseLoader(private val fetch: suspend (String) -> String?) {
         val primaryChartDeferred = async {
             readNullable(ApiUrls.LANDING3_CHART_URL, EditorialShowcaseCatalog::parseChart)
         }
-        val landingDeferred = async {
-            readNullable("${ApiUrls.LANDING3_URL}?blocks=new-releases,new-playlists,chart") { raw ->
+        val playlistsLandingDeferred = async {
+            readNullable("${ApiUrls.LANDING3_URL}?blocks=new-playlists,chart") { raw ->
+                EditorialShowcaseCatalog.parseLanding(raw)
+            }
+        }
+        val releasesLandingDeferred = async {
+            readNullable("${ApiUrls.LANDING3_URL}?blocks=new-releases") { raw ->
                 EditorialShowcaseCatalog.parseLanding(raw)
             }
         }
 
         val primaryChart = primaryChartDeferred.await()
-        val landing = landingDeferred.await() ?: EditorialShowcaseData()
+        val playlistsLanding = playlistsLandingDeferred.await() ?: EditorialShowcaseData()
+        val releasesLanding = releasesLandingDeferred.await() ?: EditorialShowcaseData()
 
         val extraChartIds = buildList {
             primaryChart?.menu
@@ -60,24 +66,24 @@ class EditorialShowcaseLoader(private val fetch: suspend (String) -> String?) {
             }
         }.awaitAll().filterNotNull()
 
-        val fallbackReleasesDeferred = if (landing.newReleases.isEmpty()) {
+        val fallbackReleasesDeferred = if (releasesLanding.newReleases.isEmpty()) {
             async {
                 readList(ApiUrls.LANDING3_NEW_RELEASES_URL, EditorialShowcaseCatalog::parseNewReleasesFallback)
             }
         } else null
 
-        val fallbackPlaylistsDeferred = if (landing.newPlaylists.isEmpty()) {
+        val fallbackPlaylistsDeferred = if (playlistsLanding.newPlaylists.isEmpty()) {
             async {
                 readList(ApiUrls.LANDING3_NEW_PLAYLISTS_URL, EditorialShowcaseCatalog::parseNewPlaylistsFallback)
             }
         } else null
 
         val mergedCharts = EditorialShowcaseCatalog.mergeCharts(
-            listOfNotNull(primaryChart) + extraCharts + landing.charts
+            listOfNotNull(primaryChart) + extraCharts + playlistsLanding.charts
         )
-        val newReleases = (landing.newReleases.ifEmpty { fallbackReleasesDeferred?.await().orEmpty() })
+        val newReleases = (releasesLanding.newReleases.ifEmpty { fallbackReleasesDeferred?.await().orEmpty() })
             .distinctBy { it.id }
-        val newPlaylists = (landing.newPlaylists.ifEmpty { fallbackPlaylistsDeferred?.await().orEmpty() })
+        val newPlaylists = (playlistsLanding.newPlaylists.ifEmpty { fallbackPlaylistsDeferred?.await().orEmpty() })
             .distinctBy { playlistKey(it) }
 
         EditorialShowcaseData(
@@ -137,6 +143,18 @@ object EditorialShowcaseCatalog {
         return cleaned.substringAfterLast('/').trim()
     }
 
+    fun acceptLanguageForUrl(url: String): String {
+        val lower = url.lowercase()
+        return if (lower.contains("/landing3/chart") ||
+            lower.contains("/landing3/new-releases") ||
+            lower.contains("blocks=new-releases")
+        ) {
+            ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA
+        } else {
+            ApiSessionContext.ACCEPT_LANGUAGE_RU
+        }
+    }
+
     fun parseChart(raw: String, requestedChartId: String = ""): ChartCollection? {
         val result = unwrapResult(raw) ?: return null
         val chartObj = result.obj("chart") ?: result.takeIf { "tracks" in it || "entities" in it } ?: return null
@@ -154,12 +172,7 @@ object EditorialShowcaseCatalog {
 
         val rawTitle = chartObj.string("title")?.trim().orEmpty()
         val menuTitle = menu.firstOrNull { it.chartId == resolvedId }?.title
-        val resolvedTitle = when {
-            rawTitle.isBlank() -> menuTitle ?: defaultChartTitle(resolvedId)
-            (rawTitle.equals("Чарт", ignoreCase = true) || rawTitle.equals("Chart", ignoreCase = true)) &&
-                !menuTitle.isNullOrBlank() -> "Чарт • $menuTitle"
-            else -> rawTitle
-        }
+        val resolvedTitle = localizeChartTitle(rawTitle, resolvedId, menuTitle)
 
         val coverUri = extractCoverUri(chartObj) ?: entries.firstOrNull()?.track?.coverUri
         val ownerUid = chartObj.number("uid") ?: chartObj.obj("owner")?.number("uid") ?: 0L
@@ -169,7 +182,7 @@ object EditorialShowcaseCatalog {
         return ChartCollection(
             chartId = resolvedId,
             title = resolvedTitle,
-            description = chartObj.string("description")?.takeIf { it.isNotBlank() } ?: menuTitle,
+            description = localizeChartDescription(chartObj.string("description"), menuTitle),
             coverUri = coverUri,
             uid = ownerUid,
             kind = kind,
@@ -263,11 +276,11 @@ object EditorialShowcaseCatalog {
 
     private fun parseMenuItem(elem: JsonElement): ChartMenuOption? {
         val obj = elem as? JsonObject ?: return null
-        val title = obj.string("title")?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        val url = obj.string("url")?.let(::normalizeChartId)?.takeIf { it.isNotBlank() } ?: return null
+        val rawTitle = obj.string("title")?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val chartId = obj.string("url")?.let(::normalizeChartId)?.takeIf { it.isNotBlank() } ?: return null
         return ChartMenuOption(
-            title = title,
-            chartId = url,
+            title = localizeMenuTitle(rawTitle, chartId),
+            chartId = chartId,
             selected = obj.boolean("selected") ?: false
         )
     }
@@ -364,6 +377,40 @@ object EditorialShowcaseCatalog {
         if (fromCover != null) return fromCover
         return obj.string("ogImage")?.takeIf { it.isNotBlank() }
             ?: obj.string("bgImageUri")?.takeIf { it.isNotBlank() }
+    }
+
+    private fun localizeMenuTitle(rawTitle: String, chartId: String): String = when (rawTitle.lowercase()) {
+        "russia" -> "Россия"
+        "world", "world chart", "global", "global chart" -> "Мир"
+        else -> when (chartId.lowercase()) {
+            "russia" -> if (rawTitle.equals("chart", ignoreCase = true)) "Россия" else rawTitle
+            "world" -> if (rawTitle.equals("chart", ignoreCase = true)) "Мир" else rawTitle
+            else -> rawTitle
+        }
+    }
+
+    private fun localizeChartTitle(rawTitle: String, chartId: String, menuTitle: String?): String {
+        val lower = rawTitle.lowercase()
+        val isGenericChart = lower.isBlank() || lower == "чaрт" || lower == "чарт" || lower == "chart"
+        val isEnglishKnown = lower in setOf(
+            "russia", "russian chart", "chart • russia", "chart russia",
+            "world", "world chart", "global chart", "chart • world"
+        )
+        return when {
+            isGenericChart -> if (!menuTitle.isNullOrBlank() && chartId.lowercase() != "world") {
+                "Чарт • $menuTitle"
+            } else {
+                defaultChartTitle(chartId)
+            }
+            isEnglishKnown -> defaultChartTitle(chartId)
+            else -> rawTitle
+        }
+    }
+
+    private fun localizeChartDescription(rawDescription: String?, menuTitle: String?): String? {
+        val trimmed = rawDescription?.trim()?.takeIf { it.isNotBlank() } ?: return menuTitle
+        val hasCyrillic = trimmed.any { it in '\u0400'..'\u04FF' }
+        return if (hasCyrillic) trimmed else (menuTitle ?: "Популярные треки прямо сейчас")
     }
 
     private fun defaultChartTitle(chartId: String): String = when (chartId.lowercase()) {
