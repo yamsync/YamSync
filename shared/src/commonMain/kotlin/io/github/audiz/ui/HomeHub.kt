@@ -1,388 +1,403 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package io.github.audiz.ui
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.ScrollableDefaults
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.gestures.stopScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.github.audiz.TracksListOrigin
 import io.github.audiz.SearchViewModel
-import io.github.audiz.sync.YamSyncConnectionState
+import io.github.audiz.TracksListOrigin
 import io.github.audiz.isPlatformPickerSupported
-import io.github.audiz.models.CustomMediaSource
-import io.github.audiz.models.LastPlaybackSession
-import io.github.audiz.models.LocalPlaylist
+import io.github.audiz.launchDirectoryPicker
+import io.github.audiz.models.LastPlaybackType
+import io.github.audiz.models.LocalSourceType
+import io.github.audiz.models.PersonalPlaylistInfo
 import io.github.audiz.models.PersonalPlaylistItemData
-import io.github.audiz.models.ThematicWavePreset
-import io.github.audiz.pickDirectory
-import kotlinx.coroutines.launch
+import io.github.audiz.player.PlaybackQueueManager
+import io.github.audiz.sync.YamSyncConnectionState
 
-/**
- * 🏠 Главный экран-хаб приложения (Home Hub).
- * Адаптирует сетки и прокручиваемые подборки под доступную ширину экрана:
- * 1. Герой-баннер «Моя Волна» (чипы стилей переносятся на новую строку).
- * 2. Плитки быстрого доступа (перенос 2x2 на смартфонах).
- * 3. Карточка быстрого продолжения последней сессии (если есть).
- * 4. Персональные подборки Яндекса (горизонтальная лента).
- * 5. Локальные плейлисты и папки (сетка на всю ширину).
- */
 @Composable
-fun HomeHub(
+internal fun HomeHub(
     viewModel: SearchViewModel,
+    scrollState: ScrollState,
     onOpenMediaLibrary: () -> Unit,
     onOpenDevices: () -> Unit,
-    modifier: Modifier = Modifier
+    onOpenCollections: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val scrollState = rememberScrollState()
-
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val isWide = maxWidth >= 540.dp
-
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(bottom = 120.dp), // Отступ снизу для плавающего плеера
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth().verticalScroll(scrollState)
+                .padding(bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // ==================================================
-            // 🌊 СЕКЦИЯ 1: ГЕРОЙ-БАННЕР «МОЯ ВОЛНА»
-            // ==================================================
-            WaveHeroCard(
-                viewModel = viewModel,
-                modifier = Modifier.fillMaxWidth()
-            )
+            HomeWaveSection(viewModel)
+            QuickAccessSection(viewModel, onOpenMediaLibrary, onOpenDevices)
 
-            // ==================================================
-            // ⚡ СЕКЦИЯ 2: ПЛИТКИ БЫСТРОГО ДОСТУПА
-            // ==================================================
-            QuickAccessSection(
-                viewModel = viewModel,
-                onOpenMediaLibrary = onOpenMediaLibrary,
-                onOpenDevices = onOpenDevices,
-                isWide = isWide,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // ==================================================
-            // 🕒 СЕКЦИЯ 3: ПРОДОЛЖИТЬ ВОСПРОИЗВЕДЕНИЕ (если есть сессия и плеер на паузе/стопе)
-            // ==================================================
             val lastSession = viewModel.playbackSessionManager.currentSession
-            if (lastSession != null && !viewModel.playerIsPlaying) {
-                ResumeSessionCard(
-                    session = lastSession,
-                    onResume = { viewModel.resumeLastSession(lastSession) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            if (lastSession != null && lastSession.type != LastPlaybackType.WAVE && !viewModel.playerIsPlaying) {
+                HomeListSurface {
+                    HomeNavigationRow(
+                        title = "Продолжить: ${lastSession.title ?: "Последний плейлист"}",
+                        subtitle = lastSession.lastTrackTitle?.takeIf { it.isNotBlank() },
+                        icon = Icons.Filled.History,
+                        onClick = { viewModel.resumeLastSession(lastSession) },
+                    )
+                }
             }
 
-            // ==================================================
-            // ✨ СЕКЦИЯ 4: ПЕРСОНАЛЬНЫЕ ПОДБОРКИ (Плейлист дня, Премьера, Дежавю...)
-            // ==================================================
-            if (viewModel.personalPlaylists.isNotEmpty()) {
-                PersonalPlaylistsSection(
-                    items = viewModel.personalPlaylists,
-                    onSelect = { item ->
-                        val playlist = item.playlist!!
-                        if (playlist.playlistUuid.isNotBlank()) {
-                            viewModel.loadPlaylistByUuid(playlist.playlistUuid, item.displayTitle)
-                        } else {
-                            viewModel.loadPlaylistTracks(playlist.uid, playlist.kind, item.displayTitle)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            HomeListSurface {
+                HomeNavigationRow("Подборки", Icons.Filled.Layers, onClick = onOpenCollections)
             }
 
-            // ==================================================
-            // 📂 СЕКЦИЯ 5: МОИ ПАПКИ И ЛОКАЛЬНЫЕ ПЛЕЙЛИСТЫ
-            // ==================================================
             if (viewModel.localPlaylists.isNotEmpty() || viewModel.customMediaSources.isNotEmpty() || isPlatformPickerSupported) {
-                LocalLibrarySection(
-                    localPlaylists = viewModel.localPlaylists,
-                    customSources = viewModel.customMediaSources,
-                    onOpenLocalPlaylist = { viewModel.openLocalPlaylist(it) },
-                    onOpenFolder = { path, name, src ->
-                        viewModel.openFolderPlaylist(path, name, src, isRecursive = true, origin = TracksListOrigin.HOME)
-                    },
-                    onAddFolder = {
-                        val picked = pickDirectory()
-                        if (!picked.isNullOrBlank()) {
-                            viewModel.addCustomSource(picked)
-                        }
-                    },
-                    onOpenMediaLibrary = onOpenMediaLibrary,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                LocalLibrarySection(viewModel)
             }
         }
     }
 }
 
-// ============================================================================
-// 🌊 1. КАРТОЧКА «МОЯ ВОЛНА» (Чипы с автоматическим переносом FlowRow)
-// ============================================================================
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WaveHeroCard(
-    viewModel: SearchViewModel,
-    modifier: Modifier = Modifier
-) {
+private fun HomeWaveSection(viewModel: SearchViewModel) {
     var showThemes by remember { mutableStateOf(false) }
-    val accent = MaterialTheme.colorScheme.primary
-    val personalSelected = viewModel.isWaveMode && viewModel.currentWaveSeeds.isEmpty()
-    val personalStatus = when {
-        personalSelected && viewModel.isWaveLoading -> "Загрузка…"
-        personalSelected && viewModel.playerIsPlaying && !viewModel.playerIsPaused -> "Выбрана"
-        personalSelected && viewModel.playerIsPaused -> "Продолжить"
-        else -> "Слушать"
+    val colors = MaterialTheme.colorScheme
+    val accent = lerp(colors.primary, colors.onSurfaceVariant, 0.24f)
+    val isCurrentTrackFromWave = viewModel.isWaveMode && !viewModel.playbackManager.isPlayingUpNextTrack &&
+        viewModel.currentWaveTrack?.let { PlaybackQueueManager.isSameTrack(it, viewModel.playerTrackId) } == true
+    val isWavePlaying = isCurrentTrackFromWave && viewModel.playerIsPlaying && !viewModel.playerIsPaused
+    val isWavePaused = isCurrentTrackFromWave && viewModel.playerIsPaused
+    val themeTitle = viewModel.currentWaveTitle?.takeIf { viewModel.currentWaveSeeds.isNotEmpty() && it.isNotBlank() }
+        ?: "Персональная"
+    val status = when {
+        isWavePlaying -> "Сейчас играет"
+        isWavePaused -> "На паузе"
+        viewModel.isWaveLoading -> "Загрузка…"
+        else -> "Тема волны"
     }
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, if (viewModel.isWaveMode) accent.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val compact = maxWidth < 340.dp
-            Column(
-                Modifier.fillMaxWidth()
-                    .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.08f), MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f))))
-                    .padding(if (compact) 10.dp else 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Waves, contentDescription = null, tint = accent, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(9.dp))
+            Text(
+                "Моя волна",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                Modifier.clip(RoundedCornerShape(10.dp))
+                    .clickable(role = Role.Button) { showThemes = true }
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .heightIn(min = 40.dp)
+                    .padding(horizontal = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.16f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Waves, null, tint = accent, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text("Моя волна", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (viewModel.isWaveLoading) {
-                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    Row(
-                        Modifier.clip(RoundedCornerShape(8.dp))
-                            .clickable(role = Role.Button) { showThemes = true }
-                            .pointerHoverIcon(PointerIcon.Hand).heightIn(min = 36.dp).padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Все темы", color = accent, style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Icon(Icons.Filled.ChevronRight, null, tint = accent, modifier = Modifier.size(16.dp))
+                Text("Все темы", color = accent, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+            }
+        }
+
+        HomeListSurface {
+            Box {
+                if (isWavePlaying || isWavePaused) {
+                    Box(Modifier.matchParentSize()) {
+                        Box(Modifier.fillMaxHeight().width(4.dp).background(accent.copy(alpha = if (isWavePlaying) 1f else 0.5f)))
                     }
                 }
-                Surface(
-                    onClick = { viewModel.selectWaveTheme() },
-                    enabled = !viewModel.isWaveLoading,
-                    modifier = Modifier.fillMaxWidth().pointerHoverIcon(PointerIcon.Hand),
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (personalSelected) accent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = BorderStroke(1.dp, if (personalSelected) accent.copy(alpha = 0.35f)
-                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 13.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(Modifier.heightIn(min = 40.dp).padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.StarBorder, null, tint = accent, modifier = Modifier.size(20.dp))
-                        Text("Персональная", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(personalStatus, color = if (personalSelected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.weight(1f)) {
+                        Text(status, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
+                        Text(
+                            themeTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (isWavePlaying) {
+                        Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+                    } else if (viewModel.isWaveLoading) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = accent)
                     }
                 }
-                if (viewModel.recentThematicWaves.isNotEmpty()) {
-                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 28.dp) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            viewModel.recentThematicWaves.take(3).forEach { theme ->
-                                val selected = viewModel.isWaveMode && viewModel.currentWaveSeeds == theme.seeds
-                                Surface(
-                                    onClick = { viewModel.selectWaveTheme(theme) },
-                                    enabled = !viewModel.isWaveLoading,
-                                    modifier = Modifier.height(28.dp).pointerHoverIcon(PointerIcon.Hand),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (selected) accent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                    border = BorderStroke(1.dp, if (selected) accent.copy(alpha = 0.45f)
-                                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                                ) {
-                                    Row(Modifier.fillMaxHeight().padding(horizontal = 10.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        if (selected) Icon(Icons.Filled.Check, null, tint = accent, modifier = Modifier.size(14.dp))
-                                        Text(theme.title, style = MaterialTheme.typography.labelMedium,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                }
-                            }
+            }
+        }
+
+        val recentThemes = viewModel.recentThematicWaves.take(3)
+        if (recentThemes.isNotEmpty()) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                recentThemes.forEach { theme ->
+                    val selected = viewModel.isWaveMode && viewModel.currentWaveSeeds == theme.seeds
+                    Surface(
+                        onClick = { viewModel.selectWaveTheme(theme) },
+                        enabled = !viewModel.isWaveLoading,
+                        modifier = Modifier.heightIn(min = 38.dp).pointerHoverIcon(PointerIcon.Hand),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) lerp(colors.surfaceContainerLow, accent, 0.12f) else colors.surfaceContainerLow,
+                        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)),
+                    ) {
+                        Box(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                                theme.title,
+                                color = if (selected) accent else colors.onSurface,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
             }
         }
     }
-    if (showThemes) WaveThemesDialog(viewModel = viewModel, onDismiss = { showThemes = false })
-}
 
-// ============================================================================
-// ⚡ 2. СЕКЦИЯ БЫСТРОГО ДОСТУПА (Spotify Style с переносом на след. строку)
-// ============================================================================
+    if (showThemes) WaveThemesDialog(viewModel, onDismiss = { showThemes = false })
+}
 
 @Composable
 private fun QuickAccessSection(
     viewModel: SearchViewModel,
     onOpenMediaLibrary: () -> Unit,
     onOpenDevices: () -> Unit,
-    isWide: Boolean,
-    modifier: Modifier = Modifier
 ) {
-    val syncState = viewModel.yamSyncManager.connectionState
-    // Точка статуса: зелёная — связано, янтарная — ожидание/связывание, серая — нет соединения
-    val devicesStatusColor = when (syncState) {
-        is YamSyncConnectionState.Connected, is YamSyncConnectionState.Syncing -> Color(0xFF2DD881)
-        is YamSyncConnectionState.Hosting, is YamSyncConnectionState.Connecting -> Color(0xFFF59E0B)
-        is YamSyncConnectionState.Disconnected -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    val colors = MaterialTheme.colorScheme
+    val deviceStateColor = when (viewModel.yamSyncManager.connectionState) {
+        is YamSyncConnectionState.Connected, is YamSyncConnectionState.Syncing -> colors.primary
+        is YamSyncConnectionState.Hosting, is YamSyncConnectionState.Connecting -> colors.tertiary
+        is YamSyncConnectionState.Disconnected -> colors.onSurfaceVariant.copy(alpha = 0.4f)
     }
-    val devicesTile: @Composable (Modifier) -> Unit = { tileModifier ->
-        QuickAccessTile(
-            title = "Устройства",
-            icon = Icons.Filled.Devices,
-            accentColor = Color(0xFF24C5C9),
-            onClick = onOpenDevices,
-            statusColor = devicesStatusColor,
-            modifier = tileModifier
-        )
+    Column {
+        HomeSectionHeading("Быстрый доступ")
+        HomeListSurface {
+            HomeNavigationRow("Скачанное", Icons.Filled.Download, onClick = { viewModel.loadDownloadedTracksPlaylist() })
+            HomeListDivider()
+            HomeNavigationRow("Любимые", Icons.Filled.Favorite, onClick = { viewModel.loadLikesPlaylist() })
+            HomeListDivider()
+            HomeNavigationRow("Медиатека", Icons.Filled.LibraryMusic, onClick = onOpenMediaLibrary)
+            HomeListDivider()
+            HomeNavigationRow("История", Icons.Filled.History, onClick = { viewModel.loadHistory() })
+            HomeListDivider()
+            HomeNavigationRow("Устройства", Icons.Filled.Devices, statusColor = deviceStateColor, onClick = onOpenDevices)
+        }
     }
+}
 
-    Column(modifier = modifier) {
-        Text(
-            text = "Быстрый доступ",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-        )
-
-        if (isWide) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                QuickAccessTile(
-                    title = "Скачанное",
-                    icon = Icons.Filled.Download,
-                    accentColor = Color(0xFF10B981), // Emerald
-                    onClick = { viewModel.loadDownloadedTracksPlaylist() },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickAccessTile(
-                    title = "Любимые треки",
-                    icon = Icons.Filled.Favorite,
-                    accentColor = Color(0xFFF05A79), // Rose
-                    onClick = { viewModel.loadLikesPlaylist() },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickAccessTile(
-                    title = "Медиатека",
-                    icon = Icons.Filled.LibraryMusic,
-                    accentColor = Color(0xFF3B82F6), // Blue
-                    onClick = onOpenMediaLibrary,
-                    modifier = Modifier.weight(1f)
-                )
-                QuickAccessTile(
-                    title = "История",
-                    icon = Icons.Filled.History,
-                    accentColor = Color(0xFFF59E0B), // Amber
-                    onClick = { viewModel.loadHistory() },
-                    modifier = Modifier.weight(1f)
-                )
-                devicesTile(Modifier.weight(1f))
+@Composable
+private fun LocalLibrarySection(viewModel: SearchViewModel) {
+    val colors = MaterialTheme.colorScheme
+    val folderTint = lerp(colors.onSurfaceVariant, colors.primary, 0.42f)
+    val folderBackground = lerp(colors.surfaceContainerLow, colors.primary, 0.065f)
+    Column {
+        HomeSectionHeading("Папки и плейлисты")
+        HomeListSurface {
+            viewModel.customMediaSources.forEachIndexed { index, source ->
+                key(source.type, source.id) {
+                    if (index > 0) HomeListDivider()
+                    val isFolder = source.type == LocalSourceType.FOLDER
+                    HomeNavigationRow(
+                        title = source.name,
+                        icon = when (source.type) {
+                            LocalSourceType.FOLDER -> Icons.Filled.Folder
+                            LocalSourceType.PLAYLIST_FILE -> Icons.AutoMirrored.Filled.QueueMusic
+                            LocalSourceType.SINGLE_FILE -> Icons.Filled.MusicNote
+                        },
+                        count = source.trackCount.takeIf { source.type == LocalSourceType.PLAYLIST_FILE },
+                        iconTint = if (isFolder) folderTint else colors.onSurfaceVariant,
+                        background = if (isFolder) folderBackground else Color.Transparent,
+                        onClick = {
+                            if (isFolder) {
+                                viewModel.openFolderPlaylist(
+                                    source.path, source.name, source, isRecursive = true, origin = TracksListOrigin.HOME,
+                                )
+                            } else {
+                                viewModel.openCustomSource(source)
+                            }
+                        },
+                    )
+                }
             }
-        } else {
-            // 2 колонки на мобильных — перенос на следующую строку
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickAccessTile(
-                        title = "Скачанное",
-                        icon = Icons.Filled.Download,
-                        accentColor = Color(0xFF10B981),
-                        onClick = { viewModel.loadDownloadedTracksPlaylist() },
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickAccessTile(
-                        title = "Любимые треки",
-                        icon = Icons.Filled.Favorite,
-                        accentColor = Color(0xFFF05A79),
-                        onClick = { viewModel.loadLikesPlaylist() },
-                        modifier = Modifier.weight(1f)
+            viewModel.localPlaylists.forEachIndexed { index, playlist ->
+                key(playlist.id) {
+                    if (index > 0 || viewModel.customMediaSources.isNotEmpty()) HomeListDivider()
+                    HomeNavigationRow(
+                        title = playlist.title,
+                        icon = Icons.AutoMirrored.Filled.QueueMusic,
+                        count = playlist.trackCount,
+                        onClick = { viewModel.openLocalPlaylist(playlist) },
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickAccessTile(
-                        title = "Медиатека",
-                        icon = Icons.Filled.LibraryMusic,
-                        accentColor = Color(0xFF3B82F6),
-                        onClick = onOpenMediaLibrary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickAccessTile(
-                        title = "История",
-                        icon = Icons.Filled.History,
-                        accentColor = Color(0xFFF59E0B),
-                        onClick = { viewModel.loadHistory() },
-                        modifier = Modifier.weight(1f)
-                    )
+            }
+            if (isPlatformPickerSupported) {
+                if (viewModel.customMediaSources.isNotEmpty() || viewModel.localPlaylists.isNotEmpty()) HomeListDivider()
+                HomeNavigationRow(
+                    title = "Добавить папку",
+                    icon = Icons.Filled.Add,
+                    onClick = {
+                        launchDirectoryPicker { path ->
+                            if (!path.isNullOrBlank()) viewModel.addCustomSource(path)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSectionHeading(title: String) {
+    Text(
+        title,
+        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun HomeListSurface(content: @Composable ColumnScope.() -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = colors.surfaceContainerLow,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)),
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun HomeListDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 39.dp, end = 10.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.36f),
+    )
+}
+
+@Composable
+private fun HomeNavigationRow(
+    title: String,
+    icon: ImageVector,
+    subtitle: String? = null,
+    count: Int? = null,
+    statusColor: Color? = null,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    background: Color = Color.Transparent,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(background)
+            .clickable(role = Role.Button, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .heightIn(min = 39.dp)
+            .padding(horizontal = 11.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(19.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        count?.let { Text(it.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        statusColor?.let { Box(Modifier.size(6.dp).background(it, CircleShape)) }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+internal fun PersonalCollectionsScreen(
+    items: List<PersonalPlaylistItemData>,
+    isLoading: Boolean,
+    gridState: LazyGridState,
+    onBack: () -> Unit,
+    onSelect: (PersonalPlaylistInfo, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val collections = items.mapNotNull { item ->
+        item.playlist?.takeIf { it.canOpen }?.let { it to item.displayTitle }
+    }.distinctBy { it.first.stableKey }
+
+    BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val columns = if (maxWidth < 540.dp) GridCells.Fixed(2) else GridCells.Adaptive(150.dp)
+        Column(Modifier.widthIn(max = 760.dp).fillMaxSize()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack, modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Text("Подборки", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+            if (collections.isEmpty()) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    if (isLoading) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    else Text("Подборок пока нет", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = columns,
+                    state = gridState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    devicesTile(Modifier.weight(1f))
-                    Spacer(modifier = Modifier.weight(1f))
+                    items(collections, key = { it.first.stableKey }) { (playlist, title) ->
+                        PersonalCollectionCard(title, playlist.cover?.uri) { onSelect(playlist, title) }
+                    }
                 }
             }
         }
@@ -390,562 +405,28 @@ private fun QuickAccessSection(
 }
 
 @Composable
-private fun QuickAccessTile(
-    title: String,
-    icon: ImageVector,
-    accentColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    statusColor: Color? = null
-) {
-    val surface = MaterialTheme.colorScheme.surface
-    Surface(
-        modifier = modifier
-            .heightIn(min = 36.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = surface,
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.20f))
+private fun PersonalCollectionCard(title: String, coverUri: String?, onClick: () -> Unit) {
+    val cover = rememberCoverBitmap(coverUri, size = 240)
+    Column(
+        Modifier.clip(RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .waveCardBackground(surface, accentColor, statusColor)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            contentAlignment = Alignment.CenterStart
+            Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.5.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-private fun Modifier.waveCardBackground(
-    surface: Color,
-    accentColor: Color,
-    statusColor: Color? = null
-): Modifier = drawWithCache {
-    val gradient = Brush.linearGradient(
-        listOf(lerp(surface, accentColor, 0.26f), lerp(surface, accentColor, 0.12f),
-            lerp(surface, accentColor, 0.20f)),
-        start = Offset.Zero,
-        end = Offset(size.width, size.height)
-    )
-    val ribbons = List(3) { index ->
-        val y = size.height * (0.64f + index * 0.24f)
-        Path().apply {
-            moveTo(size.width * 0.42f, size.height)
-            cubicTo(size.width * 0.67f, y, size.width * 0.85f, y + size.height * 0.15f,
-                size.width, y - size.height * 0.48f)
-            lineTo(size.width, size.height)
-            close()
-        }
-    }
-    val ribbonBrush = Brush.linearGradient(
-        listOf(Color.Transparent, accentColor.copy(alpha = 0.13f)),
-        start = Offset(size.width * 0.45f, size.height),
-        end = Offset(size.width, 0f)
-    )
-    onDrawBehind {
-        drawRect(gradient)
-        ribbons.forEach { drawPath(it, ribbonBrush) }
-        statusColor?.let { color ->
-            drawCircle(color, radius = 2.5.dp.toPx(),
-                center = Offset(size.width - 7.dp.toPx(), 7.dp.toPx()))
-        }
-    }
-}
-
-// ============================================================================
-// 🕒 3. КАРТОЧКА ПРОДОЛЖЕНИЯ СЕССИИ (Компактная плашка)
-// ============================================================================
-
-@Composable
-private fun ResumeSessionCard(
-    session: LastPlaybackSession,
-    onResume: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(onClick = onResume),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Продолжить: ${session.title ?: "Последний плейлист"}",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (!session.lastTrackTitle.isNullOrBlank()) {
-                    Text(
-                        text = "${session.lastTrackTitle}${if (!session.lastArtistName.isNullOrBlank()) " • ${session.lastArtistName}" else ""}",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            FilledTonalButton(
-                onClick = onResume,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                modifier = Modifier.height(30.dp).pointerHoverIcon(PointerIcon.Hand)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(2.dp))
-                Text("Слушать", fontSize = 11.sp)
-            }
-        }
-    }
-}
-
-// ============================================================================
-// ✨ 4. ПЕРСОНАЛЬНЫЕ ПОДБОРКИ ЯНДЕКСА (горизонтальная лента)
-// ============================================================================
-
-@Composable
-private fun PersonalPlaylistsSection(
-    items: List<PersonalPlaylistItemData>,
-    onSelect: (PersonalPlaylistItemData) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val visibleItems = items.filter { it.playlist?.canOpen == true }
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val flingBehavior = ScrollableDefaults.flingBehavior()
-    val canNavigate by remember { derivedStateOf { listState.canScrollBackward || listState.canScrollForward } }
-    Column(modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Персональные подборки",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val gap = 10.dp
-            val preferredCardWidth = 142.dp
-            val allCardsWidth = preferredCardWidth * visibleItems.size +
-                gap * (visibleItems.size - 1).coerceAtLeast(0)
-            // При прокрутке оставляем видимыми 32 dp следующей карточки.
-            val fullCards = when {
-                visibleItems.size <= 2 -> 1
-                maxWidth < 540.dp -> 2
-                else -> ((maxWidth - 32.dp) / (preferredCardWidth + gap)).toInt().coerceAtLeast(1)
-            }
-            val cardWidth = if (allCardsWidth <= maxWidth) {
-                preferredCardWidth
+            if (cover != null) {
+                Image(cover, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
-                ((maxWidth - 32.dp - gap * fullCards) / fullCards).coerceAtLeast(1.dp)
-            }
-
-            LazyRow(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().draggable(
-                    state = rememberDraggableState { delta -> listState.dispatchRawDelta(-delta) },
-                    orientation = Orientation.Horizontal,
-                    onDragStarted = { listState.stopScroll() },
-                    onDragStopped = { velocity ->
-                        listState.scroll { with(flingBehavior) { performFling(-velocity) } }
-                    }
-                ),
-                horizontalArrangement = Arrangement.spacedBy(gap)
-            ) {
-                items(visibleItems, key = { it.playlist!!.stableKey }) { item ->
-                    val playlist = item.playlist!!
-                    val title = item.displayTitle
-                    PersonalPlaylistCard(
-                        title = title,
-                        description = item.description ?: "Собрано для вас",
-                        coverUri = playlist.cover?.uri,
-                        onClick = { onSelect(item) },
-                        modifier = Modifier.width(cardWidth)
-                    )
-                }
+                Icon(Icons.Filled.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp))
             }
         }
-        if (canNavigate) {
-            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 36.dp) {
-                Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Подборок: ${visibleItems.size}", modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    OutlinedIconButton(
-                        onClick = {
-                            scope.launch {
-                                val previous = if (listState.firstVisibleItemScrollOffset > 0) listState.firstVisibleItemIndex
-                                    else (listState.firstVisibleItemIndex - 1).coerceAtLeast(0)
-                                listState.animateScrollToItem(previous)
-                            }
-                        },
-                        enabled = listState.canScrollBackward,
-                        modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand)
-                    ) { Icon(Icons.Filled.ChevronLeft, "Предыдущие подборки", modifier = Modifier.size(20.dp)) }
-                    OutlinedIconButton(
-                        onClick = {
-                            scope.launch {
-                                listState.animateScrollToItem((listState.firstVisibleItemIndex + 1).coerceAtMost(visibleItems.lastIndex))
-                            }
-                        },
-                        enabled = listState.canScrollForward,
-                        modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand)
-                    ) { Icon(Icons.Filled.ChevronRight, "Следующие подборки", modifier = Modifier.size(20.dp)) }
-                }
-            }
-        }
-
-    }
-}
-
-@Composable
-private fun PersonalPlaylistCard(
-    title: String,
-    description: String,
-    coverUri: String?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val coverBitmap = rememberCoverBitmap(coverUri, size = 200)
-
-    Card(
-        modifier = modifier
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            // Обложка подстраивается под ширину карточки.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (coverBitmap != null) {
-                    Image(
-                        bitmap = coverBitmap,
-                        contentDescription = title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(1.dp))
-
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-// ============================================================================
-// 📂 5. МОИ ПАПКИ И ЛОКАЛЬНЫЕ ПЛЕЙЛИСТЫ (FlowRow с автопереносом на новую строку)
-// ============================================================================
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun LocalLibrarySection(
-    localPlaylists: List<LocalPlaylist>,
-    customSources: List<CustomMediaSource>,
-    onOpenLocalPlaylist: (LocalPlaylist) -> Unit,
-    onOpenFolder: (path: String, name: String, src: CustomMediaSource?) -> Unit,
-    onAddFolder: () -> Unit,
-    onOpenMediaLibrary: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Folder,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Мои папки и плейлисты",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            itemVerticalAlignment = Alignment.CenterVertically
-        ) {
-            if (isPlatformPickerSupported) {
-                OutlinedButton(
-                    onClick = onAddFolder,
-                    modifier = Modifier.heightIn(min = 44.dp).pointerHoverIcon(PointerIcon.Hand),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Добавить папку", fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            TextButton(
-                onClick = onOpenMediaLibrary,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                modifier = Modifier.heightIn(min = 44.dp).pointerHoverIcon(PointerIcon.Hand)
-            ) {
-                Text("Все", fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val gap = 10.dp
-            val columns = if (maxWidth < 540.dp) 2 else ((maxWidth + gap) / 170.dp).toInt().coerceAtLeast(2)
-            // Округляем вниз до пикселя, чтобы последний столбец не переносился из-за округления.
-            val cardWidth = with(LocalDensity.current) {
-                ((constraints.maxWidth - gap.roundToPx() * (columns - 1)) / columns)
-                    .coerceAtLeast(1).toDp()
-            }
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                maxItemsInEachRow = columns,
-                horizontalArrangement = Arrangement.spacedBy(gap),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                customSources.forEach { src ->
-                    key(src.id) {
-                        FolderCard(
-                            stableId = src.id,
-                            title = src.name,
-                            subtitle = src.path.substringAfterLast('/').ifBlank { "Папка" },
-                            onClick = { onOpenFolder(src.path, src.name, src) },
-                            modifier = Modifier.width(cardWidth)
-                        )
-                    }
-                }
-                localPlaylists.forEach { playlist ->
-                    key(playlist.id) {
-                        LocalPlaylistCard(
-                            playlist = playlist,
-                            onClick = { onOpenLocalPlaylist(playlist) },
-                            modifier = Modifier.width(cardWidth)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private val folderCardColors = listOf(Color(0xFF38BDF8), Color(0xFF22D3EE), Color(0xFF2DD4BF))
-private val playlistCardColors = listOf(
-    Color(0xFFA78BFA), Color(0xFFF472B6), Color(0xFF34D399), Color(0xFFFBBF24)
-)
-
-private fun libraryCardColor(stableId: String, colors: List<Color>): Color =
-    colors[(stableId.hashCode().toUInt() % colors.size.toUInt()).toInt()]
-
-@Composable
-private fun FolderCard(
-    stableId: String,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LibraryItemCard(
-        title = title,
-        subtitle = subtitle,
-        icon = Icons.Filled.Folder,
-        accentColor = remember(stableId) { libraryCardColor(stableId, folderCardColors) },
-        onClick = onClick,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun LocalPlaylistCard(
-    playlist: LocalPlaylist,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LibraryItemCard(
-        title = playlist.title,
-        subtitle = "${playlist.trackPaths.size} треков",
-        icon = Icons.AutoMirrored.Filled.QueueMusic,
-        accentColor = remember(playlist.id) { libraryCardColor(playlist.id, playlistCardColors) },
-        onClick = onClick,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun LibraryItemCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    accentColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val surface = MaterialTheme.colorScheme.surface
-    Surface(
-        modifier = modifier
-            .heightIn(min = 88.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = surface,
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .waveCardBackground(surface, accentColor)
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accentColor,
-                modifier = Modifier.size(26.dp)
-            )
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
+        Text(title, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -123,7 +123,7 @@ fun SearchInputField(
             ) {
                 if (query.isEmpty()) {
                     Text(
-                        text = "Поиск: трек, артист или ссылка (yamsync://)...",
+                        text = "Поиск музыки",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         softWrap = false,

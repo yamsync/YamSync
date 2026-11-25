@@ -77,6 +77,7 @@ enum class TrackPlaySource {
 enum class TracksListOrigin {
     HOME,
     SEARCH,
+    COLLECTIONS,
     FOLDER_BROWSER,
     MEDIA_LIBRARY,
     MOBILE_PLAYER

@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -45,6 +47,7 @@ import io.github.audiz.ui.SearchInputField
 import io.github.audiz.ui.SearchResultsList
 import io.github.audiz.ui.ArtistTracksList
 import io.github.audiz.ui.HomeHub
+import io.github.audiz.ui.PersonalCollectionsScreen
 import io.github.audiz.ui.PlaylistsDialog
 import io.github.audiz.ui.UpNextDialog
 import io.github.audiz.ui.AddToPlaylistDialog
@@ -141,6 +144,10 @@ fun App() {
             // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
             val showTracksScreen = searchViewModel.isTracksListVisible &&
                 (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
+            val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
+            var showCollections by remember { mutableStateOf(false) }
+            val homeScrollState = rememberScrollState()
+            val collectionsGridState = rememberLazyGridState()
             var settingsExpanded by remember { mutableStateOf(false) }
             var isMobilePlayerExpanded by remember {
                 mutableStateOf(loadAppConfig(AppConfigKeys.MOBILE_PLAYER_EXPANDED) == "true")
@@ -384,8 +391,8 @@ fun App() {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).padding(top = 16.dp)) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         if (!showTracksScreen) {
-                            BackHandler(enabled = searchViewModel.searchResult != null) {
-                                searchViewModel.clearSearch()
+                            BackHandler(enabled = isSearchVisible || showCollections) {
+                                if (isSearchVisible) searchViewModel.clearSearch() else showCollections = false
                             }
                             // ==================================================
                             // 👤 ЭКРАН А: ПОИСК И ВЫДАЧА
@@ -426,29 +433,46 @@ fun App() {
                             // 🏠 МУЗЫКАЛЬНЫЙ ХАБ (Скрывается при активном поиске)
                             // ==================================================
                             AnimatedVisibility(
-                                visible = searchViewModel.searchResult == null && searchViewModel.activeSearchQuery == null,
+                                visible = !isSearchVisible,
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
-                                Column {
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    updateManager.availableUpdate?.let { update ->
-                                        io.github.audiz.ui.UpdateBanner(
-                                            update = update,
-                                            onDismiss = { updateManager.dismiss() },
-                                            modifier = Modifier.fillMaxWidth()
+                                Column(Modifier.padding(top = 12.dp)) {
+                                    if (showCollections) {
+                                        PersonalCollectionsScreen(
+                                            items = searchViewModel.personalPlaylists,
+                                            isLoading = searchViewModel.isPersonalPlaylistsLoading,
+                                            gridState = collectionsGridState,
+                                            onBack = { showCollections = false },
+                                            onSelect = { playlist, title ->
+                                                if (playlist.playlistUuid.isNotBlank()) {
+                                                    searchViewModel.loadPlaylistByUuid(playlist.playlistUuid, title)
+                                                } else {
+                                                    searchViewModel.loadPlaylistTracks(playlist.uid, playlist.kind, title)
+                                                }
+                                                searchViewModel.tracksListOrigin = TracksListOrigin.COLLECTIONS
+                                            },
                                         )
-                                        Spacer(modifier = Modifier.height(12.dp))
+                                    } else {
+                                        updateManager.availableUpdate?.let { update ->
+                                            io.github.audiz.ui.UpdateBanner(
+                                                update = update,
+                                                onDismiss = { updateManager.dismiss() },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                        }
+                                        HomeHub(
+                                            viewModel = searchViewModel,
+                                            scrollState = homeScrollState,
+                                            onOpenMediaLibrary = {
+                                                searchViewModel.resetBrowsedFolder()
+                                                updateShowPlaylistsDialog(true)
+                                            },
+                                            onOpenDevices = { showYamSyncDialog = true },
+                                            onOpenCollections = { showCollections = true },
+                                        )
                                     }
-                                    HomeHub(
-                                        viewModel = searchViewModel,
-                                        onOpenMediaLibrary = {
-                                            searchViewModel.resetBrowsedFolder()
-                                            updateShowPlaylistsDialog(true)
-                                        },
-                                        onOpenDevices = { showYamSyncDialog = true },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
                                 }
                             }
 
@@ -605,12 +629,14 @@ fun App() {
                             canLoadMore = searchViewModel.canLoadMore,
                             onLoadMore = { searchViewModel.loadNextPage() },
                             onHomeClick = {
+                                showCollections = false
                                 searchViewModel.clearSearch()
                                 searchViewModel.closeArtistTracks()
                             },
                             onBackClick = goBackFromTracks.takeIf {
                                 isBackGoingToFolderBrowser || isBackGoingToMediaLibrary || isBackGoingToMobilePlayer ||
-                                    searchViewModel.tracksListOrigin == TracksListOrigin.SEARCH
+                                    searchViewModel.tracksListOrigin == TracksListOrigin.SEARCH ||
+                                    searchViewModel.tracksListOrigin == TracksListOrigin.COLLECTIONS
                             },
                             isTrackDownloading = searchViewModel.isTrackDownloading,
                             downloadingTrackId = searchViewModel.downloadingTrackId,
