@@ -1763,8 +1763,8 @@ class PlaybackManager(
                 if (LocalStreamProxy.isRunning()) {
                     println("⚡ [Предзагрузка] Предзагрузка первого чанка стрима через LocalStreamProxy: $cleanTitle")
                     try {
-                        LocalStreamProxy.preloadTrack(targetTrackId, selectedQuality)
-                        if (plannedNextTrack?.id == targetTrackId) {
+                        val preloadedUrl = LocalStreamProxy.preloadTrack(targetTrackId, selectedQuality)
+                        if (preloadedUrl.isNotEmpty() && plannedNextTrack?.id == targetTrackId) {
                             preloadedAudio = PreloadedAudio(
                                 trackId = targetTrackId,
                                 audioData = null,

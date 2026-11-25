@@ -10,6 +10,7 @@ import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.CancellationException
 
@@ -161,21 +162,16 @@ class MediaStreamClient(
             }
         }
 
-        var totalSizeBytes = 0L
-        try {
-            val headResponse: HttpResponse = client.get(parsedInfo.url) {
-                header("Range", "bytes=0-0")
-            }
-            val contentRange = headResponse.headers["Content-Range"]
-            if (contentRange != null && contentRange.contains("/")) {
-                totalSizeBytes = contentRange.substringAfterLast("/").trim().toLongOrNull() ?: 0L
-            }
-            if (totalSizeBytes <= 0L) {
-                totalSizeBytes = headResponse.headers["Content-Length"]?.toLongOrNull() ?: 0L
-            }
-        } catch (e: Exception) {
-            println("MediaStreamClient: Ошибка определения размера трека: ${e.message}")
+        val sizeResponse = client.get(parsedInfo.url) {
+            header("Range", "bytes=0-0")
         }
+        val totalSizeBytes = when (sizeResponse.status) {
+            HttpStatusCode.PartialContent -> sizeResponse.headers["Content-Range"]
+                ?.substringAfterLast('/', missingDelimiterValue = "")?.trim()?.toLongOrNull()
+            HttpStatusCode.OK -> sizeResponse.headers["Content-Length"]?.toLongOrNull()
+            else -> null
+        }
+        check(totalSizeBytes != null && totalSizeBytes > 0L) { "Не удалось определить размер аудиопотока" }
 
         return TrackStreamMeta(
             directUrl = parsedInfo.url,

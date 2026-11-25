@@ -231,10 +231,12 @@ actual object LocalStreamProxy {
                     newSession
                 }
             }
-            withContext(Dispatchers.IO) {
+            val firstChunk = withContext(Dispatchers.IO) {
                 session.getChunk(0)
             }
-            getStreamUrl(cleanTrackId, quality, "", "")
+            if (firstChunk != null) getStreamUrl(cleanTrackId, quality, "", "") else ""
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             println("⚡ [StreamProxy] Ошибка предзагрузки 0-го чанка для $trackId: ${e.message}")
             ""
