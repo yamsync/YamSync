@@ -80,7 +80,7 @@ internal fun HomeHub(
                 HomeNavigationRow(
                     "Подборки",
                     Icons.Filled.Layers,
-                    iconTint = homeIconTint(Color(0xFFB9A6CA)),
+                    iconTint = homeIconTint(Color(0xFFC3AEDB)),
                     onClick = onOpenCollections,
                 )
             }
@@ -216,27 +216,27 @@ private fun QuickAccessSection(
         HomeSectionHeading("Быстрый доступ")
         HomeListSurface {
             HomeNavigationRow(
-                "Скачанное", Icons.Filled.Download, iconTint = homeIconTint(Color(0xFF8DB9A5)),
+                "Скачанное", Icons.Filled.Download, iconTint = homeIconTint(Color(0xFF8AC8AB)),
                 onClick = { viewModel.loadDownloadedTracksPlaylist() },
             )
             HomeListDivider()
             HomeNavigationRow(
-                "Любимые", Icons.Filled.Favorite, iconTint = homeIconTint(Color(0xFFD2A0B0)),
+                "Любимые", Icons.Filled.Favorite, iconTint = homeIconTint(Color(0xFFE0A4B9)),
                 onClick = { viewModel.loadLikesPlaylist() },
             )
             HomeListDivider()
             HomeNavigationRow(
-                "Медиатека", Icons.Filled.LibraryMusic, iconTint = homeIconTint(Color(0xFFACADD0)),
+                "Медиатека", Icons.Filled.LibraryMusic, iconTint = homeIconTint(Color(0xFFAEB5E1)),
                 onClick = onOpenMediaLibrary,
             )
             HomeListDivider()
             HomeNavigationRow(
-                "История", Icons.Filled.History, iconTint = homeIconTint(Color(0xFFC4AC88)),
+                "История", Icons.Filled.History, iconTint = homeIconTint(Color(0xFFD3B88C)),
                 onClick = { viewModel.loadHistory() },
             )
             HomeListDivider()
             HomeNavigationRow(
-                "Устройства", Icons.Filled.Devices, iconTint = homeIconTint(Color(0xFF8EB7BA)),
+                "Устройства", Icons.Filled.Devices, iconTint = homeIconTint(Color(0xFF8CC5CA)),
                 statusColor = deviceStateColor, onClick = onOpenDevices,
             )
         }
