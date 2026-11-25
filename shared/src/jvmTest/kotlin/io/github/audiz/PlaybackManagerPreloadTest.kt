@@ -55,13 +55,9 @@ class PlaybackManagerPreloadTest {
             getSearchTracks = { emptyList() }
         )
 
-        // When nothing is playing, candidate is first track
         val firstCandidate = playbackManager.calculateNextTrackCandidate()
         assertEquals("1", firstCandidate?.id)
 
-        // Simulate playing track 1 by changing trackId via private reflection or setting track
-        // But calculateNextTrackCandidate looks at playbackManager.trackId
-        // Initially trackId is null, so it returns first track.
     }
 
     @Test

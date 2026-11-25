@@ -34,19 +34,16 @@ class MusicStorageTest {
             val fileName = "Test Artist — Test Song.mp3"
             val dummyBytes = "ID3dummycontent".toByteArray()
 
-            // 1. Save track file
             saveTrackFile(tempDir.absolutePath, artist, fileName, dummyBytes)
             assertTrue(trackFileExists(tempDir.absolutePath, artist, fileName), "Track file should exist")
 
             val expectedFile = File(File(tempDir, "Test Artist"), fileName)
             assertTrue(localFileExists(expectedFile.absolutePath), "localFileExists should be true")
 
-            // 2. Scan tracks
             val scanned = scanDownloadedTracks(tempDir.absolutePath)
             assertTrue(scanned.isNotEmpty(), "Scanned tracks should contain the saved file")
             assertTrue(scanned.any { it.title == title && it.artists.firstOrNull()?.name == artist })
 
-            // 3. Playlist cache
             val testTracks = scanned
             val playlistName = "My Favorites"
             savePlaylistTracksCache(tempDir.absolutePath, playlistName, testTracks)
@@ -54,7 +51,6 @@ class MusicStorageTest {
             assertTrue(loadedTracks.size == testTracks.size, "Loaded cache should have same count")
             assertTrue(loadedTracks.firstOrNull()?.title == title, "Loaded cache track should match")
 
-            // 4. Personal playlist cache
             val personalPlaylists = listOf(
                 io.github.audiz.models.PersonalPlaylistItemData(
                     playlist = io.github.audiz.models.PersonalPlaylistInfo(
@@ -70,7 +66,6 @@ class MusicStorageTest {
             assertTrue(loadedPersonal.size == 1, "Personal playlist cache should have 1 item")
             assertTrue(loadedPersonal.first().playlist?.title == "Daily Mix")
 
-            // 4b. Editorial showcase cache
             val editorialShowcase = io.github.audiz.models.EditorialShowcaseData(
                 charts = listOf(
                     io.github.audiz.models.ChartCollection(
@@ -98,7 +93,6 @@ class MusicStorageTest {
             assertTrue(loadedShowcase.newPlaylists.firstOrNull()?.title == "Новые хиты")
             assertTrue(loadedShowcase.newReleases.firstOrNull()?.id == 99L)
 
-            // 4c. Wave catalog cache
             val waveCatalog = io.github.audiz.models.WavePersonalCatalog(
                 personalStations = listOf(
                     io.github.audiz.models.WaveThemeOption(
@@ -129,23 +123,19 @@ class MusicStorageTest {
             assertTrue(loadedWaveCatalog != null && loadedWaveCatalog.personalStations.size == 1, "Wave catalog cache should have 1 personal station")
             assertTrue(loadedWaveCatalog.categories.firstOrNull()?.title == "Занятия")
 
-            // 5. Delete track
             val deleted = deleteTrackFile(tempDir.absolutePath, artist, title, expectedFile.absolutePath)
             assertTrue(deleted, "Track should be deleted")
             assertTrue(!trackFileExists(tempDir.absolutePath, artist, fileName), "Track should no longer exist")
 
-            // 6. Clear playlists cache
             val clearedCount = clearPlaylistsCache(tempDir.absolutePath)
             assertTrue(clearedCount >= 1, "At least one cache file should be cleared")
             val cacheAfter = loadPlaylistTracksCache(tempDir.absolutePath, playlistName)
             assertTrue(cacheAfter.isEmpty(), "Cache should be empty after clear")
 
-            // 7. Test expired cache (> 7 days) automatic deletion
             val expiredPlaylist = "Old Playlist"
             savePlaylistTracksCache(tempDir.absolutePath, expiredPlaylist, testTracks)
             val cacheFile = java.io.File(tempDir, "playlists_cache").listFiles()?.firstOrNull { it.name.startsWith("Old Playlist") }
             assertTrue(cacheFile != null && cacheFile.exists(), "Cache file should exist")
-            // Искусственно устанавливаем дату создания/модификации 8 дней назад
             cacheFile.setLastModified(System.currentTimeMillis() - 8L * 24 * 60 * 60 * 1000L)
             val loadedExpired = loadPlaylistTracksCache(tempDir.absolutePath, expiredPlaylist)
             assertTrue(loadedExpired.isEmpty(), "Expired cache (> 7 days) should not be loaded")
@@ -168,13 +158,11 @@ class MusicStorageTest {
             val trackFile = File(File(tempDir, artist), fileName)
             assertTrue(trackFile.exists(), "Track file should exist")
 
-            // 1. Get tracks from local paths
             val tracks = getTracksFromLocalPaths(listOf(trackFile.absolutePath))
             assertTrue(tracks.size == 1, "Should find 1 track")
             assertTrue(tracks[0].title == title)
             assertTrue(tracks[0].artists.first().name == artist)
 
-            // 2. Save & Load local playlists
             val playlist = io.github.audiz.models.LocalPlaylist(
                 id = "pl-1",
                 title = "Road Trip",
@@ -189,7 +177,6 @@ class MusicStorageTest {
             assertTrue(loaded[0].title == "Road Trip")
             assertTrue(loaded[0].trackPaths.size == 1)
 
-            // 3. Export to M3U8
             val m3u8Path = exportPlaylistToM3u8(tempDir.absolutePath, loaded[0], tracks)
             assertTrue(m3u8Path.isNotBlank(), "M3U8 path should not be blank")
             val m3u8File = File(m3u8Path)
@@ -207,7 +194,6 @@ class MusicStorageTest {
     fun testYandexPlaylistDiffJsonAndModels() {
         val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-        // 1. PlaylistInfo with revision
         val playlist = io.github.audiz.models.PlaylistInfo(
             uid = 123456L,
             title = "Cloud Hits",
@@ -221,7 +207,6 @@ class MusicStorageTest {
         val decodedPlaylist = json.decodeFromString(io.github.audiz.models.PlaylistInfo.serializer(), encodedPlaylist)
         assertTrue(decodedPlaylist.revision == 5, "Decoded playlist should have revision 5")
 
-        // 2. YandexPlaylistDetails with tracks
         val details = io.github.audiz.models.YandexPlaylistDetails(
             uid = 123456L,
             kind = 1001L,
@@ -239,7 +224,6 @@ class MusicStorageTest {
         assertTrue(decodedDetails.tracks[0].id == "111", "First track id should be 111")
         assertTrue(decodedDetails.tracks[1].artist == "Artist B", "Second track artist should be Artist B")
 
-        // 3. Diff operations syntax validation
         val insertDiff = """[{"op": "insert", "at": 0, "tracks": [{"id": 111, "albumId": 222}]}]"""
         val deleteDiff = """[{"op": "delete", "from": 0, "to": 1}]"""
         val parsedInsert = json.parseToJsonElement(insertDiff)
@@ -267,7 +251,6 @@ class MusicStorageTest {
             assertEquals(1, loaded1.size)
             assertEquals("Original Name", loaded1[0].title)
 
-            // Simulate rename with updated metadata and cache persistence
             val renamed = loaded1[0].copy(title = "Renamed Hits", revision = 4)
             saveUserPlaylistsCache(tempDir.absolutePath, listOf(renamed))
             val loaded2 = loadUserPlaylistsCache(tempDir.absolutePath)
@@ -402,7 +385,6 @@ class MusicStorageTest {
     fun testLocalCoverExtractionAndUrls() {
         val tempDir = java.nio.file.Files.createTempDirectory("cover_test").toFile()
         try {
-            // 1. Тест обложки в папке (folder.jpg fallback)
             val audioFile = File(tempDir, "Artist - Song.mp3")
             audioFile.writeBytes(byteArrayOf(0xFF.toByte(), 0xFB.toByte(), 0x90.toByte(), 0x44.toByte()))
             val coverFile = File(tempDir, "cover.jpg")
@@ -417,11 +399,9 @@ class MusicStorageTest {
             assertTrue(coverUrl != null && coverUrl.startsWith("file://"), "Cover URL should be file://")
             assertTrue(coverUrl.contains("cover.jpg"))
 
-            // 2. Тест CoverImageLoader.formatCoverUrl для локального файла
             val formatted = io.github.audiz.ui.CoverImageLoader.formatCoverUrl("local:${audioFile.absolutePath}")
             assertTrue(formatted != null && formatted.startsWith("file://"), "Formatted URL should not have https:// for local files")
 
-            // 3. Тест MP3 с встроенным ID3v2 APIC
             val apicTag = java.io.ByteArrayOutputStream()
             apicTag.write(byteArrayOf('I'.code.toByte(), 'D'.code.toByte(), '3'.code.toByte(), 3, 0, 0))
             val apicPayload = java.io.ByteArrayOutputStream()
@@ -470,7 +450,6 @@ class MusicStorageTest {
             val artistDir = File(tempDir, "Artist Name")
             artistDir.mkdirs()
 
-            // 1. Delete with local: prefix
             val file1 = File(artistDir, "Artist Name — Song One.mp3")
             file1.writeBytes("dummy".toByteArray())
             assertTrue(file1.exists())

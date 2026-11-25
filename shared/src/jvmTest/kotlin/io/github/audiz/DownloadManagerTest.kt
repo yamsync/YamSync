@@ -76,7 +76,6 @@ class DownloadManagerTest {
         val original = "AC/DC - Highway to Hell: Live*?\"<>|"
         val sanitized = manager.sanitizeKeepSpaces(original)
         assertEquals("AC_DC - Highway to Hell_ Live______", sanitized)
-        // Spaces are preserved
         assertTrue(sanitized.contains(" - Highway to Hell_ Live"))
     }
 
@@ -101,7 +100,6 @@ class DownloadManagerTest {
 
             assertFalse(manager.isTrackDownloaded(artist, title))
 
-            // Save file in HQ folder
             val hqFolder = java.io.File(tempDir, "HQ")
             hqFolder.mkdirs()
             val fileName = "$artist — $title.m4a"

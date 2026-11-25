@@ -113,7 +113,6 @@ class SearchSuggestionTest {
         )
         val list = listOf(localTrack)
 
-        // 1. Поиск по имени артиста "2dcat"
         val byArtist = buildSearchSuggestions("2dcat", emptyList(), list)
         assertEquals(2, byArtist.size)
         assertEquals("Believe", byArtist[0].title)
@@ -121,12 +120,10 @@ class SearchSuggestionTest {
         assertEquals("2DCAT • На диске", byArtist[0].subtitle)
         assertEquals(localTrack, byArtist[0].localTrack)
 
-        // 2. Поиск по мульти-словам "2dcat believe"
         val byMultiWord = buildSearchSuggestions("2dcat believe", emptyList(), list)
         assertEquals(2, byMultiWord.size)
         assertEquals("Believe", byMultiWord[0].title)
 
-        // 3. Поиск по имени файла "2dcat-believe"
         val byFileName = buildSearchSuggestions("2dcat-believe", emptyList(), list)
         assertEquals(2, byFileName.size)
         assertEquals("Believe", byFileName[0].title)

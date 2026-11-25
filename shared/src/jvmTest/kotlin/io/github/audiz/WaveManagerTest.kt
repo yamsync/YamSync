@@ -121,11 +121,8 @@ class WaveManagerTest {
 
         waveManager.waveTracks.addAll(listOf(track1, track2))
 
-        // By default, currentWaveTrack should pick waveTracks[waveCurrentIndex] (index 0)
         assertEquals(track1.id, waveManager.currentWaveTrack?.id)
 
-        // When activeWaveTrack is explicitly set, it takes priority
-        // (verified via playWaveTrack logic simulation)
         waveManager.resetWaveMode()
         assertFalse(waveManager.isWaveMode)
     }
@@ -138,7 +135,6 @@ class WaveManagerTest {
             getAccessToken = { "" }
         )
 
-        // Simulate activating wave mode
         waveManager.resetWaveMode()
         assertFalse(waveManager.isWaveMode)
     }
@@ -161,7 +157,6 @@ class WaveManagerTest {
         assertEquals("1", waveManager.currentWaveTrack?.id)
         assertEquals(0, waveManager.waveCurrentIndex)
 
-        // При вызове playNextWaveTrack() плеер должен мгновенно перейти на track2
         waveManager.playNextWaveTrack()
 
         assertEquals(1, waveManager.waveCurrentIndex)
@@ -169,7 +164,6 @@ class WaveManagerTest {
         assertEquals(1, waveManager.wavePastTracks.size)
         assertEquals("1", waveManager.wavePastTracks.first().id)
 
-        // Еще один переход вперед -> track3
         waveManager.playNextWaveTrack()
 
         assertEquals(2, waveManager.waveCurrentIndex)
@@ -195,7 +189,6 @@ class WaveManagerTest {
         assertEquals("1", waveManager.currentWaveTrack?.id)
         assertEquals(0, waveManager.waveCurrentIndex)
 
-        // Когда трек доиграл естественным образом
         waveManager.onWaveTrackFinished()
 
         assertEquals(1, waveManager.waveCurrentIndex)
@@ -219,7 +212,6 @@ class WaveManagerTest {
         waveManager.waveTracks.addAll(listOf(track1, track2, track3))
         waveManager.playWaveTrack(0)
 
-        // Currently at 0, next candidate should be track2
         val candidate1 = waveManager.getNextWaveTrackCandidate()
         assertEquals("2", candidate1?.id)
 
@@ -229,7 +221,6 @@ class WaveManagerTest {
         assertEquals("3", candidateFuture?.id)
         waveManager.waveFutureTracks.clear()
 
-        // Move to last track
         waveManager.playWaveTrack(2)
         val candidateEnd = waveManager.getNextWaveTrackCandidate()
         assertEquals(null, candidateEnd)
@@ -250,7 +241,6 @@ class WaveManagerTest {
         assertEquals("Метал", waveManager.currentWaveTitle)
         assertEquals(listOf("genre:metal"), waveManager.currentWaveSeeds)
 
-        // Reset back to default wave
         waveManager.resetToDefaultWave(autoPlay = false)
         assertNull(waveManager.currentWaveTitle)
         assertTrue(waveManager.currentWaveSeeds.isEmpty())
@@ -272,13 +262,11 @@ class WaveManagerTest {
 
         assertEquals("1", waveManager.currentWaveTrack?.id)
 
-        // Переходим к следующему треку
         waveManager.playNextWaveTrack()
         assertEquals("2", waveManager.currentWaveTrack?.id)
         assertEquals(1, waveManager.wavePastTracks.size)
         assertEquals("1", waveManager.wavePastTracks.first().id)
 
-        // Кандидат на следующий трек не должен быть равен предыдущему треку ("1") и не равен текущему ("2")
         val nextCandidate = waveManager.getNextWaveTrackCandidate()
         assertFalse(nextCandidate?.id == "1")
         assertFalse(nextCandidate?.id == "2")
@@ -292,17 +280,14 @@ class WaveManagerTest {
             getAccessToken = { "" }
         )
 
-        // Clear initially for test isolation
         waveManager.recentThematicWaves.clear()
 
-        // 1. Check default diverse style presets exist and are unique
         assertEquals(3, waveManager.defaultThematicWaves.size)
         assertEquals(3, waveManager.defaultThematicWaves.map { it.title }.distinct().size)
         assertTrue(waveManager.defaultThematicWaves.all { preset ->
             WaveManager.ALL_STYLE_PRESETS.any { it.title == preset.title && it.seeds == preset.seeds }
         })
 
-        // Test refreshDefaultThematicWaves rotates styles
         waveManager.refreshDefaultThematicWaves()
         assertEquals(3, waveManager.defaultThematicWaves.size)
         assertEquals(3, waveManager.defaultThematicWaves.map { it.title }.distinct().size)
@@ -356,7 +341,6 @@ class WaveManagerTest {
     fun testWaveStylePersistenceAcrossRestarts() {
         val originalStyle = loadAppConfig(AppConfigKeys.LAST_WAVE_STYLE)
         try {
-            // 1. Проверяем наличие "Поп-рок" среди пресетов
             val popRockPreset = WaveManager.ALL_STYLE_PRESETS.firstOrNull { it.title == "Поп-рок" }
             assertNotNull(popRockPreset)
             assertEquals(listOf("genre:pop-rock"), popRockPreset.seeds)
@@ -367,7 +351,6 @@ class WaveManagerTest {
                 getAccessToken = { "" }
             )
 
-            // Запускаем волну "Поп-рок"
             manager1.startThematicWave("Поп-рок", listOf("genre:pop-rock"))
             assertEquals("Поп-рок", manager1.currentWaveTitle)
             assertEquals(listOf("genre:pop-rock"), manager1.currentWaveSeeds)
@@ -386,14 +369,12 @@ class WaveManagerTest {
             assertNull(manager2.currentWaveTitle)
             assertFalse(manager2.isWaveMode)
 
-            // 🔒 Восстанавливаем стиль из конфига
             val restored = manager2.restoreWaveStyleFromConfig()
             assertNotNull(restored)
             assertEquals("Поп-рок", manager2.currentWaveTitle)
             assertEquals(listOf("genre:pop-rock"), manager2.currentWaveSeeds)
             assertTrue(manager2.isWaveMode)
 
-            // 3. Сброс к персональной волне очищает сохраненный стиль
             manager2.resetToDefaultWave(autoPlay = false)
             assertNull(manager2.currentWaveTitle)
             assertTrue(manager2.currentWaveSeeds.isEmpty())
@@ -412,11 +393,9 @@ class WaveManagerTest {
         )
         manager.recentThematicWaves.clear()
 
-        // Default structured categories exist even before network fetch
         assertEquals(listOf("diversity", "mood", "language", "genre"), manager.waveCategories.map { it.id })
         assertTrue(manager.waveCategories.all { it.items.isNotEmpty() })
 
-        // Even with empty recent waves, quickWaveChips returns diverse options
         val artistWave = io.github.audiz.models.WaveThemeOption(
             id = "artist:42",
             title = "Любимый артист",

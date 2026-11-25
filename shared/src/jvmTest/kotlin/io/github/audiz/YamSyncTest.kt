@@ -129,7 +129,6 @@ class YamSyncTest {
             availableFiles = listOf(trackB, trackC)
         )
 
-        // 1. Вычисление diff
         val diffs = YamSyncDiffEngine.calculateDiff(localManifest, remoteManifest)
         assertEquals(1, diffs.size)
         val diff = diffs[0]
@@ -138,7 +137,6 @@ class YamSyncTest {
         assertEquals(listOf(trackC), diff.remoteOnlyTracks)
         assertEquals(listOf(trackB), diff.commonTracks)
 
-        // 2. Слияние со стратегией MERGE_ALL
         val diffWithMerge = diff.copy(resolution = YamSyncResolution.MERGE_ALL)
         val merged = YamSyncDiffEngine.mergePlaylists(listOf(diffWithMerge))
         assertEquals(1, merged.size)
@@ -147,7 +145,6 @@ class YamSyncTest {
         assertEquals(3, mergedPl.tracks.size)
         assertEquals(listOf(trackA, trackB, trackC), mergedPl.tracks)
 
-        // 3. Поиск недостающих файлов для локального устройства
         val missing = YamSyncDiffEngine.findMissingFiles(
             mergedPlaylists = merged,
             localAvailableFiles = localManifest.availableFiles,
@@ -174,11 +171,9 @@ class YamSyncTest {
             resolution = YamSyncResolution.KEEP_LOCAL
         )
 
-        // KEEP_LOCAL
         val resLocal = YamSyncDiffEngine.mergePlaylists(listOf(diff))
         assertEquals(listOf(track1), resLocal[0].tracks)
 
-        // TAKE_REMOTE
         val resRemote = YamSyncDiffEngine.mergePlaylists(listOf(diff.copy(resolution = YamSyncResolution.TAKE_REMOTE)))
         assertEquals(listOf(track2), resRemote[0].tracks)
     }
@@ -190,7 +185,6 @@ class YamSyncTest {
         // Track on device B with full duration (from file tags)
         val trackAFull = YamSyncTrack("Song.mp3", "Artist", "Song", durationMs = 180000L)
 
-        // They must have identical matchKey!
         assertEquals(trackA0.matchKey, trackAFull.matchKey)
 
         // Local playlist had duplicate entries of the same song (e.g. repeated merge attempts)
@@ -208,7 +202,6 @@ class YamSyncTest {
 
         val merged = YamSyncDiffEngine.mergePlaylists(listOf(diff))
         assertEquals(1, merged.size)
-        // Must be deduplicated to exactly 1 track!
         assertEquals(1, merged[0].tracks.size)
         assertEquals("Song.mp3", merged[0].tracks[0].fileName)
     }
@@ -239,7 +232,6 @@ class YamSyncTest {
             availableFiles = listOf(trackB, trackC)
         )
 
-        // 1. Первоначальный diff
         manager.applyDiffs(localManifest, remoteManifest)
         assertEquals(1, manager.playlistDiffs.size)
         // По умолчанию для совпадающего названия: MERGE_ALL
@@ -248,7 +240,6 @@ class YamSyncTest {
         assertTrue(manager.selectedFiles.contains(trackB.matchKey))
         assertTrue(manager.selectedFiles.contains(trackC.matchKey))
 
-        // 2. Пользователь меняет стратегию на KEEP_LOCAL
         manager.setResolution(manager.playlistDiffs[0].playlistId, YamSyncResolution.KEEP_LOCAL)
         assertEquals(YamSyncResolution.KEEP_LOCAL, manager.playlistDiffs[0].resolution)
         // Для KEEP_LOCAL чужие треки не добавляются, поэтому missingFiles пуст
@@ -256,11 +247,9 @@ class YamSyncTest {
 
         // 3. Фоновое обновление (тихий опрос каждые 4 секунды)
         manager.applyDiffs(localManifest, remoteManifest)
-        // 🔒 Выбор пользователя KEEP_LOCAL должен сохраниться!
         assertEquals(YamSyncResolution.KEEP_LOCAL, manager.playlistDiffs[0].resolution)
         assertEquals(0, manager.missingFiles.size)
 
-        // 4. Пользователь переключает на MERGE_ALL и снимает галочку с trackC
         manager.setResolution(manager.playlistDiffs[0].playlistId, YamSyncResolution.MERGE_ALL)
         assertEquals(YamSyncResolution.MERGE_ALL, manager.playlistDiffs[0].resolution)
         assertEquals(2, manager.missingFiles.size)
@@ -269,7 +258,6 @@ class YamSyncTest {
         assertFalse(manager.selectedFiles.contains(trackC.matchKey))
         assertTrue(manager.selectedFiles.contains(trackB.matchKey))
 
-        // 5. Повторное фоновое обновление не должно сбрасывать галочку пользователя!
         manager.applyDiffs(localManifest, remoteManifest)
         assertEquals(YamSyncResolution.MERGE_ALL, manager.playlistDiffs[0].resolution)
         assertFalse(manager.selectedFiles.contains(trackC.matchKey))
@@ -301,9 +289,7 @@ class YamSyncTest {
             )
         )
 
-        // Local peer has no files
         val localAvailable = emptyList<YamSyncTrack>()
-        // Remote peer has the file
         val remoteAvailable = listOf(remoteTrack)
 
         val missing = YamSyncDiffEngine.findMissingFiles(
@@ -347,7 +333,6 @@ class YamSyncTest {
             remoteAvailableFiles = listOf(remoteTrack)
         )
 
-        // The file is already on the local device, so it must NOT be marked as missing!
         assertEquals(0, missing.size)
     }
 
@@ -360,7 +345,6 @@ class YamSyncTest {
             val customFile = java.io.File(customDir, "Keep-Shelly-In-Athens-Nobody.mp3")
             customFile.writeBytes("ID3dummy_audio_bytes_123456789".toByteArray())
 
-            // Create a local playlist referencing this custom file
             val pl = LocalPlaylist(
                 id = "pl_local",
                 title = "В дорогу",
@@ -381,7 +365,6 @@ class YamSyncTest {
             assertNotNull(available, "availableFiles must include local track from playlist")
             assertTrue(available.fileSize > 0, "fileSize must be positive")
 
-            // 2. Playlist tracks must have valid track metadata
             val plTrack = manifest.playlists[0].tracks.firstOrNull { it.fileName == "Keep-Shelly-In-Athens-Nobody.mp3" }
             assertNotNull(plTrack, "playlist tracks must include the track")
             assertEquals(available.matchKey, plTrack.matchKey)
@@ -520,14 +503,11 @@ class YamSyncTest {
                 }
             }
 
-            // Path Traversal с .. должен возвращать 400 Bad Request
             assertEquals(400, getStatus("name=../../secret.txt"))
-            // Абсолютный путь должен возвращать 400 Bad Request
             assertEquals(400, getStatus("name=/etc/passwd"))
             // Файл, отсутствующий в манифесте, не отдаётся (403/404)
             val missingStatus = getStatus("name=secret.txt")
             assertTrue(missingStatus == 403 || missingStatus == 404, "Must deny access to file not in manifest")
-            // Легитимный файл из манифеста успешно отдаётся (200 OK)
             assertEquals(200, getStatus("name=Song.mp3"))
 
             server.stop()

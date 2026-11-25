@@ -67,7 +67,6 @@ class VisualizerProbeTest {
                         prev?.let { p -> for (i in 0 until 25) speedSum += abs(l[i] - p[i]) / (frameDt / 1000) }
                         for (i in 0 until 25) {
                             levelSum += l[i]
-                            // пики с амплитудой > 0.15
                             if (rising[i] && l[i] < lastExtreme[i] - 0.15f) { peaks++; rising[i] = false; lastExtreme[i] = l[i] }
                             else if (!rising[i] && l[i] > lastExtreme[i] + 0.15f) { rising[i] = true; lastExtreme[i] = l[i] }
                             else if (rising[i] && l[i] > lastExtreme[i]) lastExtreme[i] = l[i]

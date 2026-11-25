@@ -43,7 +43,6 @@ class PlaybackQueueManagerTest {
         queueManager.recordPlayed("4")
         queueManager.recordPlayed("5")
 
-        // Active track is "6", history has 1..5
         val recent = queueManager.getRecentTrackIds(activeId = "6", limit = 5)
         assertEquals(listOf("6", "5", "4", "3", "2"), recent)
         assertFalse(recent.contains("1"))
@@ -58,7 +57,6 @@ class PlaybackQueueManagerTest {
         queueManager.recordPlayed("3")
         queueManager.recordPlayed("4")
 
-        // Active track is "5"
         val recent = queueManager.getRecentTrackIds(activeId = "5", limit = 5)
         assertEquals(listOf("5", "4", "3", "1", "2"), recent)
     }
@@ -78,16 +76,13 @@ class PlaybackQueueManagerTest {
         val queueManager = PlaybackQueueManager()
         val tracks = (1..10).map { createDummyTrack(it.toString()) }
 
-        // Simulate playing tracks 1, 2, 3, 4
         queueManager.recordPlayed("1")
         queueManager.recordPlayed("2")
         queueManager.recordPlayed("3")
         queueManager.recordPlayed("4")
 
-        // Active track is 5
         val candidates = queueManager.getShuffleCandidates(activeId = "5", tracks = tracks)
 
-        // Candidates must ONLY be 6, 7, 8, 9, 10
         val candidateIds = candidates.map { it.id }.toSet()
         assertEquals(setOf("6", "7", "8", "9", "10"), candidateIds)
         assertFalse(candidateIds.contains("1"))
@@ -102,7 +97,6 @@ class PlaybackQueueManagerTest {
         val queueManager = PlaybackQueueManager()
         val tracks = (1..5).map { createDummyTrack(it.toString()) }
 
-        // Simulate playing track 1, active is 2
         queueManager.recordPlayed("1")
 
         val candidates = queueManager.getShuffleCandidates(activeId = "2", tracks = tracks)
@@ -134,7 +128,6 @@ class PlaybackQueueManagerTest {
         var currentId: String? = "1"
         playedOrder.add("1")
 
-        // Play through the remaining 6 tracks of the 7-track playlist
         repeat(6) {
             val next = queueManager.getNextFromList(activeId = currentId, tracks = tracks)
             assertNotNull(next)
@@ -143,7 +136,6 @@ class PlaybackQueueManagerTest {
             currentId = next.id
         }
 
-        // Entire playlist of 7 tracks must have played with ZERO duplicates
         assertEquals(7, playedOrder.size)
         assertEquals(7, playedOrder.distinct().size, "All 7 tracks in cycle must be unique")
         assertEquals((1..7).map { it.toString() }.toSet(), playedOrder.toSet())
@@ -155,7 +147,6 @@ class PlaybackQueueManagerTest {
         queueManager.isShuffleEnabled = true
         val tracks = (1..5).map { createDummyTrack(it.toString()) }
 
-        // Play 1, 2, 3, 4
         queueManager.recordPlayed("1")
         queueManager.recordPlayed("2")
         queueManager.recordPlayed("3")

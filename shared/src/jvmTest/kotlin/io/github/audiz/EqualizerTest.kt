@@ -27,15 +27,12 @@ class EqualizerTest {
     fun testHighPassFilterAttenuatesLowFrequencies() {
         val filter = BiquadFilter()
         val sampleRate = 44100f
-        // Cutoff at 150 Hz
         filter.configureHighPass(sampleRate, 150f)
 
-        // Generate 40 Hz sine wave (well below 150 Hz cutoff)
         val freq = 40f
         var maxIn = 0f
         var maxOut = 0f
 
-        // Process 1 second of audio
         for (n in 0 until 44100) {
             val sample = sin(2.0 * PI * freq * n / sampleRate).toFloat()
             val out = filter.processLeft(sample)
@@ -53,10 +50,8 @@ class EqualizerTest {
     fun testLowPassFilterAttenuatesHighFrequencies() {
         val filter = BiquadFilter()
         val sampleRate = 44100f
-        // Cutoff at 5000 Hz
         filter.configureLowPass(sampleRate, 5000f)
 
-        // Generate 14000 Hz sine wave (well above 5000 Hz cutoff)
         val freq = 14000f
         var maxIn = 0f
         var maxOut = 0f
@@ -78,7 +73,6 @@ class EqualizerTest {
     fun testPeakingFilterBoostsCenterFrequency() {
         val filter = BiquadFilter()
         val sampleRate = 44100f
-        // Boost 1000 Hz by +12 dB
         filter.configurePeaking(sampleRate, 1000f, 12f)
 
         val freq = 1000f
@@ -104,7 +98,6 @@ class EqualizerTest {
         EqualizerEngine.setEnabled(true)
         EqualizerEngine.resetToFlat()
 
-        // Create buffer with 16-bit PCM stereo sine wave
         val sampleRate = 44100
         val buffer = ByteArray(4000)
         for (i in 0 until buffer.size step 4) {
@@ -132,32 +125,27 @@ class EqualizerTest {
 
     @Test
     fun testCalculateEffectiveGainDb() {
-        // 1. Bypass when disabled
         EqualizerEngine.setEnabled(false)
         assertEquals(0f, EqualizerEngine.calculateEffectiveGainDb(60f))
         assertEquals(0f, EqualizerEngine.calculateEffectiveGainDb(1000f))
         assertEquals(0f, EqualizerEngine.calculateEffectiveGainDb(14000f))
 
-        // 2. Flat when enabled
         EqualizerEngine.setEnabled(true)
         EqualizerEngine.resetToFlat()
         EqualizerEngine.resetCutoffs()
         assertEquals(0f, EqualizerEngine.calculateEffectiveGainDb(60f), 0.05f)
         assertEquals(0f, EqualizerEngine.calculateEffectiveGainDb(1000f), 0.05f)
 
-        // 3. Bass Boost preset
         val bassBoost = EqualizerEngine.PRESETS.first { it.name == "Bass Boost" }
         EqualizerEngine.applyPreset(bassBoost)
         val bassGain60 = EqualizerEngine.calculateEffectiveGainDb(60f)
         assertTrue(bassGain60 > 4.5f, "60 Hz should be boosted in Bass Boost preset (got $bassGain60 dB)")
 
-        // 4. Low-Cut (HPF) filter
         EqualizerEngine.resetToFlat()
         EqualizerEngine.setHpfCutoff(120f)
         val hpfAtten60 = EqualizerEngine.calculateEffectiveGainDb(60f)
         assertTrue(hpfAtten60 < -10f, "60 Hz should be cut by ~-12 dB with 120 Hz HPF (got $hpfAtten60 dB)")
 
-        // 5. High-Cut (LPF) filter
         EqualizerEngine.resetToFlat()
         EqualizerEngine.resetCutoffs()
         EqualizerEngine.setLpfCutoff(8000f)

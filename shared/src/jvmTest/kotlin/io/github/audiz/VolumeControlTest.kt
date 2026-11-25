@@ -24,7 +24,6 @@ class VolumeControlTest {
         val quiet = volumeToGain(0.1f)
         assertEquals(0.001f, quiet, 0.00001f)
 
-        // Verify strictly monotonic growth
         var prev = -1f
         for (i in 0..100) {
             val v = i / 100f

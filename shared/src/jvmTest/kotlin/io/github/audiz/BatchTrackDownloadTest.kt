@@ -80,7 +80,6 @@ class BatchTrackDownloadTest {
             println("   -> Received trackId: ${info.trackId}, codec: ${info.codec}, bitrate: ${info.bitrate}")
         }
 
-        // Проверяем, сколько треков возвращается: больше 3?
         assertTrue(batchResult.downloadInfos.size > 3, "Batch should return more than 3 tracks! (returned ${batchResult.downloadInfos.size})")
     }
 }

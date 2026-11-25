@@ -50,7 +50,6 @@ class AudioVisualizerTest {
         val frameLater = AudioVisualizer.advanceFrame(0.200f, isPlaying = true)
         assertTrue(frameLater.peakCaps[2] < 1.0f, "Пиковая засечка начала спуск после 280 мс удержания")
 
-        // 5. Сброс в исходное состояние
         AudioVisualizer.reset()
         val afterReset = AudioVisualizer.levels.value
         assertTrue(afterReset.all { it == AudioVisualizer.RESTING_LEVEL }, "Сброс восстанавливает уровень покоя")
@@ -63,7 +62,6 @@ class AudioVisualizerTest {
         val sampleRate = 44100
         val numSamples = 2048 // ~46ms
 
-        // 1. Generate 60 Hz pure sub-bass sine wave
         val subBassBuffer = ByteArray(numSamples * 2)
         for (i in 0 until numSamples) {
             val sampleVal = (sin(2.0 * PI * 60.0 * i / sampleRate) * 28000.0).toInt().toShort()
@@ -75,7 +73,6 @@ class AudioVisualizerTest {
         assertTrue(subLevels[0] > subLevels[3] && subLevels[0] > subLevels[4],
             "60 Hz sine wave should trigger sub-bass band higher than treble (sub=${subLevels[0]}, treble=${subLevels[4]})")
 
-        // 2. Generate 10 kHz pure treble sine wave
         AudioVisualizer.reset()
         val trebleBuffer = ByteArray(numSamples * 2)
         for (i in 0 until numSamples) {
@@ -141,7 +138,6 @@ class AudioVisualizerTest {
         AudioVisualizer.latencyCompensationMs = 140L
         AudioVisualizer.reset()
 
-        // 1. Enqueue peak at simTime = 1000L
         AudioVisualizer.updateBands(0f, 0f, 1.0f, 0f, 0f)
 
         // At 50 ms later (simTime = 1050L), 140ms has not passed yet
@@ -172,13 +168,11 @@ class AudioVisualizerTest {
         val raw25 = FloatArray(25) { if (it == 8) 0.95f else 0.1f }
         AudioVisualizer.updateSpectrum(raw25)
 
-        // At 60 ms later
         simTime = 2060L
         val frameEarly = AudioVisualizer.advanceSpectrumFrame(0.060f, isPlaying = true)
         assertEquals(25, frameEarly.levels.size, "Spectrum frame should contain 25 bands")
         assertEquals(AudioVisualizer.RESTING_LEVEL, frameEarly.levels[8], 0.001f, "Band 8 should remain at resting level before 120ms")
 
-        // At 120 ms later
         simTime = 2120L
         val frameMatured = AudioVisualizer.advanceSpectrumFrame(0.060f, isPlaying = true)
         assertEquals(25, frameMatured.levels.size, "Spectrum frame should contain 25 bands")
@@ -202,7 +196,6 @@ class AudioVisualizerTest {
         AudioVisualizer.reset()
         AudioVisualizer.latencyCompensationMs = 0L
 
-        // 1. Подаем 25-полосный спектральный сигнал с сильным суб-басом/бочкой (полосы 0..3)
         val bassSpectrum = FloatArray(25) { if (it in 0..3) 0.95f else 0.05f }
         AudioVisualizer.updateSpectrum(bassSpectrum)
 
@@ -218,7 +211,6 @@ class AudioVisualizerTest {
         assertTrue(derivedLevels[0] > 0.60f, "Полоса 0 (Sub-bass) в 5-полосном индикаторе должна вывестись из спектра: ${derivedLevels[0]}")
         assertTrue(derivedLevels[4] < derivedLevels[0], "Высокие частоты в 5-полосном индикаторе должны быть значительно ниже баса: ${derivedLevels[4]}")
 
-        // 2. Подаем высокочастотный спектральный сигнал (полосы 21..24)
         AudioVisualizer.reset()
         val trebleSpectrum = FloatArray(25) { if (it in 21..24) 0.95f else 0.05f }
         AudioVisualizer.updateSpectrum(trebleSpectrum)

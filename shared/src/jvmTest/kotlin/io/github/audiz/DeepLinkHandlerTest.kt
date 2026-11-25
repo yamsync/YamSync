@@ -31,7 +31,6 @@ class DeepLinkHandlerTest {
 
     @Test
     fun testSharedMessageAndNumericIdParsing() {
-        // User's exact shared message
         val sharedMessage = """
             🎵 Earmake — Cosmic Hero
             Слушать в YamSync: yamsync://track/51990337
@@ -39,7 +38,6 @@ class DeepLinkHandlerTest {
         """.trimIndent()
         assertEquals("51990337", DeepLinkHandler.extractTrackId(sharedMessage))
 
-        // Raw numeric track ID
         assertEquals("51990337", DeepLinkHandler.extractTrackId("51990337"))
         assertEquals("12345678", DeepLinkHandler.extractTrackId("  12345678  "))
     }

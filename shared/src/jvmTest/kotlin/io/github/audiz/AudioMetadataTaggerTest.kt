@@ -44,13 +44,11 @@ class AudioMetadataTaggerTest {
         try {
             tempFile.writeBytes(tagged)
 
-            // Проверяем извлечение обложки
             val extractedCover = AudioHeaderParser.extractCoverArtBytes(tempFile)
             assertNotNull(extractedCover, "Embedded cover art must be extracted from MP3")
             assertEquals(fakeJpeg.size, extractedCover.size)
             assertTrue(fakeJpeg.contentEquals(extractedCover))
 
-            // Проверяем метаданные ID3v2
             val meta = AudioHeaderParser.readId3v2Metadata(tempFile)
             assertEquals("Тестовая Песня", meta.title)
             assertEquals("Тестовый Артист", meta.artist)

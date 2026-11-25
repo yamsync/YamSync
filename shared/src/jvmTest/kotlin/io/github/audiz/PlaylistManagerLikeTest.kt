@@ -44,14 +44,12 @@ class PlaylistManagerLikeTest {
         val garbageWithAlbum = "4485064:6177488"
         val garbageLocal = "local:4485064"
 
-        // Initially not liked
         assertFalse(manager.isTrackLiked(garbageTrackId))
         assertFalse(manager.isTrackLiked(garbageWithAlbum))
         assertFalse(manager.isTrackLiked(garbageLocal))
         assertFalse(manager.isTrackLiked(null))
         assertFalse(manager.isTrackLiked(""))
 
-        // Case 1: likedTrackIds has clean ID
         manager.likedTrackIds.add(garbageTrackId)
         assertTrue(manager.isTrackLiked(garbageTrackId), "Clean ID should be recognized as liked")
         assertTrue(manager.isTrackLiked(garbageWithAlbum), "Composite ID from Yandex playlist should be recognized as liked")
@@ -82,13 +80,11 @@ class PlaylistManagerLikeTest {
         val trackIdFromPlaylist = "4485064:6177488"
         val albumId = 6177488L
 
-        // 1. Like track from playlist
         manager.toggleLike(trackIdFromPlaylist, albumId)
         assertTrue(manager.isTrackLiked("4485064"), "Should be liked by clean ID")
         assertTrue(manager.isTrackLiked(trackIdFromPlaylist), "Should be liked by playlist ID")
         assertTrue(manager.likedTrackIds.contains("4485064"), "Clean ID must be stored in likedTrackIds")
 
-        // 2. Unlike track from playlist
         manager.toggleLike(trackIdFromPlaylist, albumId)
         assertFalse(manager.isTrackLiked("4485064"), "Should no longer be liked")
         assertFalse(manager.isTrackLiked(trackIdFromPlaylist), "Should no longer be liked")
@@ -104,7 +100,6 @@ class PlaylistManagerLikeTest {
         manager.dislikedTrackIds.add(trackId)
         assertTrue(manager.isTrackDisliked(trackId))
 
-        // Liking the track must clear dislike
         manager.toggleLike(trackId)
         assertTrue(manager.isTrackLiked(trackId))
         assertFalse(manager.isTrackDisliked(trackId))
@@ -118,7 +113,6 @@ class PlaylistManagerLikeTest {
         manager.likedTrackIds.add(trackId)
         assertTrue(manager.isTrackLiked(trackId))
 
-        // Disliking the track must clear like
         manager.toggleDislike(trackId)
         assertTrue(manager.isTrackDisliked(trackId))
         assertFalse(manager.isTrackLiked(trackId))
@@ -142,7 +136,6 @@ class PlaylistManagerLikeTest {
 
     @Test
     fun testIsLocalTrackIdClassification() {
-        // Yandex track IDs should NOT be considered local:
         assertFalse(isLocalTrackId("4485064"), "Numeric Yandex ID is not local")
         assertFalse(isLocalTrackId("4485064:6177488"), "Yandex composite ID is not local")
         assertFalse(isLocalTrackId("1:2345"), "Short 1-digit ID with colon is not local")
@@ -150,7 +143,6 @@ class PlaylistManagerLikeTest {
         assertFalse(isLocalTrackId(""), "Empty ID is not local")
         assertFalse(isLocalTrackId("   "), "Blank ID is not local")
 
-        // Local paths and prefixes MUST be considered local:
         assertTrue(isLocalTrackId("local:/storage/emulated/0/Music/song.mp3"))
         assertTrue(isLocalTrackId("local:C:\\Music\\song.mp3"))
         assertTrue(isLocalTrackId("/home/nout/Music/song.mp3"))
@@ -159,7 +151,6 @@ class PlaylistManagerLikeTest {
         assertTrue(isLocalTrackId("C:\\Music\\song.mp3"))
         assertTrue(isLocalTrackId("D:/Music/song.mp3"))
 
-        // FullTrackInfo.isLocal:
         val yandexTrack = FullTrackInfo(id = "4485064", realId = null, title = "Song")
         assertFalse(yandexTrack.isLocal)
 
@@ -180,7 +171,6 @@ class PlaylistManagerLikeTest {
         assertTrue(manager.isTrackLiked(yandexTrackId))
         assertTrue(manager.isTrackLiked("4485064"))
 
-        // Unliking must succeed
         manager.toggleLike(yandexTrackId, 6177488L)
         assertFalse(manager.isTrackLiked(yandexTrackId))
         assertFalse(manager.isTrackLiked("4485064"))

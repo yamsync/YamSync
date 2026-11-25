@@ -71,26 +71,20 @@ class PlaylistManagerDeleteTest {
 
             playlistManager.localPlaylists.addAll(listOf(playlistA, playlistB))
 
-            // Удаляем плейлист A с флагом deleteDownloadedTracks = true
             playlistManager.deleteLocalPlaylist("pl_a", deleteDownloadedTracks = true)
 
-            // Ждем завершения корутины на DispatcherIO
             val start = System.currentTimeMillis()
             while (downloadedFile1.exists() && System.currentTimeMillis() - start < 2000) {
                 Thread.sleep(50)
             }
 
-            // 1. Плейлист A удален из списка, плейлист B остался
             assertEquals(1, playlistManager.localPlaylists.size)
             assertEquals("pl_b", playlistManager.localPlaylists[0].id)
 
-            // 2. Скачанный файл 1 (принадлежал только плейлисту A) удален с диска
             assertFalse(downloadedFile1.exists(), "Downloaded track only in Playlist A should be deleted")
 
-            // 3. Общий файл 2 (используется также в Playlist B) НЕ должен быть удален!
             assertTrue(downloadedFile2.exists(), "Shared track with Playlist B must NOT be deleted")
 
-            // 4. Личный файл пользователя из внешней папки НЕ должен быть удален!
             assertTrue(userFile.exists(), "User personal file from outside app storage must NOT be deleted")
 
         } finally {
