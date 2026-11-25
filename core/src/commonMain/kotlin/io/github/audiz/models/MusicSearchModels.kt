@@ -405,6 +405,34 @@ data class EditorialShowcaseData(
         get() = charts.isEmpty() && newPlaylists.isEmpty() && newReleases.isEmpty()
 }
 
+@Serializable
+data class WaveThemeOption(
+    val id: String,
+    val title: String,
+    val seeds: List<String>,
+    val categoryId: String = "",
+    val subtitle: String? = null,
+    val imageUri: String? = null,
+    val isPersonal: Boolean = false
+)
+
+@Serializable
+data class WaveThemeCategory(
+    val id: String,
+    val title: String,
+    val allowMultiSelect: Boolean = false,
+    val items: List<WaveThemeOption> = emptyList()
+)
+
+@Serializable
+data class WavePersonalCatalog(
+    val personalStations: List<WaveThemeOption> = emptyList(),
+    val categories: List<WaveThemeCategory> = emptyList()
+) {
+    val isEmpty: Boolean
+        get() = personalStations.isEmpty() && categories.isEmpty()
+}
+
 /**
  * Метаданные прямого аудиопотока для потокового воспроизведения и чанковой загрузки
  */

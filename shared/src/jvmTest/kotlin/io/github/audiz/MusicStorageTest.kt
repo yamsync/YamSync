@@ -98,6 +98,37 @@ class MusicStorageTest {
             assertTrue(loadedShowcase.newPlaylists.firstOrNull()?.title == "Новые хиты")
             assertTrue(loadedShowcase.newReleases.firstOrNull()?.id == 99L)
 
+            // 4c. Wave catalog cache
+            val waveCatalog = io.github.audiz.models.WavePersonalCatalog(
+                personalStations = listOf(
+                    io.github.audiz.models.WaveThemeOption(
+                        id = "mood:active",
+                        title = "Энергичное",
+                        seeds = listOf("mood:active"),
+                        categoryId = "mood",
+                        isPersonal = true
+                    )
+                ),
+                categories = listOf(
+                    io.github.audiz.models.WaveThemeCategory(
+                        id = "activity",
+                        title = "Занятия",
+                        items = listOf(
+                            io.github.audiz.models.WaveThemeOption(
+                                id = "activity:workout",
+                                title = "Тренировка",
+                                seeds = listOf("activity:workout"),
+                                categoryId = "activity"
+                            )
+                        )
+                    )
+                )
+            )
+            saveWaveCatalogCache(tempDir.absolutePath, waveCatalog)
+            val loadedWaveCatalog = loadWaveCatalogCache(tempDir.absolutePath)
+            assertTrue(loadedWaveCatalog != null && loadedWaveCatalog.personalStations.size == 1, "Wave catalog cache should have 1 personal station")
+            assertTrue(loadedWaveCatalog.categories.firstOrNull()?.title == "Занятия")
+
             // 5. Delete track
             val deleted = deleteTrackFile(tempDir.absolutePath, artist, title, expectedFile.absolutePath)
             assertTrue(deleted, "Track should be deleted")

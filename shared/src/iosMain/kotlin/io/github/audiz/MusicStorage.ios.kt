@@ -4,6 +4,7 @@ package io.github.audiz
 
 import io.github.audiz.models.EditorialShowcaseData
 import io.github.audiz.models.FolderItem
+import io.github.audiz.models.WavePersonalCatalog
 import io.github.audiz.models.FolderListing
 import io.github.audiz.models.FullAlbumInfo
 import io.github.audiz.models.FullArtistInfo
@@ -583,6 +584,38 @@ actual fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? 
         playlistJson.decodeFromString(EditorialShowcaseData.serializer(), nsStr)
     } catch (e: Throwable) {
         println("iOS Storage: Ошибка чтения кеша витрины: ${e.message}")
+        null
+    }
+}
+
+@OptIn(BetaInteropApi::class)
+actual fun saveWaveCatalogCache(basePath: String, catalog: WavePersonalCatalog) {
+    if (basePath.isBlank() || catalog.isEmpty) return
+    try {
+        val cacheDir = "$basePath/playlists_cache"
+        val fileManager = NSFileManager.defaultManager
+        if (!fileManager.fileExistsAtPath(cacheDir)) {
+            fileManager.createDirectoryAtPath(cacheDir, withIntermediateDirectories = true, attributes = null, error = null)
+        }
+        val jsonStr = playlistJson.encodeToString(WavePersonalCatalog.serializer(), catalog)
+        val nsStr = jsonStr as NSString
+        nsStr.writeToFile("$cacheDir/_wave_catalog.json", atomically = true, encoding = NSUTF8StringEncoding, error = null)
+    } catch (e: Throwable) {
+        println("iOS Storage: Ошибка сохранения кеша каталога волны: ${e.message}")
+    }
+}
+
+@OptIn(BetaInteropApi::class)
+actual fun loadWaveCatalogCache(basePath: String): WavePersonalCatalog? {
+    if (basePath.isBlank()) return null
+    return try {
+        val filePath = "$basePath/playlists_cache/_wave_catalog.json"
+        val fileManager = NSFileManager.defaultManager
+        if (!fileManager.fileExistsAtPath(filePath)) return null
+        val nsStr = NSString.stringWithContentsOfFile(filePath, encoding = NSUTF8StringEncoding, error = null) ?: return null
+        playlistJson.decodeFromString(WavePersonalCatalog.serializer(), nsStr)
+    } catch (e: Throwable) {
+        println("iOS Storage: Ошибка чтения кеша каталога волны: ${e.message}")
         null
     }
 }

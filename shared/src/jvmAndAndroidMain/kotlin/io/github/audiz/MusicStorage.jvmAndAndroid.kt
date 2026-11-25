@@ -2,6 +2,7 @@ package io.github.audiz
 
 import io.github.audiz.models.EditorialShowcaseData
 import io.github.audiz.models.FolderItem
+import io.github.audiz.models.WavePersonalCatalog
 import io.github.audiz.models.FolderListing
 import io.github.audiz.models.FullAlbumInfo
 import io.github.audiz.models.FullArtistInfo
@@ -581,6 +582,31 @@ actual fun loadEditorialShowcaseCache(basePath: String): EditorialShowcaseData? 
         playlistJson.decodeFromString(EditorialShowcaseData.serializer(), file.readText())
     } catch (e: Exception) {
         println("MusicStorage: Ошибка чтения кеша витрины: ${e.message}")
+        null
+    }
+}
+
+/** Сохранить персональный каталог тем Моей волны в локальный кеш */
+actual fun saveWaveCatalogCache(basePath: String, catalog: WavePersonalCatalog) {
+    if (basePath.isBlank() || catalog.isEmpty) return
+    try {
+        val cacheDir = getPlaylistCacheDir(basePath)
+        val file = File(cacheDir, "_wave_catalog.json")
+        file.writeText(playlistJson.encodeToString(WavePersonalCatalog.serializer(), catalog))
+    } catch (e: Exception) {
+        println("MusicStorage: Ошибка сохранения кеша каталога волны: ${e.message}")
+    }
+}
+
+/** Загрузить персональный каталог тем Моей волны из локального кеша */
+actual fun loadWaveCatalogCache(basePath: String): WavePersonalCatalog? {
+    if (basePath.isBlank()) return null
+    return try {
+        val file = File(File(basePath, "playlists_cache"), "_wave_catalog.json")
+        if (!file.exists() || file.length() == 0L) return null
+        playlistJson.decodeFromString(WavePersonalCatalog.serializer(), file.readText())
+    } catch (e: Exception) {
+        println("MusicStorage: Ошибка чтения кеша каталога волны: ${e.message}")
         null
     }
 }

@@ -10,9 +10,14 @@ import kotlinx.coroutines.withContext
 import io.github.audiz.TrackPlaySource
 import io.github.audiz.api.MusicRepository
 import io.github.audiz.api.RotorFeedbackItem
+import io.github.audiz.api.WaveCatalogParser
 import io.github.audiz.models.RotorSessionResponse
+import io.github.audiz.models.WavePersonalCatalog
+import io.github.audiz.models.WaveThemeCategory
+import io.github.audiz.models.WaveThemeOption
 import io.github.audiz.api.currentIsoUtcTimestamp
 import io.github.audiz.api.generatePlayUuid
+import io.github.audiz.loadWaveCatalogCache
 import io.github.audiz.models.LastPlaybackSession
 import io.github.audiz.models.FullArtistInfo
 import io.github.audiz.models.FullTrackInfo
@@ -23,6 +28,7 @@ import io.github.audiz.AppConfigKeys
 import io.github.audiz.loadAppConfig
 import io.github.audiz.releasePlaybackWakeLock
 import io.github.audiz.saveAppConfig
+import io.github.audiz.saveWaveCatalogCache
 import io.github.audiz.models.ThematicWavePreset
 import io.github.audiz.util.AppLogger
 import kotlinx.coroutines.CancellationException
@@ -53,6 +59,7 @@ class WaveManager(
     private val shouldSkipRecommendedTrack: ((FullTrackInfo) -> Boolean)? = null,
     private val isRecentRepeat: (FullTrackInfo) -> Boolean = { false },
     private val awaitRecentHistory: suspend () -> Unit = {},
+    private val getMusicStoragePath: () -> String = { "" },
 ) : WavePlaybackBridge {
     private var playbackManager: PlaybackManager? = null
 
@@ -113,6 +120,150 @@ class WaveManager(
             ThematicWavePreset("Синти-поп", listOf("genre:synthpop")),
             ThematicWavePreset("Фанк", listOf("genre:funk"))
         )
+
+        val LOCAL_FALLBACK_CATEGORIES: List<WaveThemeCategory> = listOf(
+            WaveThemeCategory(
+                id = "diversity",
+                title = "Характер",
+                items = listOf(
+                    WaveThemeOption("diversity:discover", "Незнакомое", listOf("diversity:discover"), "diversity"),
+                    WaveThemeOption("diversity:favorite", "Любимое", listOf("diversity:favorite"), "diversity"),
+                    WaveThemeOption("diversity:popular", "Популярное", listOf("diversity:popular"), "diversity")
+                )
+            ),
+            WaveThemeCategory(
+                id = "mood",
+                title = "Настроение",
+                items = listOf(
+                    WaveThemeOption("mood:active", "Бодрое", listOf("mood:active"), "mood"),
+                    WaveThemeOption("mood:calm", "Спокойное", listOf("mood:calm"), "mood"),
+                    WaveThemeOption("mood:fun", "Весёлое", listOf("mood:fun"), "mood"),
+                    WaveThemeOption("mood:sad", "Грустное", listOf("mood:sad"), "mood")
+                )
+            ),
+            WaveThemeCategory(
+                id = "language",
+                title = "Язык",
+                items = listOf(
+                    WaveThemeOption("language:russian", "На русском", listOf("language:russian"), "language"),
+                    WaveThemeOption("language:not-russian", "Иностранное", listOf("language:not-russian"), "language")
+                )
+            ),
+            WaveThemeCategory(
+                id = "genre",
+                title = "Жанры",
+                items = ALL_STYLE_PRESETS.map { preset ->
+                    WaveThemeOption(
+                        id = preset.seeds.joinToString(","),
+                        title = preset.title,
+                        seeds = preset.seeds,
+                        categoryId = "genre",
+                        subtitle = preset.subTitle
+                    )
+                }
+            )
+        )
+    }
+
+    // 🌊 Персональные станции и категории настроек Волны с сервера + фолбэк:
+    val personalWaveStations: SnapshotStateList<WaveThemeOption> = mutableStateListOf()
+    val waveCategories: SnapshotStateList<WaveThemeCategory> = mutableStateListOf<WaveThemeCategory>().apply {
+        addAll(LOCAL_FALLBACK_CATEGORIES)
+    }
+    var isWaveCatalogLoading by mutableStateOf(false)
+        private set
+    private var waveCatalogJob: Job? = null
+
+    fun loadWaveCatalog(forceRefresh: Boolean = false) {
+        if (!forceRefresh && waveCatalogJob?.isActive == true) return
+        waveCatalogJob?.cancel()
+        waveCatalogJob = scope.launch {
+            isWaveCatalogLoading = true
+            try {
+                val storagePath = getMusicStoragePath()
+                if (personalWaveStations.isEmpty() && storagePath.isNotBlank()) {
+                    val cached = try {
+                        withContext(DispatcherIO) { loadWaveCatalogCache(storagePath) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (cached != null && !cached.isEmpty) {
+                        applyWaveCatalog(cached)
+                    }
+                }
+
+                if (getAccessToken().isNotBlank()) {
+                    try {
+                        val catalog = withContext(DispatcherIO) {
+                            repository.getWavePersonalCatalog()
+                        }
+                        if (!catalog.isEmpty) {
+                            applyWaveCatalog(catalog)
+                            if (storagePath.isNotBlank()) {
+                                withContext(DispatcherIO) {
+                                    saveWaveCatalogCache(storagePath, catalog)
+                                }
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        println("WaveManager: Ошибка загрузки каталога тем Волны: ${e.message}")
+                    }
+                }
+            } finally {
+                isWaveCatalogLoading = false
+            }
+        }
+    }
+
+    private fun applyWaveCatalog(catalog: WavePersonalCatalog) {
+        if (catalog.personalStations.isNotEmpty()) {
+            personalWaveStations.clear()
+            personalWaveStations.addAll(catalog.personalStations)
+        }
+        val merged = WaveCatalogParser.mergeCategories(catalog.categories + LOCAL_FALLBACK_CATEGORIES)
+        if (merged.isNotEmpty()) {
+            waveCategories.clear()
+            waveCategories.addAll(merged)
+        }
+    }
+
+    fun buildQuickWaveChips(artistWaves: List<WaveThemeOption> = emptyList(), limit: Int = 4): List<ThematicWavePreset> {
+        val result = mutableListOf<ThematicWavePreset>()
+        val seenSeeds = mutableSetOf<List<String>>()
+        fun addUnique(preset: ThematicWavePreset): Boolean {
+            if (preset.seeds.isEmpty() || !seenSeeds.add(preset.seeds)) return false
+            result.add(preset)
+            return result.size >= limit
+        }
+
+        for (recent in recentThematicWaves.take(2)) {
+            if (addUnique(recent)) return result
+        }
+        personalWaveStations.firstOrNull()?.let { station ->
+            if (addUnique(ThematicWavePreset(station.title, station.seeds, station.subtitle))) return result
+        }
+        waveCategories.firstOrNull { it.id == "diversity" || it.id == "mood" }?.items?.firstOrNull()?.let { option ->
+            if (addUnique(ThematicWavePreset(option.title, option.seeds, option.subtitle))) return result
+        }
+        artistWaves.firstOrNull()?.let { artist ->
+            if (addUnique(ThematicWavePreset(artist.title, artist.seeds, artist.subtitle))) return result
+        }
+        for (station in personalWaveStations.drop(1)) {
+            if (addUnique(ThematicWavePreset(station.title, station.seeds, station.subtitle))) return result
+        }
+        for (cat in waveCategories.filter { it.id != "genre" }) {
+            for (opt in cat.items) {
+                if (addUnique(ThematicWavePreset(opt.title, opt.seeds, opt.subtitle))) return result
+            }
+        }
+        for (preset in defaultThematicWaves) {
+            if (addUnique(preset)) return result
+        }
+        return result
     }
 
     // 🌊 Постоянные пресеты тематических волн (динамически разные музыкальные стили):
@@ -447,10 +598,27 @@ class WaveManager(
             isWaveLoading = true
             try {
                 println("WaveManager: Запуск тематической Волны '$title', seeds=$seeds")
-                val initial = repository.createRotorSession(seeds)
-                val sid = initial.radioSessionId
-                val response = if (autoPlay) findUnplayedBatch(initial, sid) else initial
-                val parsedTracks = response.sequence.mapNotNull { it.track }.distinctBy { it.id }
+                var initial = try {
+                    repository.createRotorSession(seeds)
+                } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
+                    val isAuthOrPlusError = e.message?.contains("Яндекс Плюс", ignoreCase = true) == true
+                    if (seeds.size > 1 && !isAuthOrPlusError) {
+                        println("WaveManager: Комбинация seeds=$seeds не сработала (${e.message}), пробуем базовый seed ${seeds.first()}")
+                        repository.createRotorSession(listOf(seeds.first()))
+                    } else {
+                        throw e
+                    }
+                }
+                var sid = initial.radioSessionId
+                var response = if (autoPlay) findUnplayedBatch(initial, sid) else initial
+                var parsedTracks = response.sequence.mapNotNull { it.track }.distinctBy { it.id }
+                if (parsedTracks.isEmpty() && seeds.size > 1) {
+                    initial = repository.createRotorSession(listOf(seeds.first()))
+                    sid = initial.radioSessionId
+                    response = if (autoPlay) findUnplayedBatch(initial, sid) else initial
+                    parsedTracks = response.sequence.mapNotNull { it.track }.distinctBy { it.id }
+                }
                 if (parsedTracks.isEmpty()) {
                     throw IllegalStateException("Для волны не найдено доступных треков")
                 }
@@ -488,7 +656,9 @@ class WaveManager(
                 if (e is CancellationException) throw e
                 AppLogger.e("WaveManager", "Ошибка запуска тематической Волны: ${e.message}", e)
                 val waveName = title?.takeIf { it.isNotBlank() } ?: "выбранная волна"
-                onError?.invoke("Волна «$waveName» недоступна (требуется подписка Плюс). Включаем Мою Волну...")
+                val reason = e.message?.takeIf { it.contains("Яндекс Плюс", ignoreCase = true) }
+                    ?.let { " ($it)" } ?: ""
+                onError?.invoke("Волна «$waveName» сейчас недоступна$reason. Включаем Мою Волну...")
                 fallbackToPersonal = true
             } finally {
                 isWaveLoading = false

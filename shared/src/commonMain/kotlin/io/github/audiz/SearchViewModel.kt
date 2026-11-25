@@ -18,6 +18,9 @@ import io.github.audiz.models.FullAlbumInfo
 import io.github.audiz.models.PlaylistInfo
 import io.github.audiz.models.LocalPlaylist
 import io.github.audiz.models.ThematicWavePreset
+import io.github.audiz.models.WaveThemeCategory
+import io.github.audiz.models.WaveThemeOption
+import io.github.audiz.models.isLocal
 import io.github.audiz.models.isLocalTrackId
 import io.github.audiz.api.generatePlayUuid
 import io.github.audiz.download.DownloadManager
@@ -246,6 +249,15 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val recentThematicWaves: List<ThematicWavePreset> get() = waveManager.recentThematicWaves
     val defaultThematicWaves: List<ThematicWavePreset> get() = waveManager.defaultThematicWaves
     val thematicWavePresets: List<ThematicWavePreset> get() = WaveManager.ALL_STYLE_PRESETS
+    val personalWaveStations: List<WaveThemeOption> get() = waveManager.personalWaveStations
+    val waveCategories: List<WaveThemeCategory> get() = waveManager.waveCategories
+    val isWaveCatalogLoading: Boolean get() = waveManager.isWaveCatalogLoading
+    val suggestedWaveArtists: List<WaveThemeOption>
+        get() = buildSuggestedWaveArtists()
+    val quickWaveChips: List<ThematicWavePreset>
+        get() = waveManager.buildQuickWaveChips(artistWaves = suggestedWaveArtists, limit = 4)
+    val currentWaveTrackCandidate: WaveThemeOption?
+        get() = buildCurrentTrackWaveCandidate()
 
     // 🔑 Сервис авторизации:
     val cookieService: YandexCookieService get() = settingsManager.cookieService
@@ -536,10 +548,13 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             likedArtistsSyncJob?.cancel()
             likedArtistsSyncJob = null
             likedArtistIds = null
+            likedArtists.clear()
             playlistManager.syncLikedTrackIds()
+            syncLikedArtistsForAiFilter()
             playlistManager.loadPersonalPlaylists()
             playlistManager.loadEditorialShowcase(forceRefresh = true)
             playlistManager.loadUserPlaylists()
+            waveManager.loadWaveCatalog(forceRefresh = true)
             loadInitialWave(autoPlay = false)
             refreshPlusSubscription()
         },
@@ -548,6 +563,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             playlistManager.loadEditorialShowcase()
             playlistManager.loadUserPlaylists()
             playlistManager.loadLocalPlaylistsFromDisk()
+            waveManager.loadWaveCatalog()
         }
     )
 
@@ -564,6 +580,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     private val aiFilterSettingsLock = Mutex()
     @Volatile
     private var likedArtistIds: Set<Long>? = null
+    private val likedArtists = mutableStateListOf<FullArtistInfo>()
     private var likedArtistsSyncJob: Job? = null
 
     fun saveAiFilterMode(mode: AiFilterMode) {
@@ -578,12 +595,14 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     private fun syncLikedArtistsForAiFilter() {
         val token = settingsManager.currentAccessToken
-        if (aiFilterMode != AiFilterMode.SKIP_IN_WAVE || token.isBlank() || likedArtistsSyncJob?.isActive == true) return
+        if (token.isBlank() || likedArtistsSyncJob?.isActive == true) return
         likedArtistsSyncJob = viewModelScope.launch {
             try {
-                val ids = withContext(DispatcherIO) { repository.getLikedArtistIds() }
+                val artists = withContext(DispatcherIO) { repository.getLikedArtists() }
                 if (settingsManager.currentAccessToken != token) return@launch
-                likedArtistIds = ids
+                likedArtistIds = artists.mapTo(linkedSetOf()) { it.id }
+                likedArtists.clear()
+                likedArtists.addAll(artists)
                 if (waveManager.isWaveMode && playerIsPlaying) playbackManager.onQueueUpdated()
             } catch (e: CancellationException) {
                 throw e
@@ -650,7 +669,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             recentPlaybackHistory.awaitLoaded()
         },
         onTrackLiked = { trackId -> playlistManager.likedTrackIds.add(trackId.removePrefix("local:").substringBefore(":")) },
-        onError = { errorMessage = it }
+        onError = { errorMessage = it },
+        getMusicStoragePath = { settingsManager.musicStoragePath }
     )
 
     // 📂 МЕНЕДЖЕР ПОЛЬЗОВАТЕЛЬСКИХ МЕДИА (Папки, файлы, M3U):
@@ -1023,11 +1043,13 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             loadPersonalPlaylists()
             loadEditorialShowcase()
             loadUserPlaylists()
+            loadWaveCatalog()
             launchSafe { settingsManager.checkPlusSubscription() }
         } else {
             loadPersonalPlaylists()
             loadEditorialShowcase()
             loadUserPlaylists()
+            loadWaveCatalog()
         }
         viewModelScope.launch {
             playbackManager.restoreUpNextQueue()
@@ -1148,8 +1170,57 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         if (theme == null) resetToDefaultWave() else startThematicWave(theme.title, theme.seeds)
     }
 
+    fun loadWaveCatalog(forceRefresh: Boolean = false) {
+        waveManager.loadWaveCatalog(forceRefresh = forceRefresh)
+    }
+
+    fun startArtistWave(artistId: String, artistName: String) {
+        val cleanId = artistId.trim()
+        if (cleanId.isBlank() || cleanId == "0") return
+        val title = artistName.trim().ifBlank { "Волна по артисту" }
+        startThematicWave(title, listOf("artist:$cleanId"))
+    }
+
     fun refreshDefaultThematicWaves() {
         waveManager.refreshDefaultThematicWaves()
+    }
+
+    private fun buildCurrentTrackWaveCandidate(): WaveThemeOption? {
+        val track = getCurrentPlayingTrackInfo() ?: return null
+        if (track.isLocal) return null
+        val cleanId = track.id.substringBefore(':').trim()
+        if (cleanId.isBlank() || cleanId.toLongOrNull() == null) return null
+        val artist = track.artists.joinToString(", ") { it.name }.takeIf { it.isNotBlank() }
+        return WaveThemeOption(
+            id = "track:$cleanId",
+            title = "Похожее на «${track.title}»",
+            seeds = listOf("track:$cleanId"),
+            categoryId = "track",
+            subtitle = artist,
+            isPersonal = true
+        )
+    }
+
+    private fun buildSuggestedWaveArtists(): List<WaveThemeOption> {
+        val result = mutableListOf<WaveThemeOption>()
+        val seenIds = mutableSetOf<Long>()
+        fun tryAdd(artist: FullArtistInfo) {
+            if (artist.id <= 0L || artist.name.isBlank() || !seenIds.add(artist.id)) return
+            result.add(
+                WaveThemeOption(
+                    id = "artist:${artist.id}",
+                    title = artist.name,
+                    seeds = listOf("artist:${artist.id}"),
+                    categoryId = "artist",
+                    subtitle = "Похожее на артиста",
+                    isPersonal = true
+                )
+            )
+        }
+        likedArtists.forEach(::tryAdd)
+        wavePastTracks.asReversed().forEach { it.artists.forEach(::tryAdd) }
+        loadedTracks.take(20).forEach { it.artists.forEach(::tryAdd) }
+        return result.take(6)
     }
 
     fun resetToDefaultWave() {

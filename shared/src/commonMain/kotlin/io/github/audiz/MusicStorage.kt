@@ -89,6 +89,12 @@ expect fun saveEditorialShowcaseCache(basePath: String, showcase: io.github.audi
 /** Загрузить редакционную витрину из локального кеша */
 expect fun loadEditorialShowcaseCache(basePath: String): io.github.audiz.models.EditorialShowcaseData?
 
+/** Сохранить персональный каталог тем Моей волны в локальный кеш */
+expect fun saveWaveCatalogCache(basePath: String, catalog: io.github.audiz.models.WavePersonalCatalog)
+
+/** Загрузить персональный каталог тем Моей волны из локального кеша */
+expect fun loadWaveCatalogCache(basePath: String): io.github.audiz.models.WavePersonalCatalog?
+
 /** Сохранить список локальных оффлайн-плейлистов на диск: {basePath}/playlists/local_playlists.json */
 expect fun saveLocalPlaylists(basePath: String, playlists: List<io.github.audiz.models.LocalPlaylist>)
 

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,6 +78,7 @@ fun ArtistTracksList(
     onAddToPlaylist: ((FullTrackInfo) -> Unit)? = null,
     onRemoveFromPlaylist: ((FullTrackInfo) -> Unit)? = null,
     onArtistClick: ((artistId: String, artistName: String) -> Unit)? = null,
+    onStartArtistWave: ((artistId: String, artistName: String) -> Unit)? = null,
     isTrackInPlaylist: ((FullTrackInfo) -> Boolean)? = null,
     scrollToTrackRequest: TrackListScrollRequest? = null,
     onScrollToTrackHandled: (TrackListScrollRequest) -> Unit = {},
@@ -110,6 +112,11 @@ fun ArtistTracksList(
             if (firstArtist != null && tracks.all { t -> t.artists.any { it.name.equals(firstArtist.name, ignoreCase = true) } }) {
                 firstArtist
             } else null
+        } else null
+    }
+    val waveArtist = remember(tracks, title, commonArtist) {
+        commonArtist ?: if (title.startsWith("Треки:")) {
+            tracks.firstOrNull()?.artists?.firstOrNull { it.id > 0L && it.name.isNotBlank() }
         } else null
     }
 
@@ -179,6 +186,16 @@ fun ArtistTracksList(
                     contentDescription = "Все треки: ${commonArtist.name}",
                     outlined = true,
                     onClick = { onArtistClick(commonArtist.id.toString(), commonArtist.name) }
+                )
+            }
+
+            if (waveArtist != null && waveArtist.id > 0L && onStartArtistWave != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                TopBarIconButton(
+                    icon = Icons.Filled.Waves,
+                    contentDescription = "Волна по артисту: ${waveArtist.name}",
+                    outlined = true,
+                    onClick = { onStartArtistWave(waveArtist.id.toString(), waveArtist.name) }
                 )
             }
 

@@ -1,6 +1,8 @@
 package io.github.audiz.api
 
 import io.github.audiz.models.RotorSessionResponse
+import io.github.audiz.models.WavePersonalCatalog
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -20,9 +22,42 @@ class WaveClient(
     val lastYnisonHost: String? get() = ynisonService.lastYnisonHost
     val lastYnisonError: String? get() = ynisonService.lastYnisonError
 
-    private fun HttpRequestBuilder.applyAuthHeaders() {
-        with(context) { applyAuthHeaders() }
+    private fun HttpRequestBuilder.applyAuthHeaders(
+        acceptLanguage: String = ApiSessionContext.ACCEPT_LANGUAGE_TRACK_METADATA
+    ) {
+        with(context) { applyAuthHeaders(acceptLanguage) }
     }
+
+    private suspend fun getRotorWithFallback(
+        path: String,
+        acceptLanguage: String = ApiSessionContext.ACCEPT_LANGUAGE_RU,
+        timeoutMs: Long = 8_000L
+    ): String? {
+        for (host in rotorHosts) {
+            try {
+                val url = "https://$host$path"
+                val response = client.get(url) {
+                    applyAuthHeaders(acceptLanguage)
+                    timeout { requestTimeoutMillis = timeoutMs }
+                }
+                if (response.status.isSuccess()) return response.bodyAsText()
+                if (response.status.value !in 500..599) return null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Пробуем резервный хост
+            }
+        }
+        return null
+    }
+
+    /**
+     * 🌊 Получить персональные настройки и рекомендованные станции Моей волны
+     */
+    suspend fun getWavePersonalCatalog(): WavePersonalCatalog = WaveCatalogLoader { url ->
+        val path = "/" + url.substringAfter("yandex.ru/").substringAfter("yandex.net/")
+        getRotorWithFallback(path, acceptLanguage = ApiSessionContext.ACCEPT_LANGUAGE_RU)
+    }.load()
 
     /**
      * 🌊 Получить session_id Моей волны через Ynison WebSocket
@@ -108,8 +143,8 @@ class WaveClient(
      */
     suspend fun createRotorSessionRaw(seeds: List<String>): String {
         println("WaveClient: Создание Rotor-сессии with seeds: $seeds")
-        val seedsJson = seeds.joinToString(",") { "\"$it\"" }
-        val payload = """{"seeds":[$seedsJson],"includeTracksInResponse":true}"""
+        val seedsJson = JsonArray(seeds.map(::JsonPrimitive)).toString()
+        val payload = """{"seeds":$seedsJson,"includeTracksInResponse":true}"""
         val response = postRotorWithFallback("/rotor/session/new", payload)
         val text = response.bodyAsText()
         println("WaveClient: Ответ session/new (HTTP ${response.status}), длина: ${text.length}")

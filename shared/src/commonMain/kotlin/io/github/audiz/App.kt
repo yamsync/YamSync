@@ -732,6 +732,9 @@ fun App() {
                             } else null,
                             onArtistClick = { artistId, artistName ->
                                 searchViewModel.loadArtistTracks(artistId, artistName)
+                            },
+                            onStartArtistWave = { artistId, artistName ->
+                                searchViewModel.startArtistWave(artistId, artistName)
                             }
                         )
                     }

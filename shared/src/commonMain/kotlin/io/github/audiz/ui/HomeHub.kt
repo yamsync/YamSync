@@ -138,7 +138,7 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
                     .padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Все темы", color = accent, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                Text("Настроить", color = accent, style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
             }
         }
@@ -173,8 +173,8 @@ private fun HomeWaveSection(viewModel: SearchViewModel) {
             }
         }
 
-        val recentThemes = viewModel.recentThematicWaves.take(3)
-        val quickThemes = if (hasThematicWave) listOf(null) + recentThemes else recentThemes
+        val chipPresets = viewModel.quickWaveChips
+        val quickThemes = if (hasThematicWave) listOf(null) + chipPresets else chipPresets
         if (quickThemes.isNotEmpty()) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),

@@ -402,5 +402,33 @@ class WaveManagerTest {
             saveAppConfig(AppConfigKeys.LAST_WAVE_STYLE, originalStyle ?: "")
         }
     }
+
+    @Test
+    fun testStructuredCategoriesAndDiverseQuickWaveChips() {
+        val manager = WaveManager(
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            repository = MusicRepository(),
+            getAccessToken = { "" }
+        )
+        manager.recentThematicWaves.clear()
+
+        // Default structured categories exist even before network fetch
+        assertEquals(listOf("diversity", "mood", "language", "genre"), manager.waveCategories.map { it.id })
+        assertTrue(manager.waveCategories.all { it.items.isNotEmpty() })
+
+        // Even with empty recent waves, quickWaveChips returns diverse options
+        val artistWave = io.github.audiz.models.WaveThemeOption(
+            id = "artist:42",
+            title = "Любимый артист",
+            seeds = listOf("artist:42"),
+            categoryId = "artist",
+            isPersonal = true
+        )
+        val chips = manager.buildQuickWaveChips(artistWaves = listOf(artistWave), limit = 4)
+        assertEquals(4, chips.size)
+        assertEquals(4, chips.map { it.seeds }.distinct().size)
+        assertTrue(chips.any { it.seeds == listOf("diversity:discover") })
+        assertTrue(chips.any { it.seeds == listOf("artist:42") })
+    }
 }
 

@@ -41,6 +41,8 @@ class MusicRepository(
 
     // === Отметки «Мне нравится» / «Не нравится» ===
 
+    suspend fun getLikedArtists(): List<FullArtistInfo> = playlistsClient.getLikedArtists()
+
     suspend fun getLikedArtistIds(): Set<Long> = playlistsClient.getLikedArtistIds()
 
     suspend fun likeTrack(trackIdWithAlbum: String): Boolean =
@@ -155,6 +157,9 @@ class MusicRepository(
 
     suspend fun fetchYnisonWaveSessionId(): String? =
         waveClient.fetchYnisonWaveSessionId()
+
+    suspend fun getWavePersonalCatalog(): WavePersonalCatalog =
+        waveClient.getWavePersonalCatalog()
 
     val lastYnisonHost: String? get() = waveClient.lastYnisonHost
 

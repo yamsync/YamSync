@@ -27,7 +27,7 @@ class PlaylistsClient(
         with(context) { applyAuthHeaders(acceptLanguage) }
     }
 
-    suspend fun getLikedArtistIds(): Set<Long> {
+    suspend fun getLikedArtists(): List<FullArtistInfo> {
         val userId = context.getUserId()?.toLongOrNull()
             ?: error("Не удалось определить пользователя для загрузки любимых артистов")
         coroutineContext.ensureActive()
@@ -38,15 +38,21 @@ class PlaylistsClient(
         check(response.status.isSuccess()) { "Не удалось загрузить любимых артистов (HTTP ${response.status.value})" }
         val result = playlistJson.parseToJsonElement(response.bodyAsText()).jsonObject["result"] as? JsonArray
             ?: error("Некорректный ответ со списком любимых артистов")
-        return buildSet {
+        return buildList {
             for (entry in result) {
                 val item = entry as? JsonObject ?: continue
                 val artist = (item["artist"] as? JsonObject) ?: item.takeUnless { "artist" in it } ?: continue
                 val id = (artist["id"] as? JsonPrimitive)?.longOrNull ?: continue
-                if (id > 0) add(id)
+                if (id <= 0) continue
+                val name = (artist["name"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+                val available = (artist["available"] as? JsonPrimitive)?.booleanOrNull ?: true
+                add(FullArtistInfo(id = id, name = name, available = available))
             }
         }
     }
+
+    suspend fun getLikedArtistIds(): Set<Long> =
+        getLikedArtists().mapTo(linkedSetOf()) { it.id }
 
     /**
      * ❤️ Добавить трек в избранное (лайк)

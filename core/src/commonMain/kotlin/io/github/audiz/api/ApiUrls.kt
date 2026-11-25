@@ -14,4 +14,7 @@ object ApiUrls {
     const val LANDING3_CHART_URL = "https://api.music.yandex.ru/landing3/chart"
     const val LANDING3_NEW_RELEASES_URL = "https://api.music.yandex.ru/landing3/new-releases"
     const val LANDING3_NEW_PLAYLISTS_URL = "https://api.music.yandex.ru/landing3/new-playlists"
+    const val ROTOR_WAVE_SETTINGS_URL = "https://api.music.yandex.ru/rotor/wave/settings"
+    const val ROTOR_STATIONS_DASHBOARD_URL = "https://api.music.yandex.ru/rotor/stations/dashboard"
+    const val ROTOR_STATIONS_LIST_URL = "https://api.music.yandex.ru/rotor/stations/list"
 }
