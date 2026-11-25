@@ -1223,6 +1223,31 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         return result.take(6)
     }
 
+    /**
+     * Подсчитывает веса жанров по недавним волнам, персональным станциям и трекам пользователя
+     * для подъёма релевантных жанров вверху настроек волны.
+     */
+    fun collectGenreAffinityWeights(): Map<String, Int> {
+        val weights = mutableMapOf<String, Int>()
+        fun addTag(rawTag: String?, weight: Int) {
+            val clean = rawTag?.trim()?.lowercase()?.removePrefix("genre:")?.takeIf { it.isNotBlank() } ?: return
+            weights[clean] = (weights[clean] ?: 0) + weight
+        }
+
+        recentThematicWaves.forEach { preset ->
+            preset.seeds.filter { it.startsWith("genre:", ignoreCase = true) }.forEach { addTag(it, 8) }
+        }
+        personalWaveStations.filter { it.categoryId == "genre" }.forEach { station ->
+            station.seeds.filter { it.startsWith("genre:", ignoreCase = true) }.forEach { addTag(it, 5) }
+        }
+        getCurrentPlayingTrackInfo()?.albums?.forEach { addTag(it.genre, 3) }
+        (wavePastTracks + loadedTracks.take(40)).forEach { track ->
+            val boost = if (track.id in likedTrackIds || track.realId?.let { it in likedTrackIds } == true) 3 else 1
+            track.albums.forEach { addTag(it.genre, boost) }
+        }
+        return weights
+    }
+
     fun resetToDefaultWave() {
         playbackManager.clearUpNextForSelection()
         playbackSessionManager.recordWave(null, emptyList())
