@@ -67,7 +67,7 @@ private fun AiBadge(match: AiMatch, modifier: Modifier) {
         Text(
             text = when (match) {
                 AiMatch.TRACK -> "ИИ-трек"
-                AiMatch.ARTIST -> "ИИ-артист"
+                AiMatch.ARTIST -> "ИИ"
                 AiMatch.SUSPECT_ARTIST -> "ИИ?"
             },
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
