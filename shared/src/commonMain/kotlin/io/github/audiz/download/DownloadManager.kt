@@ -117,30 +117,8 @@ class DownloadManager(
         }
     }
 
-    val isCurrentTrackSavedToDisk: Boolean
-        get() {
-            val id = getPlayingTrackId() ?: return false
-            if (isLocalTrackId(id)) return true
-            downloadVersion // чтение состояния для реактивной рекомпозиции
-            return isTrackDownloaded(getPlayingArtistName(), getPlayingTrackTitle())
-        }
-
     val isCurrentTrackSavingToDisk: Boolean
         get() = isTrackDownloading && downloadingTrackId == getPlayingTrackId()
-
-    fun toggleCurrentTrackSaveOrDelete() {
-        val trackId = getPlayingTrackId() ?: return
-        val title = getPlayingTrackTitle()
-        val artist = getPlayingArtistName()
-
-        if (isCurrentTrackSavedToDisk) {
-            AppLogger.d("DownloadManager", "Кнопка сохранения: удаление трека из библиотеки: $artist — $title")
-            deleteTrack(trackId, title, artist)
-        } else {
-            AppLogger.d("DownloadManager", "Кнопка сохранения: принудительное скачивание трека: $artist — $title")
-            downloadTrack(trackId, title, artist)
-        }
-    }
 
     /**
      * 🔥 Скачивание трека по клику (с автоматическим встраиванием обложки и метаданных)

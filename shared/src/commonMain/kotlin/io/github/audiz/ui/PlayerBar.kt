@@ -23,74 +23,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.audiz.models.FullArtistInfo
+import io.github.audiz.player.PlayerActions
+import io.github.audiz.player.PlayerUiState
 import kotlinx.coroutines.delay
-
-data class PlayerBarState(
-    val trackTitle: String = "Выберите трек",
-    val artistName: String = "",
-    val isPlaying: Boolean = false,
-    val isPaused: Boolean = false,
-    val currentPositionMs: Long = 0L,
-    val durationMs: Long = 0L,
-    val bitrate: Int? = null,
-    val volume: Float = 1f,
-    val isShuffle: Boolean = false,
-    val isNextLoading: Boolean = false,
-    val isPrevLoading: Boolean = false,
-    val isPlayLoading: Boolean = false,
-    val isRecordToDisk: Boolean = false,
-    val isSavingToDisk: Boolean = false,
-    val isSharing: Boolean = false,
-    val isFavorite: Boolean = false,
-    val isDisliked: Boolean = false,
-    val isInPlaylist: Boolean = false,
-    val playlistCount: Int = 0,
-    val isConfigActive: Boolean = false,
-    val isEqualizerActive: Boolean = false,
-    val hasTrackCandidate: Boolean = false,
-    val isWave: Boolean = false,
-    val waveTitle: String? = null,
-    val waveCompactTitle: String? = null,
-    val waveTags: List<String> = emptyList(),
-    val coverUri: String? = null,
-    val isMobile: Boolean = false,
-    val isQueueOpen: Boolean = false,
-    val upNextCount: Int = 0,
-    val isDownloadedOrLocal: Boolean = false,
-    val trackId: String? = null,
-    val trackArtists: List<FullArtistInfo> = emptyList(),
-)
-
-data class PlayerBarActions(
-    val onVolumeChange: (Float) -> Unit = {},
-    val onPlayPause: () -> Unit = {},
-    val onStop: () -> Unit = {},
-    val onSeek: (Long) -> Unit = {},
-    val onToggleShuffle: (() -> Unit)? = null,
-    val onNext: (() -> Unit)? = null,
-    val onPrev: (() -> Unit)? = null,
-    val onConfigClick: (() -> Unit)? = null,
-    val onToggleRecordToDisk: (() -> Unit)? = null,
-    val onShareTrack: (() -> Unit)? = null,
-    val onAddToPlaylist: (() -> Unit)? = null,
-    val onToggleFavorite: (() -> Unit)? = null,
-    val onToggleDislike: (() -> Unit)? = null,
-    val onManageTrackRemoval: (() -> Unit)? = null,
-    val onOpenEqualizer: (() -> Unit)? = null,
-    val onOpenQueue: (() -> Unit)? = null,
-    val onOpenArtist: (() -> Unit)? = null,
-    val onExpandMobilePlayer: (() -> Unit)? = null,
-    val onResetWave: (() -> Unit)? = null,
-    val onOpenWaveThemes: (() -> Unit)? = null,
-    val onMobilePlayerDrag: (Float?) -> Unit = {},
-    val onMobilePlayerDragEnd: (Boolean) -> Unit = {},
-)
 
 @Composable
 fun PlayerBar(
-    state: PlayerBarState,
-    actions: PlayerBarActions,
+    state: PlayerUiState,
+    actions: PlayerActions,
     modifier: Modifier = Modifier
 ) {
     if (state.isMobile) {
@@ -112,16 +52,13 @@ fun PlayerBar(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DesktopPlayerBar(
-    state: PlayerBarState,
-    actions: PlayerBarActions,
+    state: PlayerUiState,
+    actions: PlayerActions,
     modifier: Modifier = Modifier
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var dragProgress by remember { mutableStateOf(0f) }
+    var seekPreview by remember(state.trackId) { mutableStateOf<Float?>(null) }
     var justCopiedShare by remember { mutableStateOf(false) }
-    val displayPosition = if (isDragging && state.durationMs > 0) {
-        (dragProgress * state.durationMs).toLong()
-    } else state.currentPositionMs
+    val displayPosition = seekPreview?.let(state::positionAt) ?: state.currentPositionMs
     val coverBitmap = rememberCoverBitmap(state.coverUri, 120)
 
     LaunchedEffect(justCopiedShare) {
@@ -172,18 +109,11 @@ fun DesktopPlayerBar(
                             } else Icon(Icons.Filled.MusicNote, null, modifier = Modifier.size(16.dp), tint = tint)
                         }
                         NowPlayingIndicator(
-                            isPlaying = state.isPlaying && !state.isPaused,
+                            isPlaying = state.isActivelyPlaying,
                             barWidth = 2.dp,
                             barSpacing = 1.dp,
                             maxHeight = 14.dp
                         )
-                        val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() &&
-                            !state.waveTitle.equals("Моя Волна", ignoreCase = true)
-                        val waveText = when {
-                            isThematicWave -> state.waveCompactTitle?.takeIf { it.isNotBlank() } ?: state.waveTitle.orEmpty()
-                            state.isWave -> "Моя Волна"
-                            else -> "Сейчас играет"
-                        }
                         val waveRowModifier = if (state.isWave && actions.onOpenWaveThemes != null) {
                             Modifier.weight(1f)
                                 .clip(RoundedCornerShape(6.dp))
@@ -198,7 +128,7 @@ fun DesktopPlayerBar(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            if (isThematicWave) {
+                            if (state.isThematicWave) {
                                 Icon(
                                     imageVector = Icons.Filled.Waves,
                                     contentDescription = "Моя Волна",
@@ -207,14 +137,14 @@ fun DesktopPlayerBar(
                                 )
                             }
                             Text(
-                                text = waveText,
+                                text = state.contextLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (state.isWave) primary else tint,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        if (isThematicWave) {
+                        if (state.isThematicWave) {
                             CompactPlayerAction(
                                 icon = Icons.Filled.Close,
                                 description = "Сбросить к персональной Волне",
@@ -251,28 +181,22 @@ fun DesktopPlayerBar(
                     }
                 }
 
-                val fullTitle = if (state.artistName.isNotBlank()) "${state.artistName} — ${state.trackTitle}" else state.trackTitle
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     BouncingMarqueeText(
-                        text = fullTitle,
+                        text = state.fullTrackTitle,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Normal),
                         modifier = Modifier.weight(1f)
                     )
                     AiTrackBadge(state.trackId, state.trackArtists)
                 }
 
-                ThinSlider(
-                    value = if (isDragging) dragProgress else if (state.durationMs > 0) {
-                        (state.currentPositionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
-                    } else 0f,
-                    onValueChange = { dragProgress = it; isDragging = true },
-                    onValueChangeFinished = {
-                        if (state.durationMs > 0) actions.onSeek((it * state.durationMs).toLong())
-                        isDragging = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
+                PlayerSeekBar(
+                    state = state,
+                    preview = seekPreview,
+                    onPreviewChange = { seekPreview = it },
+                    onSeek = actions.onSeek,
                     barHeight = 5.dp,
-                    touchTargetHeight = 14.dp
+                    touchTargetHeight = 14.dp,
                 )
 
                 val leftActions: @Composable () -> Unit = {
@@ -282,12 +206,7 @@ fun DesktopPlayerBar(
                         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        DislikeButton(
-                            isDisliked = state.isDisliked,
-                            isDownloadedOrLocal = state.isDownloadedOrLocal,
-                            size = buttonSize,
-                            onClick = { actions.onToggleDislike?.invoke() }
-                        )
+                        PlayerRemovalButton(state, actions.onManageTrackRemoval, buttonSize, iconSize = 17.dp)
                         CompactPlayerAction(
                             Icons.Filled.Shuffle, "Случайный порядок", actions.onToggleShuffle,
                             active = state.isShuffle
@@ -319,20 +238,8 @@ fun DesktopPlayerBar(
                             actions.onToggleFavorite,
                             active = state.isFavorite
                         )
-                        CompactPlayerAction(
-                            Icons.Filled.Save,
-                            if (state.isRecordToDisk) "Сохранено на диск (нажмите для удаления)" else "Сохранить на диск",
-                            actions.onToggleRecordToDisk,
-                            active = state.isRecordToDisk,
-                            isLoading = state.isSavingToDisk
-                        )
-                        CompactPlayerAction(
-                            if (state.isInPlaylist) Icons.AutoMirrored.Filled.PlaylistAddCheck else Icons.AutoMirrored.Filled.PlaylistAdd,
-                            if (state.isInPlaylist) "В плейлистах (${state.playlistCount})" else "Добавить в плейлист",
-                            actions.onAddToPlaylist,
-                            active = state.isInPlaylist,
-                            enabled = state.hasTrackCandidate || (state.trackTitle.isNotBlank() && state.trackTitle != "Выберите трек")
-                        )
+                        PlayerSaveButton(state, actions.onSaveOrManageTrack, buttonSize, iconSize = 17.dp)
+                        PlayerPlaylistButton(state, actions.onAddToPlaylist, buttonSize, iconSize = 17.dp)
                         CompactPlayerAction(
                             if (justCopiedShare) Icons.Filled.Check else Icons.Filled.Share,
                             if (justCopiedShare) "Ссылка скопирована" else "Поделиться треком",
@@ -343,24 +250,7 @@ fun DesktopPlayerBar(
                     }
                 }
                 val transport: @Composable () -> Unit = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        OutlineIconButton(
-                            Icons.Filled.SkipPrevious, "Предыдущий трек", size = buttonSize,
-                            isLoading = state.isPrevLoading, onClick = { actions.onPrev?.invoke() }
-                        )
-                        FilledIconButton(
-                            if (state.isPlaying && !state.isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            if (state.isPlaying && !state.isPaused) "Пауза" else "Воспроизвести",
-                            size = 44.dp, isLoading = state.isPlayLoading, onClick = actions.onPlayPause
-                        )
-                        OutlineIconButton(
-                            Icons.Filled.SkipNext, "Следующий трек", size = buttonSize,
-                            isLoading = state.isNextLoading, onClick = { actions.onNext?.invoke() }
-                        )
-                    }
+                    PlayerTransportControls(state, actions, skipSize = buttonSize, playSize = 44.dp, spacing = 6.dp)
                 }
 
                 if (controlsInOneRow) {

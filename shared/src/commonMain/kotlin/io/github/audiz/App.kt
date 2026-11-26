@@ -56,8 +56,7 @@ import io.github.audiz.ui.LogsDialog
 import io.github.audiz.addons.AiFilterMode
 import io.github.audiz.ui.LocalAiBlacklist
 import io.github.audiz.ui.PlayerBar
-import io.github.audiz.ui.PlayerBarState
-import io.github.audiz.ui.PlayerBarActions
+import io.github.audiz.player.PlayerActions
 import io.github.audiz.ui.SettingsDialog
 import io.github.audiz.ui.SettingsState
 import io.github.audiz.ui.SettingsActions
@@ -159,76 +158,10 @@ fun App() {
             val eqState by EqualizerEngine.state.collectAsState()
             val isMobileUi = searchViewModel.isMobileUi
 
-            val isFirstPage = !showTracksScreen
-            val currentWave = searchViewModel.currentWaveTrack
-            val hasTrackCandidate = searchViewModel.playerTrackId != null || currentWave != null || searchViewModel.plannedNextTrack != null
-            val isWaveActiveOrPreloaded = searchViewModel.isWaveMode || (isFirstPage && searchViewModel.playerTrackId == null && currentWave != null)
-            val activeWaveDisplay = if (isWaveActiveOrPreloaded) searchViewModel.currentWaveDisplay else null
-
-            val displayTitle = when {
-                searchViewModel.playerTrackTitle.isNotEmpty() -> searchViewModel.playerTrackTitle
-                isFirstPage && currentWave != null -> currentWave.title
-                else -> "Выберите трек"
-            }
-
-            val displayArtist = when {
-                searchViewModel.playerArtistName.isNotEmpty() -> searchViewModel.playerArtistName
-                isFirstPage && currentWave != null -> currentWave.artists.joinToString { it.name }
-                else -> ""
-            }
-
-            val isCurrentTrackDownloaded = remember(displayArtist, displayTitle, searchViewModel.isCurrentTrackSavedToDisk) {
-                searchViewModel.isCurrentTrackSavedToDisk ||
-                    (displayTitle.isNotBlank() && searchViewModel.isTrackDownloaded(displayArtist, displayTitle))
-            }
-            val isCurrentTrackDownloadedOrLocal = searchViewModel.isCurrentTrackLocal || isCurrentTrackDownloaded
-
-            val currentTrackKey = searchViewModel.playerTrackId ?: currentWave?.id ?: "$displayArtist::$displayTitle"
-            val playlistsVersion = searchViewModel.playlistsVersion
-            val isCurrentTrackInPlaylist = remember(currentTrackKey, playlistsVersion) {
-                searchViewModel.isCurrentTrackInPlaylist
-            }
-            val currentTrackPlaylistsCount = remember(currentTrackKey, playlistsVersion) {
-                searchViewModel.currentTrackPlaylistsCount
-            }
-
-            val playerBarState = PlayerBarState(
-                trackId = searchViewModel.playerTrackId ?: currentWave?.id,
-                trackArtists = if (searchViewModel.aiFilterMode == AiFilterMode.OFF) {
-                    emptyList()
-                } else {
-                    searchViewModel.playerTrackArtists
-                },
-                trackTitle = displayTitle,
-                artistName = displayArtist,
-                isPlaying = searchViewModel.playerIsPlaying,
-                isPaused = searchViewModel.playerIsPaused,
-                durationMs = searchViewModel.playerDurationMs,
-                bitrate = searchViewModel.playerBitrate,
-                volume = searchViewModel.playerVolume,
-                isShuffle = searchViewModel.isShuffleEnabled,
-                isNextLoading = searchViewModel.isNextTrackLoading,
-                isPrevLoading = searchViewModel.isPrevTrackLoading,
-                isPlayLoading = searchViewModel.isPlayTrackLoading,
-                isRecordToDisk = if (searchViewModel.isCurrentTrackLocal) false else searchViewModel.isCurrentTrackSavedToDisk,
-                isSavingToDisk = if (searchViewModel.isCurrentTrackLocal) false else searchViewModel.isCurrentTrackSavingToDisk,
-                isSharing = searchViewModel.isSharingTrack,
-                isFavorite = if (searchViewModel.isCurrentTrackLocal) false else searchViewModel.isCurrentTrackLiked,
-                isDisliked = if (searchViewModel.isCurrentTrackLocal) false else searchViewModel.isCurrentTrackDisliked,
-                isInPlaylist = isCurrentTrackInPlaylist,
-                playlistCount = currentTrackPlaylistsCount,
+            val playerState = searchViewModel.playerUiState(showWavePreview = !showTracksScreen).copy(
                 isConfigActive = nav.settingsExpanded,
                 isEqualizerActive = eqState.isEnabled,
-                hasTrackCandidate = hasTrackCandidate,
-                isWave = isWaveActiveOrPreloaded,
-                waveTitle = activeWaveDisplay?.fullTitle,
-                waveCompactTitle = activeWaveDisplay?.compactTitle,
-                waveTags = activeWaveDisplay?.tags.orEmpty(),
-                coverUri = searchViewModel.playerCoverUri ?: if (isWaveActiveOrPreloaded) currentWave?.coverUri else null,
-                isMobile = isMobileUi,
                 isQueueOpen = dialog is AppDialog.UpNext || (showTracksScreen && !searchViewModel.isPreviewingTrackList),
-                upNextCount = searchViewModel.upNextState.pending.size,
-                isDownloadedOrLocal = isCurrentTrackDownloadedOrLocal
             )
 
             val openPlayingPlaylist: () -> Unit = {
@@ -243,61 +176,28 @@ fun App() {
                 }
             }
 
-            val playerBarActions = PlayerBarActions(
+            val playerActions = PlayerActions(
                 onVolumeChange = { searchViewModel.changeVolume(it) },
                 onPlayPause = { searchViewModel.togglePlayPause() },
-                onStop = { searchViewModel.stopPlayback() },
                 onSeek = { searchViewModel.seekPlayer(it) },
                 onToggleShuffle = { searchViewModel.toggleShuffle() },
                 onNext = { searchViewModel.playNextTrack() },
                 onPrev = { searchViewModel.playPrevTrack() },
                 onConfigClick = { nav.settingsExpanded = !nav.settingsExpanded },
-                onToggleRecordToDisk = if (searchViewModel.isCurrentTrackLocal) null else {
-                    {
-                        if (searchViewModel.isCurrentTrackSavedToDisk) {
-                            val trackId = searchViewModel.playerTrackId ?: currentWave?.id
-                            val title = searchViewModel.playerTrackTitle.ifBlank { currentWave?.title ?: "" }
-                            val artist = searchViewModel.playerArtistName.ifBlank { currentWave?.artists?.joinToString { it.name } ?: "" }
-                            if (trackId != null) {
-                                dialog = AppDialog.DeleteTrack(
-                                    trackId = trackId,
-                                    title = title,
-                                    artist = artist
-                                )
-                            }
-                        } else {
-                            searchViewModel.toggleCurrentTrackSaveOrDelete()
-                        }
+                onSaveOrManageTrack = {
+                    searchViewModel.saveOrManagePlayerTrack { track ->
+                        dialog = AppDialog.PlayerTrackRemoval(track)
                     }
                 },
-                onShareTrack = { searchViewModel.shareCurrentTrack() },
+                onShareTrack = searchViewModel::shareCurrentTrack,
                 onAddToPlaylist = {
-                    val track = searchViewModel.getCurrentPlayingTrackInfo()
-                        ?: currentWave
-                        ?: searchViewModel.plannedNextTrack
-                    if (track != null) {
-                        dialog = AppDialog.AddToPlaylist(track)
-                    }
+                    searchViewModel.playerActionTrack()?.let { dialog = AppDialog.AddToPlaylist(it) }
                 },
-                onToggleFavorite = if (searchViewModel.isCurrentTrackLocal) null else { { searchViewModel.toggleLikeCurrentTrack() } },
+                onToggleFavorite = if (playerState.hasTrackCandidate && !playerState.isLocalTrack) {
+                    searchViewModel::toggleLikeCurrentTrack
+                } else null,
                 onManageTrackRemoval = {
-                    searchViewModel.getCurrentPlayingTrackInfo()?.let { dialog = AppDialog.PlayerTrackRemoval(it) }
-                },
-                onToggleDislike = {
-                    if (isCurrentTrackDownloadedOrLocal) {
-                        val trackId = searchViewModel.playerTrackId ?: searchViewModel.currentPlayingFilePath ?: currentWave?.id
-                        val title = searchViewModel.playerTrackTitle.ifBlank { currentWave?.title ?: "" }
-                        val artist = searchViewModel.playerArtistName.ifBlank { currentWave?.artists?.joinToString { it.name } ?: "" }
-                        if (trackId != null) {
-                            dialog = AppDialog.DeleteTrack(
-                                trackId = trackId,
-                                title = title,
-                                artist = artist
-                            )
-                        }
-                    } else {
-                        searchViewModel.toggleDislikeCurrentTrack()
-                    }
+                    searchViewModel.playerActionTrack()?.let { dialog = AppDialog.PlayerTrackRemoval(it) }
                 },
                 onOpenEqualizer = {
                     dialog = AppDialog.Equalizer(initialTab = 0)
@@ -309,7 +209,7 @@ fun App() {
                         dialog = AppDialog.UpNext(openedFromPlayer = isMobileUi && nav.isMobilePlayerExpanded)
                     }
                 },
-                onOpenArtist = if (displayArtist.isNotBlank()) {
+                onOpenArtist = if (playerState.artistName.isNotBlank()) {
                     {
                         searchViewModel.openCurrentTrackArtist {
                             nav.updateMobilePlayerExpanded(false)
@@ -351,11 +251,11 @@ fun App() {
                                 !searchViewModel.isPlayTrackLoading,
                             trackId = searchViewModel.playerTrackId,
                             isLiked = searchViewModel.isCurrentTrackLiked,
-                            isSaved = searchViewModel.isCurrentTrackSavedToDisk
+                            isSaved = playerState.isLocalTrack || playerState.isSavedToDisk
                         )
                         PlayerBar(
-                            state = playerBarState.copy(currentPositionMs = searchViewModel.playerPositionMs),
-                            actions = playerBarActions
+                            state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                            actions = playerActions
                         )
                     }
                 }
@@ -702,8 +602,8 @@ fun App() {
                     }
                     if (showFullPlayer) {
                         MobileFullPlayerSheet(
-                            state = playerBarState.copy(currentPositionMs = searchViewModel.playerPositionMs),
-                            actions = playerBarActions,
+                            state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                            actions = playerActions,
                             onDismiss = { nav.updateMobilePlayerExpanded(false) },
                             modifier = Modifier.offset {
                                 val top = nav.mobilePlayerDragTop ?: if (nav.isDraggingMobilePlayerOpen) {

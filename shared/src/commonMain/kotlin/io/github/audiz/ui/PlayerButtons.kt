@@ -35,14 +35,10 @@ import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -292,95 +288,6 @@ fun FavoriteButton(
             size = size,
             modifier = modifier,
             onClick = onClick
-        )
-    }
-}
-
-@Composable
-fun DislikeButton(
-    isDisliked: Boolean,
-    modifier: Modifier = Modifier,
-    isDownloadedOrLocal: Boolean = false,
-    size: Dp = 28.dp,
-    onClick: () -> Unit
-) {
-    var showConfirmDialog by remember { mutableStateOf(false) }
-
-    val tint = if (isDisliked || isDownloadedOrLocal) {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-    }
-    val icon = if (isDisliked) Icons.Filled.Delete else Icons.Filled.DeleteOutline
-
-    Box(
-        modifier = modifier
-            .size(size)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {
-                    if (isDownloadedOrLocal) {
-                        onClick()
-                    } else {
-                        showConfirmDialog = true
-                    }
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = if (isDownloadedOrLocal) {
-                "Удалить файл с диска"
-            } else if (isDisliked) {
-                "Не нравится"
-            } else {
-                "Дизлайк"
-            },
-            tint = tint,
-            modifier = Modifier.size(size * 0.85f)
-        )
-    }
-
-    if (!isDownloadedOrLocal && showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            title = {
-                Text(
-                    text = if (isDisliked) "Убрать из корзины?" else "Не рекомендовать этот трек?",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = if (isDisliked) {
-                        "Вы уверены, что хотите продолжить и вернуть этот трек в рекомендации?"
-                    } else {
-                        "Вы уверены, что хотите продолжить? Этот трек больше не будет воспроизводиться в Моей Волне."
-                    }
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showConfirmDialog = false
-                        onClick()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isDisliked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                        contentColor = if (isDisliked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onError
-                    )
-                ) {
-                    Text("Продолжить")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
-                    Text("Отмена")
-                }
-            }
         )
     }
 }

@@ -53,6 +53,8 @@ import kotlin.math.PI
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import io.github.audiz.dsp.AudioVisualizer
+import io.github.audiz.player.PlayerActions
+import io.github.audiz.player.PlayerUiState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -80,14 +82,12 @@ import kotlin.math.roundToInt
 
 @Composable
 fun MobileMiniPlayerBar(
-    state: PlayerBarState,
-    actions: PlayerBarActions,
+    state: PlayerUiState,
+    actions: PlayerActions,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val currentProgress = if (state.durationMs > 0) {
-        (state.currentPositionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    val currentProgress = state.progress
 
     val currentActions by rememberUpdatedState(actions)
     var miniPlayerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -215,7 +215,7 @@ fun MobileMiniPlayerBar(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            if (state.isPlaying && !state.isPaused) {
+                            if (state.isActivelyPlaying) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -229,7 +229,7 @@ fun MobileMiniPlayerBar(
                                     )
                                 }
                             }
-                        } else if (state.isPlaying && !state.isPaused) {
+                        } else if (state.isActivelyPlaying) {
                             NowPlayingIndicator(
                                 isPlaying = true,
                                 color = MaterialTheme.colorScheme.onPrimary,
@@ -256,24 +256,22 @@ fun MobileMiniPlayerBar(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.Center
                     ) {
-                        val fullTitle = if (state.artistName.isNotBlank()) "${state.artistName} — ${state.trackTitle}" else state.trackTitle
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             BouncingMarqueeText(
-                                text = fullTitle,
+                                text = state.fullTrackTitle,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 modifier = Modifier.weight(1f),
                                 enableCopy = false
                             )
                             AiTrackBadge(state.trackId, state.trackArtists)
                         }
-                        val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() && !state.waveTitle.equals("Моя Волна", ignoreCase = true)
                         if (state.isWave) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                if (isThematicWave) {
+                                if (state.isThematicWave) {
                                     Icon(
                                         imageVector = Icons.Filled.Waves,
                                         contentDescription = "Моя Волна",
@@ -281,20 +279,15 @@ fun MobileMiniPlayerBar(
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
-                                val waveLabel = if (isThematicWave) {
-                                    state.waveCompactTitle?.takeIf { it.isNotBlank() } ?: state.waveTitle.orEmpty()
-                                } else {
-                                    "Моя Волна"
-                                }
                                 Text(
-                                    text = waveLabel,
+                                    text = state.contextLabel,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
-                                if (isThematicWave && actions.onResetWave != null) {
+                                if (state.isThematicWave && actions.onResetWave != null) {
                                     Box(
                                         modifier = Modifier
                                             .size(18.dp)
@@ -321,34 +314,7 @@ fun MobileMiniPlayerBar(
                     }
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    OutlineIconButton(
-                        icon = Icons.Filled.SkipPrevious,
-                        contentDescription = "Предыдущий",
-                        size = 42.dp,
-                        isLoading = state.isPrevLoading,
-                        onClick = { actions.onPrev?.invoke() }
-                    )
-
-                    FilledIconButton(
-                        icon = if (state.isPlaying && !state.isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (state.isPlaying && !state.isPaused) "Пауза" else "Воспроизведение",
-                        size = 48.dp,
-                        isLoading = state.isPlayLoading,
-                        onClick = actions.onPlayPause
-                    )
-
-                    OutlineIconButton(
-                        icon = Icons.Filled.SkipNext,
-                        contentDescription = "Следующий",
-                        size = 42.dp,
-                        isLoading = state.isNextLoading,
-                        onClick = { actions.onNext?.invoke() }
-                    )
-                }
+                PlayerTransportControls(state, actions, skipSize = 42.dp, playSize = 48.dp, spacing = 4.dp)
             }
         }
     }
@@ -437,8 +403,8 @@ private suspend fun PointerInputScope.detectPlayerDrag(
 
 @Composable
 fun MobileFullPlayerSheet(
-    state: PlayerBarState,
-    actions: PlayerBarActions,
+    state: PlayerUiState,
+    actions: PlayerActions,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     backHandlerEnabled: Boolean = true
@@ -451,20 +417,8 @@ fun MobileFullPlayerSheet(
     var dragOffsetY by remember { mutableStateOf(0f) }
     val animatedOffsetY = remember { Animatable(0f) }
 
-    var isDraggingScrubber by remember { mutableStateOf(false) }
-    var scrubberProgress by remember { mutableStateOf(0f) }
-
-    val currentMs = if (isDraggingScrubber && state.durationMs > 0) {
-        (scrubberProgress * state.durationMs).toLong()
-    } else {
-        state.currentPositionMs
-    }
-
-    val sliderValue = if (isDraggingScrubber) {
-        scrubberProgress
-    } else if (state.durationMs > 0) {
-        (state.currentPositionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    var seekPreview by remember(state.trackId) { mutableStateOf<Float?>(null) }
+    val currentMs = seekPreview?.let(state::positionAt) ?: state.currentPositionMs
 
     val coverBitmap = rememberCoverBitmap(state.coverUri, 600)
     // Палитра считается по пикселям обложки — вне UI-потока
@@ -475,7 +429,7 @@ fun MobileFullPlayerSheet(
     }
 
     // «Дыхание» подсветки: только во время воспроизведения и на общей сетке ~30 fps
-    val isActivelyPlaying = state.isPlaying && !state.isPaused
+    val isActivelyPlaying = state.isActivelyPlaying
     val breathingAlphaState = remember { mutableFloatStateOf(0.50f) }
     LaunchedEffect(isActivelyPlaying) {
         if (!isActivelyPlaying) {
@@ -629,12 +583,6 @@ fun MobileFullPlayerSheet(
                         )
                     }
 
-                    val isThematicWave = state.isWave && !state.waveTitle.isNullOrBlank() && !state.waveTitle.equals("Моя Волна", ignoreCase = true)
-                    val contextLabel = when {
-                        isThematicWave -> state.waveCompactTitle?.takeIf { it.isNotBlank() } ?: state.waveTitle.orEmpty()
-                        state.isWave -> "МОЯ ВОЛНА"
-                        else -> "СЕЙЧАС ИГРАЕТ"
-                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -659,7 +607,7 @@ fun MobileFullPlayerSheet(
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                             modifier = labelModifier
                         ) {
-                            if (isThematicWave) {
+                            if (state.isThematicWave) {
                                 Icon(
                                     imageVector = Icons.Filled.Waves,
                                     contentDescription = "Моя Волна",
@@ -668,7 +616,7 @@ fun MobileFullPlayerSheet(
                                 )
                             }
                             Text(
-                                text = contextLabel.uppercase(),
+                                text = state.contextLabel.uppercase(),
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.2.sp
@@ -679,7 +627,7 @@ fun MobileFullPlayerSheet(
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                         }
-                        if (isThematicWave && actions.onResetWave != null) {
+                        if (state.isThematicWave && actions.onResetWave != null) {
                             Box(
                                 modifier = Modifier
                                     .size(22.dp)
@@ -824,7 +772,7 @@ fun MobileFullPlayerSheet(
                     }
 
                     CoverSpectrumVisualizer(
-                        isPlaying = state.isPlaying && !state.isPaused,
+                        isPlaying = state.isActivelyPlaying,
                         glowLeft = glowLeft,
                         glowRight = glowRight,
                         onOpenEqualizer = actions.onOpenEqualizer,
@@ -878,32 +826,26 @@ fun MobileFullPlayerSheet(
                     }
                 }
 
-                FavoriteButton(
-                    isFavorite = state.isFavorite,
-                    modifier = controlModifier,
-                    size = 48.dp,
-                    onClick = { actions.onToggleFavorite?.invoke() }
-                )
+                actions.onToggleFavorite?.let { toggleFavorite ->
+                    FavoriteButton(
+                        isFavorite = state.isFavorite,
+                        modifier = controlModifier,
+                        size = 48.dp,
+                        onClick = toggleFavorite,
+                    )
+                }
             }
 
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
             ) {
-                ThinSlider(
-                    value = sliderValue,
-                    onValueChange = { newProgress ->
-                        isDraggingScrubber = true
-                        scrubberProgress = newProgress
-                    },
-                    onValueChangeFinished = { finalFraction ->
-                        if (state.durationMs > 0) {
-                            actions.onSeek((finalFraction * state.durationMs).toLong())
-                        }
-                        isDraggingScrubber = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
+                PlayerSeekBar(
+                    state = state,
+                    preview = seekPreview,
+                    onPreviewChange = { seekPreview = it },
+                    onSeek = actions.onSeek,
                     barHeight = 6.dp,
-                    touchTargetHeight = 36.dp
+                    touchTargetHeight = 36.dp,
                 )
 
                 Box(
@@ -972,37 +914,9 @@ fun MobileFullPlayerSheet(
                 }
 
                 // 2. ЦЕНТРАЛЬНЫЙ БЛОК: Предыдущий + Play/Pause + Следующий (ВСЕГДА СТРОГО ПО ЦЕНТРУ ЭКРАНА)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(controlsSpacing)
-                ) {
-                    OutlineIconButton(
-                        icon = Icons.Filled.SkipPrevious,
-                        contentDescription = "Предыдущий",
-                        modifier = controlModifier,
-                        size = skipButtonSize,
-                        isLoading = state.isPrevLoading,
-                        onClick = { actions.onPrev?.invoke() }
-                    )
-
-                    FilledIconButton(
-                        icon = if (state.isPlaying && !state.isPaused) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (state.isPlaying && !state.isPaused) "Пауза" else "Воспроизведение",
-                        modifier = controlModifier,
-                        size = playButtonSize,
-                        isLoading = state.isPlayLoading,
-                        onClick = actions.onPlayPause
-                    )
-
-                    OutlineIconButton(
-                        icon = Icons.Filled.SkipNext,
-                        contentDescription = "Следующий",
-                        modifier = controlModifier,
-                        size = skipButtonSize,
-                        isLoading = state.isNextLoading,
-                        onClick = { actions.onNext?.invoke() }
-                    )
-                }
+                PlayerTransportControls(
+                    state, actions, skipButtonSize, playButtonSize, controlsSpacing, controlModifier,
+                )
 
                 Box(
                     modifier = Modifier.weight(1f),
@@ -1041,21 +955,7 @@ fun MobileFullPlayerSheet(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    val dislikeTint = if (state.isDisliked || state.isDownloadedOrLocal) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        defaultActionTint
-                    }
-                    GhostIconButton(
-                        icon = Icons.Filled.Delete,
-                        contentDescription = "Удалить трек",
-                        modifier = controlModifier,
-                        size = actionButtonSize,
-                        iconSize = actionIconSize,
-                        contentColor = dislikeTint,
-                        enabled = state.hasTrackCandidate,
-                        onClick = { actions.onManageTrackRemoval?.invoke() }
-                    )
+                    PlayerRemovalButton(state, actions.onManageTrackRemoval, actionButtonSize, actionIconSize, controlModifier)
                 }
 
                 Box(
@@ -1099,65 +999,14 @@ fun MobileFullPlayerSheet(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (state.isSavingToDisk) {
-                        Box(
-                            modifier = Modifier.size(actionButtonSize).then(controlModifier),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(actionIconSize),
-                                strokeWidth = 1.8.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        GhostIconButton(
-                            icon = Icons.Filled.Save,
-                            contentDescription = if (state.isRecordToDisk) "Сохранено на диск (нажмите для удаления)" else "Сохранить на диск",
-                            modifier = controlModifier,
-                            size = actionButtonSize,
-                            iconSize = actionIconSize,
-                            contentColor = if (state.isRecordToDisk) MaterialTheme.colorScheme.primary else defaultActionTint,
-                            onClick = {
-                                if (state.isRecordToDisk) actions.onManageTrackRemoval?.invoke()
-                                else actions.onToggleRecordToDisk?.invoke()
-                            }
-                        )
-                    }
+                    PlayerSaveButton(state, actions.onSaveOrManageTrack, actionButtonSize, actionIconSize, controlModifier)
                 }
 
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    val canAddToPlaylist = state.hasTrackCandidate || (state.trackTitle.isNotBlank() && state.trackTitle != "Выберите трек")
-                    val playlistTint = when {
-                        !canAddToPlaylist -> defaultActionTint.copy(alpha = 0.35f)
-                        state.isInPlaylist -> MaterialTheme.colorScheme.primary
-                        else -> defaultActionTint
-                    }
-                    val playlistIcon = if (state.isInPlaylist) {
-                        Icons.AutoMirrored.Filled.PlaylistAddCheck
-                    } else {
-                        Icons.AutoMirrored.Filled.PlaylistAdd
-                    }
-                    GhostIconButton(
-                        icon = playlistIcon,
-                        modifier = controlModifier,
-                        contentDescription = when {
-                            !state.isInPlaylist -> "Добавить в плейлист"
-                            state.playlistCount > 1 -> "В плейлистах (${state.playlistCount})"
-                            else -> "В плейлисте"
-                        },
-                        size = actionButtonSize,
-                        iconSize = actionIconSize,
-                        contentColor = playlistTint,
-                        onClick = {
-                            if (canAddToPlaylist) {
-                                actions.onAddToPlaylist?.invoke()
-                            }
-                        }
-                    )
+                    PlayerPlaylistButton(state, actions.onAddToPlaylist, actionButtonSize, actionIconSize, controlModifier)
                 }
 
                 Box(

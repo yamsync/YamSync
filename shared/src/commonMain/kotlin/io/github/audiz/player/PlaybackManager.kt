@@ -278,9 +278,9 @@ class PlaybackManager(
         audioPlayer.setVolume(volume)
 
         systemMediaControls.initialize(
-            onPlay = { if (isPaused) togglePlayPause() },
-            onPause = { if (isPlaying && !isPaused) togglePlayPause() },
-            onTogglePlayPause = { togglePlayPause() },
+            onPlay = ::play,
+            onPause = ::pause,
+            onTogglePlayPause = ::togglePlayPause,
             onNext = { playNextTrack() },
             onPrev = { playPrevTrack() },
             onSeek = { seekTo(it) }
@@ -464,20 +464,31 @@ class PlaybackManager(
     }
 
     fun togglePlayPause() {
+        if (isPlaying && !isPaused) pause() else play()
+    }
+
+    internal fun pause() {
         wasInterruptedBySystem = false
-        if (isPlaying && !isPaused) {
-            positionMs = audioPlayer.getCurrentPositionMs()
-            audioPlayer.pause()
-            isPaused = true
-            systemMediaControls.updatePlaybackState(false, true, positionMs)
-        } else if (isPaused) {
+        if (!isPlaying || isPaused) return
+        positionMs = audioPlayer.getCurrentPositionMs()
+        audioPlayer.pause()
+        isPaused = true
+        systemMediaControls.updatePlaybackState(false, true, positionMs)
+    }
+
+    internal fun play() {
+        wasInterruptedBySystem = false
+        if (isPlaying && !isPaused) return
+        if (isPaused) {
             resumePausedPlayback()
-        } else if (trackId == null) {
+            return
+        }
+        if (isPlayLoading || isNextLoading || isPrevLoading) return
+        if (trackId == null) {
             if (upNextQueue.state.pending.isNotEmpty()) {
                 playNextTrack(source = TrackPlaySource.PLAY)
                 return
             }
-            isPlayLoading = true
             waveBridge?.resumeOrLoadWave(true, TrackPlaySource.PLAY)
         } else if (waveBridge?.isWaveMode == true && upNextQueue.state.current?.inserted != true &&
             waveBridge.waveTracks.getOrNull(waveBridge.waveCurrentIndex)?.id == trackId) {

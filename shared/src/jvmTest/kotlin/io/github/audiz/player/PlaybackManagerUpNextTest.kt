@@ -40,6 +40,30 @@ class PlaybackManagerUpNextTest {
     }
 
     @Test
+    fun explicitPlayStartsPreparedTrackAndDoesNotToggleItToPause() = fixture { manager ->
+        manager.pause()
+        assertFalse(manager.isPaused)
+
+        manager.play()
+        assertTrue(manager.isPlayLoading)
+        manager.play()
+        assertTrue(manager.isPlayLoading)
+        assertFalse(manager.isPaused)
+        assertEquals(a.id, manager.trackId)
+    }
+
+    @Test
+    fun explicitPlayWithoutCurrentTrackStartsPendingQueue() = fixture { manager ->
+        manager.stopPlayback()
+        manager.addToUpNext(x)
+
+        manager.play()
+
+        assertEquals(x, manager.upNextQueue.state.current?.track)
+        assertTrue(manager.upNextQueue.state.pending.isEmpty())
+    }
+
+    @Test
     fun queueOverridesPreloadAndReturnsToOriginalNextTrack() = fixture { manager ->
         manager.addToUpNext(x)
         assertEquals(a.id, manager.trackId)

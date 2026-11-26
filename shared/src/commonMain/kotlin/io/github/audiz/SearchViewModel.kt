@@ -55,6 +55,7 @@ import io.github.audiz.search.SearchSuggestionType
 import io.github.audiz.search.buildSearchSuggestions
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -319,8 +320,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val isUiWatchdogActive: Boolean get() = settingsManager.isUiWatchdogEnabled
     fun toggleUiWatchdog(active: Boolean = !isUiWatchdogActive) = settingsManager.toggleUiWatchdog(active)
 
-    val isCurrentTrackSavedToDisk: Boolean get() = downloadManager.isCurrentTrackSavedToDisk
-
     val isCurrentTrackSavingToDisk: Boolean get() = downloadManager.isCurrentTrackSavingToDisk
 
     val isCurrentTrackLocal: Boolean
@@ -329,9 +328,19 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
             return isLocalTrackId(id)
         }
 
-    fun toggleCurrentTrackSaveOrDelete() {
-        if (isCurrentTrackLocal) return
-        downloadManager.toggleCurrentTrackSaveOrDelete()
+    internal fun saveOrManagePlayerTrack(onManage: (FullTrackInfo) -> Unit) {
+        val id = playerTrackId ?: return
+        if (isLocalTrackId(id) || isCurrentTrackSavingToDisk) return
+        val track = playerActionTrack() ?: return
+        val title = playerTrackTitle
+        val artist = playerArtistName
+        launchSafe {
+            val saved = withContext(DispatcherIO) {
+                downloadManager.isTrackDownloaded(artist, title)
+            }
+            if (playerTrackId != id || isCurrentTrackSavingToDisk) return@launchSafe
+            if (saved) onManage(track) else downloadManager.downloadTrack(id, title, artist)
+        }
     }
 
     var isSharingTrack by mutableStateOf(false)
@@ -380,18 +389,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         get() {
             val id = playerTrackId ?: currentWaveTrack?.id
             return playlistManager.isTrackDisliked(id)
-        }
-
-    val isCurrentTrackInPlaylist: Boolean
-        get() {
-            val track = getCurrentPlayingTrackInfo() ?: return false
-            return isTrackInAnyPlaylist(track)
-        }
-
-    val currentTrackPlaylistsCount: Int
-        get() {
-            val track = getCurrentPlayingTrackInfo() ?: return 0
-            return getTrackPlaylistsCount(track)
         }
 
     /** 🔄 Версия состояния плейлистов (для реактивного обновления UI при добавлении/удалении треков) */
@@ -895,7 +892,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val playerPositionMs: Long get() = playbackManager.positionMs
     val playerBitrate: Int? get() = playbackManager.bitrate
     val currentPlayingFilePath: String? get() = playbackManager.currentPlayingFilePath
-    val isCurrentTrackHQ: Boolean get() = playbackManager.isCurrentTrackHQ
     val playerCoverUri: String?
         get() {
             val id = playerTrackId
@@ -940,34 +936,73 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         return plannedNextTrack
     }
 
-    val playerUiState: PlayerUiState
-        get() = PlayerUiState(
-            trackId = playerTrackId,
-            albumId = playerAlbumId,
-            title = playerTrackTitle,
-            artist = playerArtistName,
-            coverUri = playerCoverUri,
+    internal fun playerActionTrack(): FullTrackInfo? = getCurrentPlayingTrackInfo() ?: currentWaveTrack
+
+    private data class PlayerLibraryState(
+        val trackId: String? = null,
+        val savedToDisk: Boolean = false,
+        val playlistCount: Int = 0,
+    )
+
+    private var playerLibraryState by mutableStateOf(PlayerLibraryState())
+
+    internal fun playerUiState(showWavePreview: Boolean): PlayerUiState {
+        val currentWave = currentWaveTrack
+        val preview = currentWave.takeIf { showWavePreview }
+        val trackId = playerTrackId
+        val isLocal = isLocalTrackId(trackId ?: currentWave?.id)
+        val isWave = isWaveMode || (trackId == null && preview != null)
+        val wave = currentWaveDisplay.takeIf { isWave }
+        val target = playerActionTrack()
+        val library = playerLibraryState.takeIf { it.trackId == target?.id }
+        return PlayerUiState(
+            trackId = trackId ?: currentWave?.id,
+            trackArtists = if (aiFilterMode == AiFilterMode.OFF) emptyList() else playerTrackArtists,
+            trackTitle = playerTrackTitle.ifEmpty { preview?.title ?: "Выберите трек" },
+            artistName = playerArtistName.ifEmpty { preview?.artists?.joinToString { it.name }.orEmpty() },
+            coverUri = playerCoverUri ?: currentWave?.coverUri.takeIf { isWave },
             isPlaying = playerIsPlaying,
             isPaused = playerIsPaused,
             durationMs = playerDurationMs,
-            positionMs = playerPositionMs,
             volume = playerVolume,
-            crossfadeSeconds = playerCrossfadeSeconds,
             bitrate = playerBitrate,
-            isHQ = isCurrentTrackHQ,
             isShuffle = isShuffleEnabled,
             isNextLoading = isNextTrackLoading,
             isPrevLoading = isPrevTrackLoading,
             isPlayLoading = isPlayTrackLoading,
-            isLiked = isCurrentTrackLiked,
-            isDisliked = isCurrentTrackDisliked,
-            isSavedToDisk = isCurrentTrackSavedToDisk,
-            isSavingToDisk = isCurrentTrackSavingToDisk,
-            isWaveMode = isWaveMode,
-            currentWaveTitle = currentWaveDisplay?.compactTitle ?: currentWaveTitle
+            isFavorite = !isLocal && isCurrentTrackLiked,
+            isDisliked = !isLocal && isCurrentTrackDisliked,
+            isLocalTrack = isLocal,
+            canSaveTrack = trackId != null && !isLocal,
+            isSavedToDisk = !isLocal && library?.savedToDisk == true,
+            isSavingToDisk = !isLocal && isCurrentTrackSavingToDisk,
+            isSharing = isSharingTrack,
+            hasTrackCandidate = target != null,
+            playlistCount = library?.playlistCount ?: 0,
+            isWave = isWave,
+            waveTitle = wave?.fullTitle,
+            waveCompactTitle = wave?.compactTitle,
+            waveTags = wave?.tags.orEmpty(),
+            isMobile = isMobileUi,
+            upNextCount = upNextState.pending.size,
         )
+    }
 
     init {
+        viewModelScope.launch {
+            snapshotFlow { Triple(playerActionTrack(), playlistsVersion, downloadManager.downloadVersion) }
+                .collectLatest { (track) ->
+                    playerLibraryState = if (track == null) PlayerLibraryState() else withContext(DispatcherIO) {
+                        PlayerLibraryState(
+                            trackId = track.id,
+                            savedToDisk = !track.isLocal && downloadManager.isTrackDownloaded(
+                                track.artists.joinToString { it.name }, track.title
+                            ),
+                            playlistCount = getTrackPlaylistsCount(track),
+                        )
+                    }
+                }
+        }
         viewModelScope.launch {
             try {
                 val (enabled, savedLimit) = withContext(DispatcherIO) {
@@ -2002,13 +2037,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         )
     }
 
-    fun togglePlayPause() {
-        if (playbackManager.trackId == null && waveManager.currentWaveTrack != null) {
-            waveManager.resumeOrLoadWave()
-        } else {
-            playbackManager.togglePlayPause()
-        }
-    }
+    fun togglePlayPause() = playbackManager.togglePlayPause()
 
     fun stopPlayback() = playbackManager.stopPlayback()
 
