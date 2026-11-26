@@ -57,20 +57,39 @@ internal fun CarPlayerLayout(
         val canSplitHorizontally = maxWidth >= 640.dp || (maxWidth >= 480.dp && maxWidth > maxHeight)
         when {
             !isPanelOpen -> Row(Modifier.fillMaxSize()) {
-                CarPlayer(state, actions, Modifier.weight(1f).fillMaxHeight())
+                CompactFullPlayer(state, actions, Modifier.weight(1f).fillMaxHeight())
                 CarPanelHandle(openPanel, Modifier.fillMaxHeight())
             }
-            canSplitHorizontally -> Row(Modifier.fillMaxSize()) {
-                CarPlayer(state, actions, Modifier.weight(1f).fillMaxHeight(), isSplit = true)
-                VerticalDivider()
-                CarBrowserPanel(closePanel, Modifier.weight(1f).fillMaxHeight(), panelContent)
+            canSplitHorizontally -> SplitPlayerLayout(state, actions) {
+                CarBrowserPanel(closePanel, Modifier.fillMaxSize(), panelContent)
             }
             else -> Column(Modifier.fillMaxSize()) {
-                CarPlayer(state, actions, Modifier.weight(1f).fillMaxWidth(), isSplit = true)
+                CompactFullPlayer(state, actions, Modifier.weight(1f).fillMaxWidth(), isSplit = true)
                 HorizontalDivider()
                 CarBrowserPanel(closePanel, Modifier.weight(1f).fillMaxWidth(), panelContent)
             }
         }
+    }
+}
+
+@Composable
+internal fun SplitPlayerLayout(
+    state: PlayerUiState,
+    actions: PlayerActions,
+    modifier: Modifier = Modifier,
+    mobileControls: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    Row(modifier.fillMaxSize()) {
+        CompactFullPlayer(
+            state = state,
+            actions = actions,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            isSplit = true,
+            mobileControls = mobileControls,
+        )
+        VerticalDivider()
+        Box(Modifier.weight(1f).fillMaxHeight().clipToBounds()) { content() }
     }
 }
 
@@ -136,11 +155,12 @@ private fun CarBrowserPanel(
 }
 
 @Composable
-private fun CarPlayer(
+private fun CompactFullPlayer(
     state: PlayerUiState,
     actions: PlayerActions,
     modifier: Modifier,
     isSplit: Boolean = false,
+    mobileControls: Boolean = false,
 ) {
     BoxWithConstraints(modifier.clipToBounds()) {
         val short = maxHeight < 440.dp
@@ -176,6 +196,11 @@ private fun CarPlayer(
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     FullPlayerContextLabel(state)
                 }
+                if (mobileControls) {
+                    actions.onToggleFavorite?.let { toggleFavorite ->
+                        FavoriteButton(isFavorite = state.isFavorite, size = headerButtonSize, onClick = toggleFavorite)
+                    }
+                }
                 IconButton(
                     onClick = { actions.onConfigClick?.invoke() },
                     enabled = actions.onConfigClick != null,
@@ -192,11 +217,16 @@ private fun CarPlayer(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        AnimatedPlayerCover(state, Modifier.size(minOf(maxWidth, maxHeight)))
+                        AnimatedPlayerCover(
+                            state, Modifier.size(minOf(maxWidth, maxHeight)),
+                            onCoverClick = actions.onPlayPause.takeIf { mobileControls },
+                            onOpenEqualizer = actions.onOpenEqualizer.takeIf { mobileControls },
+                        )
                     }
                     FullPlayerTrackInfo(
                         state = state,
                         modifier = Modifier.weight(1f),
+                        onOpenArtist = actions.onOpenArtist.takeIf { mobileControls },
                         titleSize = if (short) 20.sp else 32.sp,
                         artistSize = if (short) 14.sp else 20.sp,
                     )
@@ -206,9 +236,15 @@ private fun CarPlayer(
                     Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    AnimatedPlayerCover(state, Modifier.size(minOf(maxWidth, maxHeight)))
+                    AnimatedPlayerCover(
+                        state, Modifier.size(minOf(maxWidth, maxHeight)),
+                        onCoverClick = actions.onPlayPause.takeIf { mobileControls },
+                        onOpenEqualizer = actions.onOpenEqualizer.takeIf { mobileControls },
+                    )
                 }
-                FullPlayerTrackInfo(state, Modifier.fillMaxWidth())
+                FullPlayerTrackInfo(
+                    state, Modifier.fillMaxWidth(), onOpenArtist = actions.onOpenArtist.takeIf { mobileControls }
+                )
             }
 
             FullPlayerTimeline(

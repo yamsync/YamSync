@@ -66,6 +66,7 @@ import io.github.audiz.ui.AppAccentColor
 import io.github.audiz.ui.buildAppColorScheme
 import io.github.audiz.ui.EqualizerDialog
 import io.github.audiz.ui.CarPlayerLayout
+import io.github.audiz.ui.SplitPlayerLayout
 import io.github.audiz.ui.MobileFullPlayerSheet
 import io.github.audiz.ui.clipAboveMiniPlayer
 import io.github.audiz.ui.PlayerTrackRemovalDialog
@@ -73,6 +74,7 @@ import io.github.audiz.ui.WaveThemesDialog
 import io.github.audiz.ui.BackHandler
 import io.github.audiz.dsp.EqualizerEngine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -136,7 +138,9 @@ fun App() {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val isLandscapeMobile = searchViewModel.uiMode == "mobile" &&
+                maxWidth >= 600.dp && maxWidth > maxHeight
 
             // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
             val isWaveQueue = searchViewModel.isShowingWaveQueue
@@ -166,7 +170,15 @@ fun App() {
             val eqState by EqualizerEngine.state.collectAsState()
             val isCarUi = searchViewModel.uiMode == "car"
             val isMobileUi = searchViewModel.isMobileUi
+            val usesCompactFullPlayer = isCarUi || isLandscapeMobile
             var isCarPanelOpen by remember(isCarUi) { mutableStateOf(false) }
+
+            LaunchedEffect(isLandscapeMobile) {
+                if (isLandscapeMobile) {
+                    snapshotFlow { searchViewModel.hasPlaybackQueue }.first { it }
+                    searchViewModel.openQueueView()
+                }
+            }
 
             val playerState = searchViewModel.playerUiState(showWavePreview = !showTracksScreen).copy(
                 isConfigActive = nav.settingsExpanded,
@@ -178,9 +190,9 @@ fun App() {
                 val upNext = dialog as? AppDialog.UpNext
                 val fromPlayer = upNext?.openedFromPlayer ?: nav.isMobilePlayerExpanded
                 if (upNext != null) dialog = null
-                if (isCarUi) {
+                if (usesCompactFullPlayer) {
                     searchViewModel.openQueueView()
-                    isCarPanelOpen = true
+                    if (isCarUi) isCarPanelOpen = true
                 } else if (isMobileUi && fromPlayer) {
                     searchViewModel.openQueueView(TracksListOrigin.MOBILE_PLAYER)
                     nav.updateMobilePlayerExpanded(false)
@@ -226,7 +238,7 @@ fun App() {
                 onOpenArtist = if (playerState.artistName.isNotBlank()) {
                     {
                         searchViewModel.openCurrentTrackArtist {
-                            nav.updateMobilePlayerExpanded(false)
+                            if (!isLandscapeMobile) nav.updateMobilePlayerExpanded(false)
                         }
                     }
                 } else null,
@@ -490,8 +502,12 @@ fun App() {
                                     dialog = AppDialog.MediaLibrary
                                 }
                                 isBackGoingToMobilePlayer -> {
-                                    searchViewModel.closeArtistTracks()
-                                    nav.updateMobilePlayerExpanded(true)
+                                    if (isLandscapeMobile) {
+                                        searchViewModel.openQueueView()
+                                    } else {
+                                        searchViewModel.closeArtistTracks()
+                                        nav.updateMobilePlayerExpanded(true)
+                                    }
                                 }
                                 else -> searchViewModel.closeArtistTracks()
                             }
@@ -560,7 +576,7 @@ fun App() {
             Scaffold(
                 snackbarHost = { SnackbarHost(messageHost) },
                 bottomBar = {
-                    if (!isCarUi) Column(
+                    if (!usesCompactFullPlayer) Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = if (isMobileUi) 10.dp else 16.dp)
@@ -599,12 +615,20 @@ fun App() {
                         modifier = Modifier.padding(paddingValues),
                         content = mainContent,
                     )
+                } else if (isLandscapeMobile) {
+                    SplitPlayerLayout(
+                        state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                        actions = playerActions,
+                        modifier = Modifier.padding(paddingValues),
+                        mobileControls = true,
+                        content = mainContent,
+                    )
                 } else {
                     Box(Modifier.fillMaxSize().padding(paddingValues)) { mainContent() }
                 }
             }
 
-            if (isMobileUi && !isCarUi) {
+            if (isMobileUi && !usesCompactFullPlayer) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
                     val openingProgress = remember {
@@ -788,6 +812,7 @@ fun App() {
                 )
             }
             }
+        }
         }
     }
 }

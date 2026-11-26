@@ -123,7 +123,7 @@ internal fun PlaylistTrackRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        AiArtistBadge(track.artists)
+                        AiTrackBadge(track.id, track.artists)
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
