@@ -499,6 +499,7 @@ fun App() {
                         BackHandler(enabled = showTracksScreen, onBack = goBackFromTracks)
 
                         ArtistTracksList(
+                            contentPadding = PaddingValues(bottom = if (isCarUi) 0.dp else 16.dp),
                             onQueuePlaylistTrack = { track -> searchViewModel.addToUpNext(track) },
                             onManagePlaylistTrackRemoval = { track -> dialog = AppDialog.PlayerTrackRemoval(track) },
                             isPlaybackQueue = !searchViewModel.isPreviewingTrackList,

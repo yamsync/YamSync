@@ -118,9 +118,10 @@ private fun CarBrowserPanel(
         OutlinedButton(
             onClick = onCollapse,
             modifier = Modifier.fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
-                .heightIn(min = 60.dp)
+                .padding(horizontal = 16.dp)
+                .height(48.dp)
                 .pointerHoverIcon(PointerIcon.Hand),
+            contentPadding = PaddingValues(horizontal = 16.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),

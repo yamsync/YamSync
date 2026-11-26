@@ -77,6 +77,7 @@ fun ArtistTracksList(
     modifier: Modifier = Modifier,
     onQueuePlaylistTrack: ((FullTrackInfo) -> Unit)? = null,
     onManagePlaylistTrackRemoval: ((FullTrackInfo) -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(bottom = 16.dp),
 ) {
     val listState = rememberLazyListState()
     val visibleTrackIndices by listState.rememberVisiblePlaylistTrackIndices()
@@ -235,7 +236,7 @@ fun ArtistTracksList(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp),
+                    contentPadding = contentPadding,
                 ) {
                     itemsIndexed(tracks, key = { index, track -> "${track.id}_$index" }) { index, track ->
                         val artistsString = track.artists.joinToString { it.name }
