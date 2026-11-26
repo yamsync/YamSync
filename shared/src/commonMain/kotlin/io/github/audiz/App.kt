@@ -138,6 +138,7 @@ fun App() {
             // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
             val showTracksScreen = searchViewModel.isTracksListVisible &&
                 (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
+            val showPlaylistScreen = showTracksScreen && searchViewModel.isDisplayingPlaylist
             val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
             val nav = rememberAppNavigationState()
             val homeScrollState = rememberScrollState()
@@ -360,7 +361,11 @@ fun App() {
                     }
                 }
             ) { paddingValues ->
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).padding(top = 16.dp)) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(paddingValues)
+                        .padding(horizontal = if (showPlaylistScreen) 8.dp else 16.dp)
+                        .padding(top = 16.dp)
+                ) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         if (!showTracksScreen) {
                             BackHandler(enabled = isSearchVisible || nav.showCollections) {
@@ -611,6 +616,9 @@ fun App() {
                         BackHandler(enabled = showTracksScreen, onBack = goBackFromTracks)
 
                         ArtistTracksList(
+                            compactPlaylist = showPlaylistScreen,
+                            onQueuePlaylistTrack = { track -> searchViewModel.addToUpNext(track) },
+                            onManagePlaylistTrackRemoval = { track -> dialog = AppDialog.PlayerTrackRemoval(track) },
                             isPlaybackQueue = !searchViewModel.isPreviewingTrackList,
                             chartPositions = searchViewModel.chartTrackPositions,
                             scrollToTrackRequest = searchViewModel.queueScrollRequest,
@@ -623,9 +631,9 @@ fun App() {
                                 nav.showCollections = false
                                 searchViewModel.clearSearch()
                                 searchViewModel.closeArtistTracks()
-                            },
+                            }.takeUnless { showPlaylistScreen },
                             onBackClick = goBackFromTracks.takeIf {
-                                isBackGoingToFolderBrowser || isBackGoingToMediaLibrary || isBackGoingToMobilePlayer ||
+                                showPlaylistScreen || isBackGoingToFolderBrowser || isBackGoingToMediaLibrary || isBackGoingToMobilePlayer ||
                                     searchViewModel.tracksListOrigin == TracksListOrigin.SEARCH ||
                                     searchViewModel.tracksListOrigin == TracksListOrigin.COLLECTIONS
                             },

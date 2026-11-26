@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -46,6 +45,16 @@ private fun LazyListState.OnBottomReached(buffer: Int = 2, onLoadMore: () -> Uni
     }
 }
 
+private fun playlistTrackCountLabel(count: Int): String {
+    val noun = when {
+        count % 100 in 11..14 -> "треков"
+        count % 10 == 1 -> "трек"
+        count % 10 in 2..4 -> "трека"
+        else -> "треков"
+    }
+    return "$count $noun"
+}
+
 @Composable
 fun ArtistTracksList(
     tracks: List<FullTrackInfo>,
@@ -83,9 +92,15 @@ fun ArtistTracksList(
     highlightedTrackId: String? = null,
     isPlaybackQueue: Boolean = true,
     chartPositions: Map<String, ChartPositionInfo> = emptyMap(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compactPlaylist: Boolean = false,
+    onQueuePlaylistTrack: ((FullTrackInfo) -> Unit)? = null,
+    onManagePlaylistTrackRemoval: ((FullTrackInfo) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
+    val visibleTrackIndices by remember(listState) {
+        derivedStateOf { listState.layoutInfo.visibleItemsInfo.mapTo(hashSetOf()) { it.index } }
+    }
     listState.OnBottomReached { if (canLoadMore) onLoadMore() }
 
     val scrollTargetIndex = scrollToTrackRequest?.let { request ->
@@ -120,7 +135,10 @@ fun ArtistTracksList(
 
     Column(modifier = modifier) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(
+                horizontal = if (compactPlaylist) 8.dp else 0.dp,
+                vertical = 8.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onHomeClick != null) {
@@ -145,11 +163,14 @@ fun ArtistTracksList(
                     TopBarIconButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Назад",
+                        size = if (compactPlaylist) 40.dp else 36.dp,
                         outlined = true,
                         onClick = onBackClick
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Назад", style = MaterialTheme.typography.titleSmall)
+                    if (!compactPlaylist) {
+                        Text("Назад", style = MaterialTheme.typography.titleSmall)
+                    }
                 }
                 Spacer(modifier = Modifier.width(16.dp))
             }
@@ -157,7 +178,7 @@ fun ArtistTracksList(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = if (compactPlaylist) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -167,6 +188,7 @@ fun ArtistTracksList(
                         isLoading && tracks.isEmpty() -> "Загрузка треков..."
                         isLoading && tracks.isNotEmpty() -> "Показано: ${tracks.size} (обновление...)"
                         tracks.isEmpty() -> "Нет треков"
+                        compactPlaylist && total == tracks.size -> playlistTrackCountLabel(total)
                         total > tracks.size -> "Показано: ${tracks.size} из $total"
                         else -> "Показано: ${tracks.size}"
                     },
@@ -260,22 +282,41 @@ fun ArtistTracksList(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(if (compactPlaylist) 0.dp else 8.dp)
                 ) {
                     itemsIndexed(tracks, key = { index, track -> "${track.id}_$index" }) { index, track ->
                         val artistsString = track.artists.joinToString { it.name }
-                        val isCurrentTrackDownloading = isTrackDownloading && downloadingTrackId == track.id
-                        val isCurrentTrackActive = (
-                            track.id == playingTrackId ||
-                            track.realId == playingTrackId ||
-                            (playingTrackId != null && track.id.removePrefix("local:") == playingTrackId.removePrefix("local:")) ||
-                            (playingTrackId != null && track.realId?.removePrefix("local:") == playingTrackId.removePrefix("local:"))
-                        ) && (isPlaying || isPaused)
+                        val isCurrentTrackActive = (isPlaying || isPaused) &&
+                            PlaybackQueueManager.isSameTrack(track, playingTrackId)
                         val isCurrentTrackPlaying = isCurrentTrackActive && isPlaying && !isPaused && isPlaybackQueue
+                        val isHighlighted = highlightedTrackId != null && PlaybackQueueManager.isSameTrack(track, highlightedTrackId)
+                        if (compactPlaylist) {
+                            val loadThumbnail by remember(index, listState) {
+                                derivedStateOf { index in visibleTrackIndices }
+                            }
+                            PlaylistTrackRow(
+                                track = track,
+                                artists = artistsString,
+                                loadThumbnail = loadThumbnail,
+                                isFirst = index == 0,
+                                isLast = index == tracks.lastIndex,
+                                isActive = isCurrentTrackActive || isHighlighted,
+                                isPlaying = isCurrentTrackPlaying,
+                                onActivate = {
+                                    if (isCurrentTrackActive && isPlaybackQueue) onTogglePlayPause()
+                                    else onPlayTrack(track.id, track.title, artistsString)
+                                },
+                                onAddToPlaylist = onAddToPlaylist?.let { add -> { add(track) } },
+                                onQueue = onQueuePlaylistTrack?.let { enqueue -> { enqueue(track) } },
+                                onRemove = onManagePlaylistTrackRemoval?.let { remove -> { remove(track) } },
+                            )
+                            return@itemsIndexed
+                        }
+
+                        val isCurrentTrackDownloading = isTrackDownloading && downloadingTrackId == track.id
                         val isDownloaded = track.isLocal || isTrackDownloaded(artistsString, track.title)
                         val isInPlaylist = isTrackInPlaylist?.invoke(track) ?: false
 
-                        val isHighlighted = highlightedTrackId != null && PlaybackQueueManager.isSameTrack(track, highlightedTrackId)
                         val chartPos = chartPositions[track.id] ?: chartPositions[track.id.substringBefore(":")]
 
                         TrackItemCard(

@@ -15,8 +15,12 @@ import io.github.audiz.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import io.github.audiz.util.AppLogger
 
@@ -29,8 +33,10 @@ import io.github.audiz.util.AppLogger
  */
 object CoverImageLoader {
     private const val MEMORY_CACHE_LIMIT = 64
+    internal const val TRACK_THUMBNAIL_SIZE = 120
 
     private val cacheLock = Any()
+    private val thumbnailSlots = Semaphore(3)
     private val memoryCache = LinkedHashMap<String, ImageBitmap>()
     private val inFlight = HashMap<String, Deferred<ImageBitmap?>>()
     private val requestedSizes = LinkedHashSet<Int>()
@@ -79,11 +85,22 @@ object CoverImageLoader {
         }
     }
 
-    suspend fun loadCover(coverUri: String?, size: Int = 400): ImageBitmap? {
+    suspend fun loadCover(coverUri: String?, size: Int = 400): ImageBitmap? =
+        loadCover(coverUri, size, includeInPrefetch = true)
+
+    internal suspend fun loadTrackThumbnail(coverUri: String): ImageBitmap? =
+        thumbnailSlots.withPermit {
+            // A request already started in loaderScope keeps its slot until it finishes.
+            withContext(NonCancellable) {
+                loadCover(coverUri, TRACK_THUMBNAIL_SIZE, includeInPrefetch = false)
+            }
+        }
+
+    private suspend fun loadCover(coverUri: String?, size: Int, includeInPrefetch: Boolean): ImageBitmap? {
         val key = cacheKey(coverUri, size) ?: return null
         val trimmed = coverUri!!.trim()
         val request = synchronized(cacheLock) {
-            requestedSizes.add(size)
+            if (includeInPrefetch) requestedSizes.add(size)
             val cached = memoryCache.remove(key)
             if (cached != null) {
                 memoryCache[key] = cached

@@ -453,12 +453,21 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         val recommendationTrackId = sequenceOf(track.id, track.realId)
             .filterNotNull()
             .firstOrNull { it.substringBefore(':').toLongOrNull()?.let { id -> id > 0 } == true }
+        val displayedUserPlaylist = currentOpenUserPlaylist?.takeIf {
+            isTracksListVisible && trackListCoordinator.loadedTracks.any { item ->
+                PlaybackQueueManager.isSameTrack(item, track.id) ||
+                    PlaybackQueueManager.isSameTrack(item, track.realId)
+            }
+        }
+        val yandexPlaylists = recommendationTrackId?.let(playlistManager::yandexPlaylistsContaining).orEmpty()
         return PlayerTrackRemoval(
             track = track,
             filePath = filePath,
             localTrackPaths = localTrackPaths,
             localPlaylistIds = playlistManager.localPlaylistsContaining(localTrackPaths),
-            yandexPlaylists = recommendationTrackId?.let(playlistManager::yandexPlaylistsContaining).orEmpty(),
+            yandexPlaylists = if (recommendationTrackId != null && displayedUserPlaylist != null) {
+                (yandexPlaylists + displayedUserPlaylist).distinctBy { it.uid to it.kind }
+            } else yandexPlaylists,
             recommendationTrackId = recommendationTrackId,
             isHiddenFromRecommendations = playlistManager.isTrackDisliked(recommendationTrackId)
         )
@@ -832,6 +841,15 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     val isPreviewingTrackList: Boolean
         get() = trackListNavigation.isPreview
+
+    internal val isDisplayingPlaylist: Boolean
+        get() = when ((trackListNavigation.previewSession ?: playbackSessionManager.currentSession)?.type) {
+            LastPlaybackType.LOCAL_PLAYLIST,
+            LastPlaybackType.YANDEX_USER_PLAYLIST,
+            LastPlaybackType.YANDEX_UUID,
+            LastPlaybackType.YANDEX_LIKES -> true
+            else -> false
+        }
 
     private fun browseTrackList(session: LastPlaybackSession, load: (TrackListCoordinator) -> Unit) {
         queueScrollRequest = null
