@@ -15,13 +15,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.audiz.models.ChartPositionInfo
 import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.models.isLocalTrackId
 
@@ -34,6 +38,7 @@ internal fun PlaylistTrackRow(
     isLast: Boolean,
     isActive: Boolean,
     isPlaying: Boolean,
+    chartPosition: ChartPositionInfo?,
     onActivate: () -> Unit,
     onAddToPlaylist: (() -> Unit)?,
     onQueue: (() -> Unit)?,
@@ -70,14 +75,23 @@ internal fun PlaylistTrackRow(
             PlaylistTrackThumbnail(track, loadThumbnail)
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isActive) colors.primary else colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (chartPosition != null) {
+                        ChartPositionBadge(chartPosition, isPlaying = false)
+                    }
+                    Text(
+                        text = title,
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isActive) colors.primary else colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -122,27 +136,34 @@ internal fun PlaylistTrackRow(
 
 @Composable
 private fun PlaylistTrackThumbnail(track: FullTrackInfo, loadThumbnail: Boolean) {
+    val displaySize = 52.dp
+    val thumbnailSize = if (with(LocalDensity.current) { displaySize.roundToPx() } <= 120) 120 else 200
     val coverUri = track.coverUri?.takeIf { it.isNotBlank() }
         ?: track.realId?.takeIf(::isLocalTrackId)
         ?: track.id.takeIf(::isLocalTrackId)
-    var bitmap by remember(coverUri) {
-        mutableStateOf(CoverImageLoader.peek(coverUri, CoverImageLoader.TRACK_THUMBNAIL_SIZE))
+    var bitmap by remember(coverUri, thumbnailSize) {
+        mutableStateOf(CoverImageLoader.peek(coverUri, thumbnailSize))
     }
-    LaunchedEffect(coverUri, loadThumbnail) {
+    LaunchedEffect(coverUri, thumbnailSize, loadThumbnail) {
         if (loadThumbnail && bitmap == null && coverUri != null) {
-            bitmap = CoverImageLoader.loadTrackThumbnail(coverUri)
+            bitmap = CoverImageLoader.loadTrackThumbnail(coverUri, thumbnailSize)
         }
     }
     Box(
         modifier = Modifier
-            .size(52.dp)
+            .size(displaySize)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
     ) {
         val artwork = bitmap
         if (artwork != null) {
-            Image(artwork, contentDescription = null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Image(
+                painter = remember(artwork) { BitmapPainter(artwork, filterQuality = FilterQuality.Medium) },
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
         } else {
             ContentTypeIcon(ContentType.ALBUM, modifier = Modifier.size(22.dp))
         }

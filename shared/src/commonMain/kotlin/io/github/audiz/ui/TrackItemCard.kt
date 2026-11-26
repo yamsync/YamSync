@@ -237,7 +237,7 @@ fun TrackItemCard(
 }
 
 @Composable
-private fun ChartPositionBadge(chart: ChartPositionInfo, isPlaying: Boolean) {
+internal fun ChartPositionBadge(chart: ChartPositionInfo, isPlaying: Boolean) {
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     Row(
         verticalAlignment = Alignment.CenterVertically,

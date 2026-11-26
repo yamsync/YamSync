@@ -65,6 +65,9 @@ class TrackListCoordinator(
 
     var isDownloadedTracksScreen by mutableStateOf(false)
 
+    internal var usesCompactRows by mutableStateOf(false)
+        private set
+
     var isBrowsingPreview = false
     var viewedUserPlaylist by mutableStateOf<PlaylistInfo?>(null)
         private set
@@ -185,11 +188,13 @@ class TrackListCoordinator(
         origin: TracksListOrigin? = null,
         cacheKey: String? = null,
         updatePlaylistContext: Boolean = true,
+        compactRows: Boolean = true,
         initialChartPositions: Map<String, ChartPositionInfo> = emptyMap(),
         fetchIdsAndTracksBlock: (suspend () -> Pair<List<String>, List<FullTrackInfo>>)? = null,
         fetchIdsBlock: (suspend () -> List<String>)? = null
     ) {
         paginationJob?.cancel()
+        usesCompactRows = compactRows
         isDownloadedTracksScreen = false
         onSetTracksListVisible(true)
         tracksListOrigin = origin ?: if (getSearchResult() != null) TracksListOrigin.SEARCH else TracksListOrigin.HOME
@@ -368,6 +373,7 @@ class TrackListCoordinator(
 
     fun loadDownloadedTracksPlaylist(restoreTrackId: String? = null, previewOnly: Boolean = false) {
         if (isCoordinatorLoading) return
+        usesCompactRows = true
         currentScreenTitle = "Загруженная музыка"
         isDownloadedTracksScreen = true
         onSetTracksListVisible(true)
@@ -441,7 +447,8 @@ class TrackListCoordinator(
             title = title,
             cacheKey = cacheKey,
             restoreTrackId = restoreTrackId,
-            updatePlaylistContext = recordPlaybackSession
+            updatePlaylistContext = recordPlaybackSession,
+            compactRows = false,
         ) {
             withContext(DispatcherIO) {
                 repository.getTrackIds(artistId).result
@@ -531,6 +538,7 @@ class TrackListCoordinator(
             title = title,
             cacheKey = cacheKey,
             restoreTrackId = restoreTrackId,
+            compactRows = false,
             origin = origin ?: if (getSearchResult() != null) TracksListOrigin.SEARCH else TracksListOrigin.HOME,
             fetchIdsAndTracksBlock = {
                 withContext(DispatcherIO) {
@@ -717,6 +725,7 @@ class TrackListCoordinator(
             )
         }
         currentScreenTitle = playlist.title
+        usesCompactRows = true
         isDownloadedTracksScreen = true
         onSetTracksListVisible(true)
         tracksListOrigin = TracksListOrigin.HOME
@@ -798,6 +807,7 @@ class TrackListCoordinator(
             )
         )
         currentScreenTitle = source.name
+        usesCompactRows = source.type != LocalSourceType.SINGLE_FILE
         isDownloadedTracksScreen = true
         onSetTracksListVisible(true)
         tracksListOrigin = TracksListOrigin.HOME
@@ -868,6 +878,7 @@ class TrackListCoordinator(
         activeQueueFolderPath = folderPath
         activeQueueFolderName = folderName
         currentScreenTitle = folderName
+        usesCompactRows = true
         isDownloadedTracksScreen = true
         onSetTracksListVisible(true)
         playlistManager.currentOpenUserPlaylist = null
@@ -940,6 +951,7 @@ class TrackListCoordinator(
         activeQueueFolderPath = folderPath
         activeQueueFolderName = folderName
         currentScreenTitle = folderName
+        usesCompactRows = true
         isDownloadedTracksScreen = true
         onSetTracksListVisible(true)
         if (!previewOnly) playlistManager.currentOpenUserPlaylist = null
@@ -1018,6 +1030,7 @@ class TrackListCoordinator(
             )
         }
         currentScreenTitle = title
+        usesCompactRows = !folderPath.isNullOrBlank() || source?.type == LocalSourceType.PLAYLIST_FILE
         activeBrowsedFolderSource = source
         activeBrowsedFolderPath = folderPath
         tracksListOrigin = if (source != null) TracksListOrigin.FOLDER_BROWSER else TracksListOrigin.HOME
@@ -1202,6 +1215,7 @@ class TrackListCoordinator(
         waveTitle: String? = null
     ) {
         if (isWaveMode && waveTracks.isNotEmpty()) {
+            usesCompactRows = false
             loadedTracks.clear()
             loadedTracks.addAll(waveTracks)
             chartTrackPositions = emptyMap()

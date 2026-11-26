@@ -842,14 +842,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val isPreviewingTrackList: Boolean
         get() = trackListNavigation.isPreview
 
-    internal val isDisplayingPlaylist: Boolean
-        get() = when ((trackListNavigation.previewSession ?: playbackSessionManager.currentSession)?.type) {
-            LastPlaybackType.LOCAL_PLAYLIST,
-            LastPlaybackType.YANDEX_USER_PLAYLIST,
-            LastPlaybackType.YANDEX_UUID,
-            LastPlaybackType.YANDEX_LIKES -> true
-            else -> false
-        }
+    internal val usesCompactTrackRows: Boolean
+        get() = trackListCoordinator.usesCompactRows
 
     private fun browseTrackList(session: LastPlaybackSession, load: (TrackListCoordinator) -> Unit) {
         queueScrollRequest = null

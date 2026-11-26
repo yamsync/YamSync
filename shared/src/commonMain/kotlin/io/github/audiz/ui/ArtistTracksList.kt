@@ -290,6 +290,7 @@ fun ArtistTracksList(
                             PlaybackQueueManager.isSameTrack(track, playingTrackId)
                         val isCurrentTrackPlaying = isCurrentTrackActive && isPlaying && !isPaused && isPlaybackQueue
                         val isHighlighted = highlightedTrackId != null && PlaybackQueueManager.isSameTrack(track, highlightedTrackId)
+                        val chartPos = chartPositions[track.id] ?: chartPositions[track.id.substringBefore(":")]
                         if (compactPlaylist) {
                             val loadThumbnail by remember(index, listState) {
                                 derivedStateOf { index in visibleTrackIndices }
@@ -302,6 +303,7 @@ fun ArtistTracksList(
                                 isLast = index == tracks.lastIndex,
                                 isActive = isCurrentTrackActive || isHighlighted,
                                 isPlaying = isCurrentTrackPlaying,
+                                chartPosition = chartPos,
                                 onActivate = {
                                     if (isCurrentTrackActive && isPlaybackQueue) onTogglePlayPause()
                                     else onPlayTrack(track.id, track.title, artistsString)
@@ -316,8 +318,6 @@ fun ArtistTracksList(
                         val isCurrentTrackDownloading = isTrackDownloading && downloadingTrackId == track.id
                         val isDownloaded = track.isLocal || isTrackDownloaded(artistsString, track.title)
                         val isInPlaylist = isTrackInPlaylist?.invoke(track) ?: false
-
-                        val chartPos = chartPositions[track.id] ?: chartPositions[track.id.substringBefore(":")]
 
                         TrackItemCard(
                             track = track,

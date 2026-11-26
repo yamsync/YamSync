@@ -160,7 +160,27 @@ class LocalTrackListPreviewTest {
                 fixture.coordinator.loadDownloadedTracksPlaylist(fixture.file.absolutePath, previewOnly = true)
             }
             fixture.awaitLoaded()
+            assertTrue(fixture.coordinator.usesCompactRows)
             assertEquals("playing", fixture.playback.trackId)
+            assertEquals(LastPlaybackType.WAVE, fixture.sessionManager.currentSession?.type)
+        } finally { fixture.close() }
+    }
+
+    @Test
+    fun importedPlaylistUsesCompactRowsWhileAnotherSessionIsPlaying() = runBlocking {
+        val fixture = Fixture()
+        try {
+            val m3u = File(fixture.directory, "preview.m3u").apply {
+                writeText("#EXTM3U\n${fixture.file.name}\n")
+            }
+            val source = CustomMediaSource(
+                id = "playlist", type = LocalSourceType.PLAYLIST_FILE, name = "Imported", path = m3u.absolutePath
+            )
+            withContext(Dispatchers.Main) {
+                fixture.coordinator.openCustomSource(source, previewOnly = true)
+            }
+            fixture.awaitLoaded()
+            assertTrue(fixture.coordinator.usesCompactRows)
             assertEquals(LastPlaybackType.WAVE, fixture.sessionManager.currentSession?.type)
         } finally { fixture.close() }
     }

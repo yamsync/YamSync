@@ -138,7 +138,7 @@ fun App() {
             // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
             val showTracksScreen = searchViewModel.isTracksListVisible &&
                 (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
-            val showPlaylistScreen = showTracksScreen && searchViewModel.isDisplayingPlaylist
+            val showPlaylistScreen = showTracksScreen && searchViewModel.usesCompactTrackRows
             val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
             val nav = rememberAppNavigationState()
             val homeScrollState = rememberScrollState()

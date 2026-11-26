@@ -33,7 +33,6 @@ import io.github.audiz.util.AppLogger
  */
 object CoverImageLoader {
     private const val MEMORY_CACHE_LIMIT = 64
-    internal const val TRACK_THUMBNAIL_SIZE = 120
 
     private val cacheLock = Any()
     private val thumbnailSlots = Semaphore(3)
@@ -88,11 +87,11 @@ object CoverImageLoader {
     suspend fun loadCover(coverUri: String?, size: Int = 400): ImageBitmap? =
         loadCover(coverUri, size, includeInPrefetch = true)
 
-    internal suspend fun loadTrackThumbnail(coverUri: String): ImageBitmap? =
+    internal suspend fun loadTrackThumbnail(coverUri: String, size: Int): ImageBitmap? =
         thumbnailSlots.withPermit {
             // A request already started in loaderScope keeps its slot until it finishes.
             withContext(NonCancellable) {
-                loadCover(coverUri, TRACK_THUMBNAIL_SIZE, includeInPrefetch = false)
+                loadCover(coverUri, size, includeInPrefetch = false)
             }
         }
 
