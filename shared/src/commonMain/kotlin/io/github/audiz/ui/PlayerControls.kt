@@ -89,13 +89,11 @@ internal fun PlayerShuffleButton(
 @Composable
 internal fun PlayingPlaylistButton(
     onOpen: () -> Unit,
-    modifier: Modifier = Modifier,
     size: Dp = 44.dp,
 ) {
     GhostIconButton(
         icon = Icons.AutoMirrored.Filled.PlaylistPlay,
         contentDescription = "Текущий плейлист",
-        modifier = modifier,
         size = size,
         iconSize = 22.dp,
         onClick = onOpen,

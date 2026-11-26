@@ -296,10 +296,6 @@ fun MobileMiniPlayerBar(
                     }
                 }
 
-                actions.onOpenPlayingPlaylist?.let { openPlaylist ->
-                    PlayingPlaylistButton(openPlaylist, swipeGuard.controlModifier)
-                }
-
                 PlayerTransportControls(
                     state, actions, skipSize = 42.dp, playSize = 48.dp, spacing = 4.dp,
                     controlModifier = swipeGuard.controlModifier,
