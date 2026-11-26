@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -20,10 +21,13 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import io.github.audiz.models.ChartPositionInfo
 import io.github.audiz.models.FullTrackInfo
@@ -39,6 +43,7 @@ internal fun PlaylistTrackRow(
     isActive: Boolean,
     isPlaying: Boolean,
     chartPosition: ChartPositionInfo?,
+    narrow: Boolean,
     onActivate: () -> Unit,
     onAddToPlaylist: (() -> Unit)?,
     onQueue: (() -> Unit)?,
@@ -72,58 +77,101 @@ internal fun PlaylistTrackRow(
                 .heightIn(min = 54.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PlaylistTrackThumbnail(track, loadThumbnail)
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (chartPosition != null) {
-                        ChartPositionBadge(chartPosition, isPlaying = false)
+            PlaylistTrackThumbnail(track, loadThumbnail, displaySize = if (narrow) 44.dp else 52.dp)
+            Spacer(Modifier.width(if (narrow) 8.dp else 10.dp))
+            Layout(
+                modifier = Modifier.weight(1f),
+                content = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (chartPosition != null) {
+                            ChartPositionBadge(chartPosition, isPlaying = false)
+                        }
+                        Text(
+                            text = title,
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isActive) colors.primary else colors.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    Text(
-                        text = title,
-                        modifier = Modifier.weight(1f, fill = false),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isActive) colors.primary else colors.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = artists.ifBlank { "—" },
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        AiArtistBadge(track.artists)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (narrow) {
+                            Icon(
+                                Icons.Filled.Album,
+                                contentDescription = "Альбом",
+                                tint = colors.onSurfaceVariant,
+                                modifier = Modifier.size(12.dp),
+                            )
+                        }
+                        val albumName = album.ifBlank { "—" }
+                        Text(
+                            text = if (narrow) albumName else "Альбом: $albumName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (track.durationMs > 0L) {
+                            Text(
+                                text = formatTime(track.durationMs),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        PlaylistTrackMenu(onAddToPlaylist, onQueue, onRemove)
+                    }
+                },
+            ) { measurables, constraints ->
+                val (titleLine, artistLine, albumLine, actions) = measurables
+                val width = constraints.maxWidth
+                val rowConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+                val controls = actions.measure(rowConstraints)
+                val textWidth = (width - controls.width - 8.dp.roundToPx()).coerceAtLeast(0)
+                val wideTextConstraints = rowConstraints.copy(maxWidth = width - 4.dp.roundToPx().coerceAtMost(width))
+                val artistConstraints = rowConstraints.copy(maxWidth = textWidth)
+                val titlePlaceable = titleLine.measure(if (narrow) wideTextConstraints else artistConstraints)
+                val artistPlaceable = artistLine.measure(artistConstraints)
+                val albumPlaceable = albumLine.measure(if (narrow) wideTextConstraints else artistConstraints)
+                val metadataHeight = titlePlaceable.height + artistPlaceable.height + albumPlaceable.height
+                val height = constraints.constrainHeight(maxOf(metadataHeight, controls.height))
+                val textTop = (height - metadataHeight) / 2
+                val artistTop = textTop + titlePlaceable.height
+                val controlsCenter = if (narrow) artistTop + artistPlaceable.height / 2 else height / 2
+                val controlsTop = (controlsCenter - controls.height / 2).coerceIn(0, (height - controls.height).coerceAtLeast(0))
+
+                layout(width, height) {
+                    titlePlaceable.placeRelative(0, textTop)
+                    artistPlaceable.placeRelative(0, artistTop)
+                    albumPlaceable.placeRelative(0, artistTop + artistPlaceable.height)
+                    controls.placeRelative(width - controls.width, controlsTop)
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = artists.ifBlank { "—" },
-                        modifier = Modifier.weight(1f, fill = false),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    AiArtistBadge(track.artists)
-                }
-                Text(
-                    text = if (album.isBlank()) "Альбом: —" else "Альбом: $album",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
-            if (track.durationMs > 0L) {
-                Text(
-                    text = formatTime(track.durationMs),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            PlaylistTrackMenu(onAddToPlaylist, onQueue, onRemove)
         }
         if (!isLast) {
             HorizontalDivider(
@@ -135,8 +183,7 @@ internal fun PlaylistTrackRow(
 }
 
 @Composable
-private fun PlaylistTrackThumbnail(track: FullTrackInfo, loadThumbnail: Boolean) {
-    val displaySize = 52.dp
+private fun PlaylistTrackThumbnail(track: FullTrackInfo, loadThumbnail: Boolean, displaySize: Dp) {
     val thumbnailSize = if (with(LocalDensity.current) { displaySize.roundToPx() } <= 120) 120 else 200
     val coverUri = track.coverUri?.takeIf { it.isNotBlank() }
         ?: track.realId?.takeIf(::isLocalTrackId)

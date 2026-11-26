@@ -243,7 +243,8 @@ fun ArtistTracksList(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val narrowRows = maxWidth < 360.dp
             if (tracks.isEmpty()) {
                 if (isLoading) {
                     Box(
@@ -304,6 +305,7 @@ fun ArtistTracksList(
                                 isActive = isCurrentTrackActive || isHighlighted,
                                 isPlaying = isCurrentTrackPlaying,
                                 chartPosition = chartPos,
+                                narrow = narrowRows,
                                 onActivate = {
                                     if (isCurrentTrackActive && isPlaybackQueue) onTogglePlayPause()
                                     else onPlayTrack(track.id, track.title, artistsString)
