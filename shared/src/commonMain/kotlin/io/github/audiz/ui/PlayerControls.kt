@@ -50,7 +50,7 @@ internal fun PlayerTransportControls(
             contentDescription = if (state.isActivelyPlaying) "Пауза" else "Воспроизвести",
             modifier = controlModifier,
             size = playSize,
-            isLoading = state.isPlayLoading,
+            isLoading = state.isPlayLoading && !state.isActivelyPlaying,
             onClick = actions.onPlayPause,
         )
         OutlineIconButton(

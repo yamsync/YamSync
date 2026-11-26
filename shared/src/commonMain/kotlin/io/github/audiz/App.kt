@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -64,6 +66,7 @@ import io.github.audiz.ui.AppAccentColor
 import io.github.audiz.ui.buildAppColorScheme
 import io.github.audiz.ui.EqualizerDialog
 import io.github.audiz.ui.MobileFullPlayerSheet
+import io.github.audiz.ui.clipAboveMiniPlayer
 import io.github.audiz.ui.PlayerTrackRemovalDialog
 import io.github.audiz.ui.WaveThemesDialog
 import io.github.audiz.ui.BackHandler
@@ -139,6 +142,8 @@ fun App() {
                 (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
             val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
             val nav = rememberAppNavigationState()
+            var appTopInRoot by remember { mutableFloatStateOf(0f) }
+            var miniPlayerTopInRoot by remember { mutableStateOf<Float?>(null) }
             val homeScrollState = rememberScrollState()
             val collectionsGridState = rememberLazyGridState()
 
@@ -221,7 +226,7 @@ fun App() {
                 onOpenWaveThemes = { dialog = AppDialog.WaveThemes },
                 onMobilePlayerDrag = { top ->
                     nav.isDraggingMobilePlayerOpen = true
-                    nav.mobilePlayerDragTop = top
+                    nav.mobilePlayerDragTop = top?.minus(appTopInRoot)
                 },
                 onMobilePlayerDragEnd = { open ->
                     if (open) nav.updateMobilePlayerExpanded(true)
@@ -229,7 +234,7 @@ fun App() {
                 }
             )
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { appTopInRoot = it.positionInRoot().y }) {
             Scaffold(
                 snackbarHost = { SnackbarHost(messageHost) },
                 bottomBar = {
@@ -255,7 +260,10 @@ fun App() {
                         )
                         PlayerBar(
                             state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
-                            actions = playerActions
+                            actions = playerActions,
+                            modifier = if (isMobileUi) {
+                                Modifier.onGloballyPositioned { miniPlayerTopInRoot = it.positionInRoot().y }
+                            } else Modifier,
                         )
                     }
                 }
@@ -601,20 +609,26 @@ fun App() {
                         }
                     }
                     if (showFullPlayer) {
-                        MobileFullPlayerSheet(
-                            state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
-                            actions = playerActions,
-                            onDismiss = { nav.updateMobilePlayerExpanded(false) },
-                            modifier = Modifier.offset {
-                                val top = nav.mobilePlayerDragTop ?: if (nav.isDraggingMobilePlayerOpen) {
-                                    heightPx
-                                } else {
-                                    (1f - openingProgress.value) * heightPx
-                                }
-                                IntOffset(0, top.coerceIn(0f, heightPx).roundToInt())
-                            },
-                            backHandlerEnabled = nav.isMobilePlayerExpanded
-                        )
+                        val miniPlayerTop = miniPlayerTopInRoot?.minus(appTopInRoot)
+                        val overlayModifier = if (!nav.isMobilePlayerExpanded &&
+                            !nav.isDraggingMobilePlayerOpen && miniPlayerTop != null
+                        ) Modifier.clipAboveMiniPlayer(miniPlayerTop) else Modifier
+                        Box(Modifier.fillMaxSize().then(overlayModifier)) {
+                            MobileFullPlayerSheet(
+                                state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                                actions = playerActions,
+                                onDismiss = { nav.updateMobilePlayerExpanded(false) },
+                                modifier = Modifier.offset {
+                                    val top = nav.mobilePlayerDragTop ?: if (nav.isDraggingMobilePlayerOpen) {
+                                        heightPx
+                                    } else {
+                                        (1f - openingProgress.value) * heightPx
+                                    }
+                                    IntOffset(0, top.coerceIn(0f, heightPx).roundToInt())
+                                },
+                                backHandlerEnabled = nav.isMobilePlayerExpanded
+                            )
+                        }
                     }
                 }
             }

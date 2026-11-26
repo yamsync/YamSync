@@ -16,12 +16,12 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalPointerSlopOrCancellation
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.awaitVerticalPointerSlopOrCancellation
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import kotlin.math.exp
@@ -69,6 +70,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,7 +93,8 @@ fun MobileMiniPlayerBar(
 
     val currentActions by rememberUpdatedState(actions)
     var miniPlayerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val expandDragModifier = Modifier.pointerInput(Unit) {
+    val swipeGuard = remember { PlayerSwipeGuard() }
+    val expandDragModifier = Modifier.pointerInput(swipeGuard) {
         val openThreshold = 96.dp.toPx()
         var distance = 0f
         var dragging = false
@@ -104,16 +107,18 @@ fun MobileMiniPlayerBar(
         }
 
         try {
-            detectVerticalDragGestures(
+            detectPlayerDrag(
+                guard = swipeGuard,
+                orientation = Orientation.Vertical,
                 onDragStart = {
                     dragging = true
                     distance = 0f
                 },
-                onVerticalDrag = { change, delta ->
+                onDrag = { delta ->
                     distance = (distance - delta).coerceAtLeast(0f)
                     val top = miniPlayerCoordinates
                         ?.takeIf { it.isAttached && distance > 0f }
-                        ?.localToRoot(change.position)?.y
+                        ?.positionInRoot()?.y?.minus(distance)
                     currentActions.onMobilePlayerDrag(top)
                 },
                 onDragEnd = { finish(distance >= openThreshold) },
@@ -314,11 +319,18 @@ fun MobileMiniPlayerBar(
                     }
                 }
 
-                PlayerTransportControls(state, actions, skipSize = 42.dp, playSize = 48.dp, spacing = 4.dp)
+                PlayerTransportControls(
+                    state, actions, skipSize = 42.dp, playSize = 48.dp, spacing = 4.dp,
+                    controlModifier = swipeGuard.controlModifier,
+                )
             }
         }
     }
 }
+
+internal fun Modifier.clipAboveMiniPlayer(top: Float): Modifier = clip(GenericShape { size, _ ->
+    addRect(Rect(0f, 0f, size.width, top.coerceIn(0f, size.height)))
+})
 
 /**
  * ⏱ Неинтерактивная шкала прогресса для мини-плеера (только индикация).
