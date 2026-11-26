@@ -141,8 +141,7 @@ private fun CarPlayer(
     modifier: Modifier,
     isSplit: Boolean = false,
 ) {
-    val cover = rememberCoverBitmap(state.coverUri, 600)
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(modifier.clipToBounds()) {
         val short = maxHeight < 440.dp
         val sideBySide = (!isSplit && maxWidth >= 540.dp) || (short && maxWidth >= 300.dp)
         val inset = if (maxWidth >= 540.dp) 24.dp else 12.dp
@@ -191,11 +190,12 @@ private fun CarPlayer(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        FullPlayerCover(state, cover, Modifier.size(minOf(maxWidth, maxHeight)))
+                        AnimatedPlayerCover(state, Modifier.size(minOf(maxWidth, maxHeight)))
                     }
                     FullPlayerTrackInfo(
                         state = state,
                         modifier = Modifier.weight(1f),
+                        showArtistBadge = true,
                         titleSize = if (short) 20.sp else 32.sp,
                         artistSize = if (short) 14.sp else 20.sp,
                     )
@@ -205,9 +205,9 @@ private fun CarPlayer(
                     Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    FullPlayerCover(state, cover, Modifier.size(minOf(maxWidth, maxHeight)))
+                    AnimatedPlayerCover(state, Modifier.size(minOf(maxWidth, maxHeight)))
                 }
-                FullPlayerTrackInfo(state, Modifier.fillMaxWidth())
+                FullPlayerTrackInfo(state, Modifier.fillMaxWidth(), showArtistBadge = true)
             }
 
             FullPlayerTimeline(
@@ -224,7 +224,13 @@ private fun CarPlayer(
                 Spacer(Modifier.width(sideGap))
                 PlayerTransportControls(state, actions, skipSize, playSize, gap)
                 Spacer(Modifier.width(sideGap))
-                Spacer(Modifier.weight(1f))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    DesktopVolumeControl(
+                        volume = state.volume,
+                        onVolumeChange = actions.onVolumeChange,
+                        buttonSize = shuffleSize,
+                    )
+                }
             }
         }
     }
