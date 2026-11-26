@@ -499,7 +499,7 @@ fun App() {
                                             )
                                             IconButton(
                                                 onClick = { searchViewModel.errorMessage = null },
-                                                modifier = Modifier.size(24.dp).padding(start = 4.dp)
+                                                modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Filled.Close,

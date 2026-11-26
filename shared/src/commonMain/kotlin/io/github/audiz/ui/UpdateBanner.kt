@@ -75,7 +75,7 @@ fun UpdateBanner(
         }
         IconButton(
             onClick = onDismiss,
-            modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand)
+            modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)
         ) {
             Icon(
                 imageVector = Icons.Filled.Close,

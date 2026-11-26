@@ -206,7 +206,7 @@ internal fun WaveThemesDialog(viewModel: SearchViewModel, onDismiss: () -> Unit)
                                 Icon(Icons.Filled.Refresh, "Обновить подборки волны", modifier = Modifier.size(20.dp))
                             }
                         }
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand)) {
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)) {
                             Icon(Icons.Filled.Close, "Закрыть")
                         }
                     }

@@ -97,6 +97,7 @@ fun SettingsDialog(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val onClose by rememberUpdatedState(actions.onClose)
     var selectedSection by remember { mutableStateOf<SettingsSection?>(null) }
     val currentSection = selectedSection
     var selectedAddon by remember { mutableStateOf<SettingsAddon?>(null) }
@@ -153,6 +154,28 @@ fun SettingsDialog(
             val horizontalCardPadding = if (isCompact) 8.dp else 16.dp
             val horizontalContentPadding = if (isCompact) 10.dp else 16.dp
             val endContentPadding = if (isCompact) 8.dp else 12.dp
+            val headerDragModifier = Modifier.pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        if (dragAmount > 0 || dragOffsetY > 0) {
+                            dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                            change.consume()
+                        }
+                    },
+                    onDragEnd = {
+                        if (dragOffsetY > 100f) {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            onClose()
+                        }
+                        dragOffsetY = 0f
+                    },
+                    onDragCancel = {
+                        dragOffsetY = 0f
+                    }
+                )
+            }
+
             ElevatedCard(
                 modifier = Modifier
                     .fillMaxSize()
@@ -175,34 +198,11 @@ fun SettingsDialog(
                 )
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, dragAmount ->
-                                        if (dragAmount > 0 || dragOffsetY > 0) {
-                                            dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
-                                            change.consume()
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        if (dragOffsetY > 100f) {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            actions.onClose()
-                                        }
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        dragOffsetY = 0f
-                                    }
-                                )
-                            }
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(headerDragModifier)
                                 .padding(top = 8.dp, bottom = 2.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -240,6 +240,7 @@ fun SettingsDialog(
                                 }
                                 Text(
                                     text = currentAddon?.title ?: currentSection?.title ?: "Настройки",
+                                    modifier = Modifier.weight(1f).then(headerDragModifier),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,

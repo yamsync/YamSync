@@ -97,6 +97,7 @@ fun AddToPlaylistDialog(
     val localListState = rememberLazyListState()
     val yandexListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
     var dragOffsetY by remember { mutableStateOf(0f) }
     val animatedOffsetY = remember { Animatable(0f) }
 
@@ -110,6 +111,31 @@ fun AddToPlaylistDialog(
         ) {
             val isCompact = maxWidth < 380.dp
             val horizontalPadding = if (isCompact) 10.dp else 12.dp
+
+            val headerDragModifier = Modifier.pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        if (dragAmount > 0 || dragOffsetY > 0) {
+                            dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                            change.consume()
+                        }
+                    },
+                    onDragEnd = {
+                        if (dragOffsetY > 80f) {
+                            currentOnDismiss()
+                        } else {
+                            coroutineScope.launch {
+                                animatedOffsetY.snapTo(dragOffsetY)
+                                dragOffsetY = 0f
+                                animatedOffsetY.animateTo(0f, tween(150, easing = FastOutSlowInEasing))
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        dragOffsetY = 0f
+                    }
+                )
+            }
 
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -129,37 +155,11 @@ fun AddToPlaylistDialog(
                         .fillMaxSize()
                         .padding(horizontal = horizontalPadding, vertical = 8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, dragAmount ->
-                                        if (dragAmount > 0 || dragOffsetY > 0) {
-                                            dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
-                                            change.consume()
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        if (dragOffsetY > 80f) {
-                                            onDismiss()
-                                        } else {
-                                            coroutineScope.launch {
-                                                animatedOffsetY.snapTo(dragOffsetY)
-                                                dragOffsetY = 0f
-                                                animatedOffsetY.animateTo(0f, tween(150, easing = FastOutSlowInEasing))
-                                            }
-                                        }
-                                    },
-                                    onDragCancel = {
-                                        dragOffsetY = 0f
-                                    }
-                                )
-                            }
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(headerDragModifier)
                                 .padding(top = 2.dp, bottom = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -182,6 +182,8 @@ fun AddToPlaylistDialog(
                             Row(
                                 modifier = Modifier
                                     .weight(1f)
+                                    .heightIn(min = 40.dp)
+                                    .then(headerDragModifier)
                                     .padding(end = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -203,7 +205,7 @@ fun AddToPlaylistDialog(
                             IconButton(
                                 onClick = onDismiss,
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(40.dp)
                                     .pointerHoverIcon(PointerIcon.Hand)
                             ) {
                                 Icon(Icons.Filled.Close, contentDescription = "Закрыть")
@@ -214,6 +216,7 @@ fun AddToPlaylistDialog(
 
                         Text(
                             text = "${track.artists.joinToString { it.name }} — ${track.title}",
+                            modifier = Modifier.fillMaxWidth().then(headerDragModifier),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

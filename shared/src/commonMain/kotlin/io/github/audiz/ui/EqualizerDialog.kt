@@ -125,7 +125,7 @@ fun EqualizerDialog(
 
                         IconButton(
                             onClick = onDismissRequest,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)
                         ) {
                             Icon(Icons.Default.Close, contentDescription = "Закрыть", modifier = Modifier.size(20.dp))
                         }

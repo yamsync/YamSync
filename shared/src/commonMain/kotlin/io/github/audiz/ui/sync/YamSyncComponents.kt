@@ -210,7 +210,10 @@ internal fun YamSyncDialogHeader(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = { syncManager.errorMessage = null }, modifier = Modifier.size(28.dp)) {
+                    IconButton(
+                        onClick = { syncManager.errorMessage = null },
+                        modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Скрыть ошибку",

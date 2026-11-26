@@ -115,7 +115,7 @@ fun PlaylistsDialog(
                                 )
                             }
                         }
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)) {
                             Icon(Icons.Filled.Close, contentDescription = "Закрыть")
                         }
                     }
@@ -163,7 +163,7 @@ fun PlaylistsDialog(
                                     )
                                 }
                             }
-                            IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp).pointerHoverIcon(PointerIcon.Hand)) {
                                 Icon(Icons.Filled.Close, contentDescription = "Закрыть")
                             }
                         }
