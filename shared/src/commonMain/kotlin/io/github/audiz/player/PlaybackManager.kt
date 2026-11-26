@@ -47,7 +47,7 @@ class PlaybackManager(
     private val getSelectedQuality: () -> String,
     private val isRecordToDisk: () -> Boolean,
     private val onTrackSavedToDisk: (() -> Unit)? = null,
-    private val onTrackStarted: ((trackId: String, title: String, artist: String, coverUri: String?, isWave: Boolean) -> Unit)? = null,
+    private val onTrackStarted: ((trackId: String, title: String, artist: String, coverUri: String?, isWave: Boolean, source: TrackPlaySource) -> Unit)? = null,
     private val onError: (String) -> Unit = {},
     private val onTrackMetadataChanged: ((FullTrackInfo) -> Unit)? = null,
     private val onPlaybackConfirmed: ((String) -> Unit)? = null,
@@ -184,7 +184,7 @@ class PlaybackManager(
             override fun playWaveTrack(index: Int, source: TrackPlaySource, crossfadeMs: Long) {
                 onPlayWaveByIndex?.invoke(index, source)
             }
-            override fun playNextWaveTrack(crossfadeMs: Long) { onPlayNextWave?.invoke() }
+            override fun playNextWaveTrack(crossfadeMs: Long, source: TrackPlaySource) { onPlayNextWave?.invoke() }
             override fun playPrevWaveTrack() { onPlayPrevWave?.invoke() }
             override fun onWaveTrackFinished(crossfadeMs: Long) { onWaveTrackFinished?.invoke(crossfadeMs) }
             override fun loadInitialWave(autoPlay: Boolean, source: TrackPlaySource) { onInitialWave?.invoke(autoPlay, source) }
@@ -394,7 +394,7 @@ class PlaybackManager(
         isPlayLoading = play
     }
 
-    private fun setLoadingFor(source: TrackPlaySource) = setLoadingFlags(
+    internal fun setLoadingFor(source: TrackPlaySource) = setLoadingFlags(
         next = source == TrackPlaySource.NEXT,
         prev = source == TrackPlaySource.PREV,
         play = source == TrackPlaySource.PLAY,
@@ -671,7 +671,7 @@ class PlaybackManager(
                         isLiked = isTrackLiked?.invoke(targetTrackId) == true
                     )
                     systemMediaControls.updatePlaybackState(true, false, 0L)
-                    onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave)
+                    onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave, source)
                     preloader.clearAudio()
                     startProgressPolling()
                     planNextAndPreload()
@@ -730,7 +730,7 @@ class PlaybackManager(
                         isLiked = isTrackLiked?.invoke(targetTrackId) == true
                     )
                     systemMediaControls.updatePlaybackState(true, false, 0L)
-                    onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave)
+                    onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave, source)
                     startProgressPolling()
                     preloader.clearAudio()
                     planNextAndPreload()
@@ -785,7 +785,7 @@ class PlaybackManager(
                     isLiked = isTrackLiked?.invoke(targetTrackId) == true
                 )
                 systemMediaControls.updatePlaybackState(true, false, 0L)
-                onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave)
+                onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, coverUri, isWave, source)
                 startProgressPolling()
                 planNextAndPreload()
 
@@ -899,7 +899,7 @@ class PlaybackManager(
                         isLiked = isTrackLiked?.invoke(targetTrackId) == true
                     )
                     systemMediaControls.updatePlaybackState(true, false, 0L)
-                    onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, resolvedCoverUri, isWave)
+                    onTrackStarted?.invoke(targetTrackId, cleanTitle, cleanArtist, resolvedCoverUri, isWave, source)
                     startProgressPolling()
                     preloader.clearAudio()
                     planNextAndPreload()
@@ -1229,10 +1229,10 @@ class PlaybackManager(
         if (source == TrackPlaySource.NEXT) setLoadingFor(source)
         when (val target = navigator.resolveNext(currentId ?: trackId)) {
             is NavigationTarget.UpNext -> playUpNextTrack(target.track, source, crossfadeMs)
-            NavigationTarget.Wave -> waveBridge?.playNextWaveTrack(crossfadeMs)
+            NavigationTarget.Wave -> waveBridge?.playNextWaveTrack(crossfadeMs, source)
             is NavigationTarget.Track -> playNavigationTrack(target, source, crossfadeMs)
             is NavigationTarget.LoadMoreAfter -> loadMoreAndPlayNext(target.currentIndex, source, crossfadeMs)
-            NavigationTarget.WaveFallback -> waveBridge?.playNextWaveTrack()
+            NavigationTarget.WaveFallback -> waveBridge?.playNextWaveTrack(source = source)
             NavigationTarget.None -> isNextLoading = false
         }
     }

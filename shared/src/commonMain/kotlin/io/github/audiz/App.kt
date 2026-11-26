@@ -139,8 +139,10 @@ fun App() {
 
 
             // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
+            val isWaveQueue = searchViewModel.isShowingWaveQueue
+            val displayedTracks = searchViewModel.displayedTracks
             val showTracksScreen = searchViewModel.isTracksListVisible &&
-                (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
+                (searchViewModel.isPreviewingTrackList || isWaveQueue || displayedTracks.isNotEmpty() || searchViewModel.isLoading)
             val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
             val nav = rememberAppNavigationState()
             var appTopInRoot by remember { mutableFloatStateOf(0f) }
@@ -504,8 +506,8 @@ fun App() {
                             scrollToTrackRequest = searchViewModel.queueScrollRequest,
                             onScrollToTrackHandled = searchViewModel::consumeQueueScrollRequest,
                             highlightedTrackId = searchViewModel.highlightedTrackId,
-                            tracks = searchViewModel.loadedTracks,
-                            canLoadMore = searchViewModel.canLoadMore,
+                            tracks = displayedTracks,
+                            canLoadMore = !isWaveQueue && searchViewModel.canLoadMore,
                             onLoadMore = { searchViewModel.loadNextPage() },
                             onBackClick = goBackFromTracks,
                             onPlayTrack = { trackId, trackTitle, artistName ->
@@ -515,12 +517,12 @@ fun App() {
                             isPlaying = searchViewModel.playerIsPlaying,
                             isPaused = searchViewModel.playerIsPaused,
                             onTogglePlayPause = { searchViewModel.togglePlayPause() },
-                            totalTracksCount = searchViewModel.totalTracksCount,
-                            isLoading = searchViewModel.isLoading,
-                            isLoadingAllPages = searchViewModel.isLoadingAllPages,
+                            totalTracksCount = if (isWaveQueue) displayedTracks.size else searchViewModel.totalTracksCount,
+                            isLoading = if (isWaveQueue) searchViewModel.isWaveLoading else searchViewModel.isLoading,
+                            isLoadingAllPages = !isWaveQueue && searchViewModel.isLoadingAllPages,
                             onLoadAllClick = { searchViewModel.loadAllRemainingPages() },
                             title = searchViewModel.currentScreenTitle,
-                            onRefresh = if (searchViewModel.isDownloadedTracksScreen) {
+                            onRefresh = if (!isWaveQueue && searchViewModel.isDownloadedTracksScreen) {
                                 {
                                     val currentLocal = searchViewModel.localPlaylists.firstOrNull { it.title == searchViewModel.currentScreenTitle }
                                     if (currentLocal != null) {

@@ -1,6 +1,7 @@
 package io.github.audiz.wave
 
 import io.github.audiz.AppConfigKeys
+import io.github.audiz.TrackPlaySource
 import io.github.audiz.loadAppConfig
 import io.github.audiz.saveAppConfig
 import io.github.audiz.player.UpNextState
@@ -115,8 +116,19 @@ class WaveSessionRestoreTest {
             assertEquals("saved", wave.currentWaveTrack?.id)
             player.playNextTrack()
             assertEquals("first", wave.currentWaveTrack?.id)
+            assertTrue(player.isNextLoading)
             player.playPrevTrack()
             assertEquals("saved", wave.currentWaveTrack?.id)
+
+            player.playNextTrack(source = TrackPlaySource.PLAY)
+            assertEquals("first", wave.currentWaveTrack?.id)
+            assertFalse(player.isNextLoading)
+            assertTrue(player.isPlayLoading)
+
+            player.playNextTrack(source = TrackPlaySource.PLAY)
+            assertEquals("second", wave.currentWaveTrack?.id)
+            assertFalse(player.isNextLoading)
+            assertTrue(player.isPlayLoading)
         } finally {
             player.release()
             scope.cancel()

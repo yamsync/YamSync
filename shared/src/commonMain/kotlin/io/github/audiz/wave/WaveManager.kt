@@ -802,8 +802,8 @@ class WaveManager(
      * Если пользователь ранее нажимал «Назад», возвращаемся вперед по истории.
      * Если история вперед исчерпана — пропускаем трек (skip) с запросом новой пачки.
      */
-    override fun playNextWaveTrack(crossfadeMs: Long) {
-        playbackManager?.setLoadingFlags(next = true, prev = false, play = false)
+    override fun playNextWaveTrack(crossfadeMs: Long, source: TrackPlaySource) {
+        playbackManager?.setLoadingFor(source)
 
         val current = currentWaveTrack
         while (waveFutureTracks.firstOrNull()?.id?.let { it == current?.id } == true) {
@@ -819,9 +819,9 @@ class WaveManager(
             }
             val nextTrack = waveFutureTracks.removeAt(0)
             AppLogger.d("WaveManager", "🌊 Волна: Вперед по истории к треку [в истории вперед: ${waveFutureTracks.size}]: ${nextTrack.title}")
-            playWaveTrackDirect(nextTrack, source = TrackPlaySource.NEXT, crossfadeMs = crossfadeMs)
+            playWaveTrackDirect(nextTrack, source = source, crossfadeMs = crossfadeMs)
         } else {
-            skipWaveTrack(crossfadeMs = crossfadeMs)
+            skipWaveTrack(crossfadeMs = crossfadeMs, source = source)
         }
     }
 
@@ -862,12 +862,12 @@ class WaveManager(
      * Если в очереди уже есть следующий трек — переключаем мгновенно (Zero Latency)
      * и в фоне отправляем фидбек + обновляем хвост очереди.
      */
-    fun skipWaveTrack(crossfadeMs: Long = 0L) {
+    fun skipWaveTrack(crossfadeMs: Long = 0L, source: TrackPlaySource = TrackPlaySource.NEXT) {
         if (!isWaveMode) {
             if (waveTracks.isNotEmpty()) {
                 val nextIndex = if (waveCurrentIndex + 1 < waveTracks.size) waveCurrentIndex + 1 else 0
                 val index = recommendedIndex(nextIndex)
-                if (index != null) playWaveTrack(index, TrackPlaySource.NEXT, crossfadeMs)
+                if (index != null) playWaveTrack(index, source, crossfadeMs)
                 else playbackManager?.resetLoadingFlags()
             }
             return
@@ -885,7 +885,7 @@ class WaveManager(
             }
             waveFutureTracks.clear()
 
-            playWaveTrack(nextIndex, TrackPlaySource.NEXT, crossfadeMs)
+            playWaveTrack(nextIndex, source, crossfadeMs)
             val nextTrack = waveTracks[waveCurrentIndex]
 
             val radioSessionId = waveRadioSessionId ?: ynisonWaveSessionId
@@ -991,11 +991,11 @@ class WaveManager(
         val batchId = waveBatchId
         if (radioSessionId == null) {
             AppLogger.w("WaveManager", "skipWaveTrack - сессия не готова, перезапускаем")
-            loadInitialWave(autoPlay = true, source = TrackPlaySource.NEXT)
+            loadInitialWave(autoPlay = true, source = source)
             return
         }
 
-        playbackManager?.setLoadingFlags(next = true, prev = false, play = false)
+        playbackManager?.setLoadingFor(source)
         val current = currentWaveTrack
         if (current != null && wavePastTracks.lastOrNull()?.id != current.id) {
             wavePastTracks.add(current)
@@ -1083,7 +1083,7 @@ class WaveManager(
                 AppLogger.i("WaveManager", "🌊 Волна: Новая пачка из ${waveTracks.size} треков загружена после skip! Запуск первого трека.")
 
                 if (waveTracks.isNotEmpty()) {
-                    playFirstRecommendation(source = TrackPlaySource.NEXT)
+                    playFirstRecommendation(source = source)
                 } else {
                     playbackManager?.resetLoadingFlags()
                 }

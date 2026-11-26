@@ -406,16 +406,16 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     /** Всегда поставить дизлайк текущему треку и переключить на следующий */
     fun dislikeCurrentTrackAndSkip() {
         if (isCurrentTrackLocal) {
-            playNextTrack()
+            playNextTrack(source = TrackPlaySource.PLAY)
             return
         }
         val trackId = playerTrackId ?: currentWaveTrack?.id ?: run {
-            playNextTrack()
+            playNextTrack(source = TrackPlaySource.PLAY)
             return
         }
         val albumId = playerAlbumId ?: currentWaveTrack?.albums?.firstOrNull()?.id
         playlistManager.dislikeTrack(trackId, albumId) {
-            playNextTrack()
+            playNextTrack(source = TrackPlaySource.PLAY)
         }
         playbackManager.systemMediaControls.updateLikedState(false)
     }
@@ -425,7 +425,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         val trackId = playerTrackId ?: currentWaveTrack?.id ?: return
         val albumId = playerAlbumId ?: currentWaveTrack?.albums?.firstOrNull()?.id
         playlistManager.toggleDislike(trackId, albumId) {
-            playNextTrack()
+            playNextTrack(source = TrackPlaySource.PLAY)
         }
         val isLikedNow = playlistManager.isTrackLiked(trackId)
         playbackManager.systemMediaControls.updateLikedState(isLikedNow)
@@ -504,7 +504,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         ) {
             val isStillCurrent = PlaybackQueueManager.isSameTrack(track, playerTrackId ?: currentWaveTrack?.id)
             playlistManager.toggleDislike(recommendationId, track.albums.firstOrNull()?.id) {
-                if (fileToDelete == null && isStillCurrent) playNextTrack()
+                if (fileToDelete == null && isStillCurrent) playNextTrack(source = TrackPlaySource.PLAY)
             }
             if (isStillCurrent) {
                 playbackManager.systemMediaControls.updateLikedState(playlistManager.isTrackLiked(recommendationId))
@@ -703,7 +703,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
                         isManualSelection = false
                     )
                 } else if (isWaveMode) {
-                    playNextTrack()
+                    playNextTrack(source = TrackPlaySource.PLAY)
                 } else {
                     stopPlayback()
                 }
@@ -738,7 +738,10 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         isRecordToDisk = { downloadManager.isRecordToDiskActive },
         onTrackSavedToDisk = { downloadManager.incrementDownloadVersion() },
         onPlaybackConfirmed = { trackId -> recentPlaybackHistory.record(trackId) },
-        onTrackStarted = { trackId, title, artist, cover, isWave ->
+        onTrackStarted = { trackId, title, artist, cover, isWave, source ->
+            if (source == TrackPlaySource.NEXT && isTracksListVisible && !isPreviewingTrackList) {
+                requestScrollToPlayingTrack(trackId)
+            }
             if (playbackManager.upNextQueue.state.current?.inserted != true) {
                 if (isWave) {
                     playbackSessionManager.recordWave(waveManager.currentWaveTitle, waveManager.currentWaveSeeds)
@@ -822,13 +825,12 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
         queueScrollRequest = TrackListScrollRequest(++queueScrollRequestId, trackId)
     }
 
-    private fun requestScrollToPlayingTrack() {
-        val trackId = playerTrackId ?: currentWaveTrack?.id ?: return
-        val queue = trackListNavigation.active
-        val isInQueue = queue.loadedTracks.any { PlaybackQueueManager.isSameTrack(it, trackId) } ||
-            queue.allTrackIds.any { PlaybackQueueManager.isSameTrackId(it, trackId) }
+    private fun requestScrollToPlayingTrack(trackId: String? = playerTrackId ?: currentWaveTrack?.id) {
+        if (trackId == null) return
+        val isInQueue = displayedTracks.any { PlaybackQueueManager.isSameTrack(it, trackId) } ||
+            (!isShowingWaveQueue && allTrackIds.any { PlaybackQueueManager.isSameTrackId(it, trackId) })
         if (isInQueue) {
-            queueScrollRequest = TrackListScrollRequest(++queueScrollRequestId, trackId)
+            requestScrollToTrack(trackId)
         }
     }
 
@@ -838,6 +840,12 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
 
     val isPreviewingTrackList: Boolean
         get() = trackListNavigation.isPreview
+
+    val isShowingWaveQueue: Boolean
+        get() = isWaveMode && !isPreviewingTrackList
+
+    val displayedTracks: List<FullTrackInfo>
+        get() = if (isShowingWaveQueue) waveTracks.toList() else loadedTracks.toList()
 
     private fun browseTrackList(session: LastPlaybackSession, load: (TrackListCoordinator) -> Unit) {
         queueScrollRequest = null
@@ -2073,6 +2081,8 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     fun playNextTrack(currentId: String? = playerTrackId, source: TrackPlaySource = TrackPlaySource.NEXT) {
         try {
             playbackManager.playNextTrack(currentId, source)
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             AppLogger.e("SearchViewModel", "Ошибка playNextTrack: ${t.message}")
         }

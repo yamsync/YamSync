@@ -12,7 +12,7 @@ interface WavePlaybackBridge {
 
     fun playWaveTrack(index: Int = 0, source: TrackPlaySource = TrackPlaySource.PLAY, crossfadeMs: Long = 0L)
 
-    fun playNextWaveTrack(crossfadeMs: Long = 0L)
+    fun playNextWaveTrack(crossfadeMs: Long = 0L, source: TrackPlaySource = TrackPlaySource.NEXT)
 
     fun playPrevWaveTrack()
 

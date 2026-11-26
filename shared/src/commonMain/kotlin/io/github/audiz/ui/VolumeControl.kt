@@ -112,7 +112,7 @@ internal fun VolumeButtonIcon(
     }
 
     // Shuffle occupies 16×16 units of its 24-unit viewport.
-    // Match the painted bounds of the speaker, including the sound waves.
+    // Keep the speaker slightly larger than shuffle to balance its narrower silhouette.
     val speaker = if (icon == Icons.AutoMirrored.Filled.VolumeMute) {
         Icons.AutoMirrored.Filled.VolumeOff
     } else {
@@ -130,8 +130,8 @@ internal fun VolumeButtonIcon(
         contentDescription = contentDescription,
         modifier = Modifier.size(shuffleIconSize).graphicsLayer {
             // The quiet speaker tapers to a point and looks smaller at equal bounds.
-            scaleX = (if (isQuiet) 16.5f else 16f) / glyphWidth
-            scaleY = (if (isQuiet) 18f else 16f) / glyphHeight
+            scaleX = 1.1f * (if (isQuiet) 16.5f else 16f) / glyphWidth
+            scaleY = 1.1f * (if (isQuiet) 18f else 16f) / glyphHeight
         },
         tint = tint,
     )
