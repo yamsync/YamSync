@@ -58,7 +58,7 @@ data class SettingsState(
     val crossfadeSeconds: Int = 3,
     val isUiWatchdogActive: Boolean = false,
     val hasPlusSubscription: Boolean? = null,
-    val aiFilterMode: AiFilterMode = AiFilterMode.OFF,
+    val aiFilterMode: AiFilterMode = AiFilterMode.LABELS,
     val aiBlacklistVersion: Int? = null,
     val waveLoopProtectionEnabled: Boolean = false,
     val waveLoopHistoryLimit: Int = RecentPlaybackHistory.MAX_TRACKS,

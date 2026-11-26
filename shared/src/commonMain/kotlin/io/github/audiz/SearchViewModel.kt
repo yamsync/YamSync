@@ -554,7 +554,7 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     var aiFilterMode by mutableStateOf(
         loadAppConfig(AppConfigKeys.AI_FILTER_MODE)?.let { saved ->
             AiFilterMode.entries.firstOrNull { it.name == saved }
-        } ?: AiFilterMode.OFF
+        } ?: AiFilterMode.LABELS
     )
         private set
 
