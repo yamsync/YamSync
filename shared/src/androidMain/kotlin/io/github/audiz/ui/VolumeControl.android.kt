@@ -31,7 +31,8 @@ actual fun DesktopVolumeControl(
     modifier: Modifier,
     buttonSize: Dp,
     bottomPlayerPadding: Dp,
-    hoverDelayMs: Long
+    hoverDelayMs: Long,
+    iconSize: Dp,
 ) {
     var isPopupOpen by remember { mutableStateOf(false) }
     var lastNonZeroVolume by remember { mutableStateOf(0.7f) }
@@ -67,7 +68,7 @@ actual fun DesktopVolumeControl(
                 imageVector = icon,
                 contentDescription = "Громкость",
                 tint = if (isPopupOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(buttonSize * 0.85f)
+                modifier = Modifier.size(iconSize)
             )
         }
 

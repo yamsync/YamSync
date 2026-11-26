@@ -149,9 +149,10 @@ private fun CarPlayer(
         val largeTargets = !short && controlWidth >= 420.dp
         val skipSize = minOf(if (largeTargets) 76.dp else 56.dp, controlWidth / 6)
         val playSize = skipSize + if (largeTargets) 12.dp else 8.dp
-        val shuffleSize = minOf(skipSize, 64.dp)
+        val sideButtonSize = minOf(skipSize, 64.dp)
+        val sideIconSize = minOf(sideButtonSize, 24.dp)
         val sideGap = minOf(12.dp, controlWidth / 24)
-        val gap = ((controlWidth - shuffleSize * 2 - skipSize * 2 - playSize - sideGap * 2) / 2)
+        val gap = ((controlWidth - sideButtonSize * 2 - skipSize * 2 - playSize - sideGap * 2) / 2)
             .coerceIn(0.dp, 100.dp)
         val headerButtonSize = if (short) 44.dp else 54.dp
         val sectionGap = if (short) 4.dp else 12.dp
@@ -219,7 +220,7 @@ private fun CarPlayer(
             )
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    PlayerShuffleButton(state, actions.onToggleShuffle, shuffleSize, 24.dp)
+                    PlayerShuffleButton(state, actions.onToggleShuffle, sideButtonSize, sideIconSize)
                 }
                 Spacer(Modifier.width(sideGap))
                 PlayerTransportControls(state, actions, skipSize, playSize, gap)
@@ -228,7 +229,8 @@ private fun CarPlayer(
                     DesktopVolumeControl(
                         volume = state.volume,
                         onVolumeChange = actions.onVolumeChange,
-                        buttonSize = shuffleSize,
+                        buttonSize = sideButtonSize,
+                        iconSize = sideIconSize,
                     )
                 }
             }

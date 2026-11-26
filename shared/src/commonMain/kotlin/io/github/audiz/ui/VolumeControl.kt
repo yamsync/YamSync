@@ -87,5 +87,6 @@ expect fun DesktopVolumeControl(
     modifier: Modifier = Modifier,
     buttonSize: Dp = 28.dp,
     bottomPlayerPadding: Dp = 0.dp,
-    hoverDelayMs: Long = 120L
+    hoverDelayMs: Long = 120L,
+    iconSize: Dp = buttonSize * 0.85f,
 )
