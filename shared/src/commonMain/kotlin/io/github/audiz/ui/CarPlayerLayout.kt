@@ -230,7 +230,7 @@ private fun CarPlayer(
                         volume = state.volume,
                         onVolumeChange = actions.onVolumeChange,
                         buttonSize = sideButtonSize,
-                        iconSize = sideIconSize,
+                        shuffleIconSize = sideIconSize,
                     )
                 }
             }

@@ -42,7 +42,7 @@ actual fun DesktopVolumeControl(
     buttonSize: Dp,
     bottomPlayerPadding: Dp,
     hoverDelayMs: Long,
-    iconSize: Dp,
+    shuffleIconSize: Dp?,
 ) {
     var isPopupOpen by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
@@ -99,11 +99,12 @@ actual fun DesktopVolumeControl(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
+            VolumeButtonIcon(
+                icon = icon,
                 contentDescription = "Volume",
                 tint = if (isPopupOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(iconSize)
+                buttonSize = buttonSize,
+                shuffleIconSize = shuffleIconSize,
             )
         }
 

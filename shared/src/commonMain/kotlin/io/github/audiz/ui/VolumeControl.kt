@@ -5,11 +5,18 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -88,5 +95,44 @@ expect fun DesktopVolumeControl(
     buttonSize: Dp = 28.dp,
     bottomPlayerPadding: Dp = 0.dp,
     hoverDelayMs: Long = 120L,
-    iconSize: Dp = buttonSize * 0.85f,
+    shuffleIconSize: Dp? = null,
 )
+
+@Composable
+internal fun VolumeButtonIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    buttonSize: Dp,
+    shuffleIconSize: Dp?,
+) {
+    if (shuffleIconSize == null) {
+        Icon(icon, contentDescription, Modifier.size(buttonSize * 0.85f), tint)
+        return
+    }
+
+    // Shuffle occupies 16×16 units of its 24-unit viewport.
+    // Match the painted bounds of the speaker, including the sound waves.
+    val speaker = if (icon == Icons.AutoMirrored.Filled.VolumeMute) {
+        Icons.AutoMirrored.Filled.VolumeOff
+    } else {
+        icon
+    }
+    val isQuiet = speaker == Icons.AutoMirrored.Filled.VolumeDown
+    val glyphWidth = if (isQuiet) 13.5f else 18f
+    val glyphHeight = when (speaker) {
+        Icons.AutoMirrored.Filled.VolumeDown -> 16f
+        Icons.AutoMirrored.Filled.VolumeOff -> 18f
+        else -> 17.54f
+    }
+    Icon(
+        imageVector = speaker,
+        contentDescription = contentDescription,
+        modifier = Modifier.size(shuffleIconSize).graphicsLayer {
+            // The quiet speaker tapers to a point and looks smaller at equal bounds.
+            scaleX = (if (isQuiet) 16.5f else 16f) / glyphWidth
+            scaleY = (if (isQuiet) 18f else 16f) / glyphHeight
+        },
+        tint = tint,
+    )
+}
