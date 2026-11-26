@@ -16,6 +16,8 @@ import io.github.audiz.saveAppConfig
 import io.github.audiz.saveMusicStoragePath
 import io.github.audiz.saveSessionToken
 
+private val interfaceModes = setOf("mobile", "desktop", "car")
+
 class SettingsManager(
     private val repository: MusicRepository,
     private val onTokenUpdated: ((String) -> Unit)? = null,
@@ -58,17 +60,13 @@ class SettingsManager(
     var accentColor by mutableStateOf(loadAppConfig(AppConfigKeys.ACCENT_COLOR) ?: "purple")
         private set
 
-    // 📱 Режим интерфейса (mobile, desktop - по умолчанию mobile)
     var uiMode by mutableStateOf(
-        loadAppConfig(AppConfigKeys.UI_MODE)?.takeIf { it == "mobile" || it == "desktop" } ?: "mobile"
+        loadAppConfig(AppConfigKeys.UI_MODE)?.takeIf { it in interfaceModes } ?: "mobile"
     )
         private set
 
     val isMobileUi: Boolean
-        get() = when (uiMode) {
-            "desktop" -> false
-            else -> true
-        }
+        get() = uiMode != "desktop"
 
     var musicStoragePath by mutableStateOf(
         loadMusicStoragePath()?.takeIf { it.isNotBlank() && localFileExists(it) } ?: getDefaultMusicDir()
@@ -112,6 +110,7 @@ class SettingsManager(
     }
 
     fun saveUiMode(mode: String) {
+        if (mode !in interfaceModes) return
         uiMode = mode
         saveAppConfig(AppConfigKeys.UI_MODE, mode)
     }

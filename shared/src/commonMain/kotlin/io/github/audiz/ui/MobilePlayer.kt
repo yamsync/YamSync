@@ -319,6 +319,10 @@ fun MobileMiniPlayerBar(
                     }
                 }
 
+                actions.onOpenPlayingPlaylist?.let { openPlaylist ->
+                    PlayingPlaylistButton(openPlaylist, swipeGuard.controlModifier)
+                }
+
                 PlayerTransportControls(
                     state, actions, skipSize = 42.dp, playSize = 48.dp, spacing = 4.dp,
                     controlModifier = swipeGuard.controlModifier,
@@ -428,9 +432,6 @@ fun MobileFullPlayerSheet(
     val coroutineScope = rememberCoroutineScope()
     var dragOffsetY by remember { mutableStateOf(0f) }
     val animatedOffsetY = remember { Animatable(0f) }
-
-    var seekPreview by remember(state.trackId) { mutableStateOf<Float?>(null) }
-    val currentMs = seekPreview?.let(state::positionAt) ?: state.currentPositionMs
 
     val coverBitmap = rememberCoverBitmap(state.coverUri, 600)
     // Палитра считается по пикселям обложки — вне UI-потока
@@ -627,15 +628,8 @@ fun MobileFullPlayerSheet(
                                     modifier = Modifier.size(15.dp)
                                 )
                             }
-                            Text(
-                                text = state.contextLabel.uppercase(),
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.2.sp
-                                ),
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                            FullPlayerContextLabel(
+                                state = state,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                         }
@@ -669,12 +663,7 @@ fun MobileFullPlayerSheet(
                             onClick = { actions.onConfigClick.invoke() },
                             modifier = Modifier.size(44.dp).then(controlModifier)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = "Настройки",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            FullPlayerSettingsIcon()
                         }
                     } else {
                         Spacer(modifier = Modifier.size(44.dp))
@@ -726,63 +715,13 @@ fun MobileFullPlayerSheet(
                         }
                 )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(coverCornerRadius))
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                                    MaterialTheme.colorScheme.surface
-                                )
-                            )
-                        )
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                            RoundedCornerShape(coverCornerRadius)
-                        )
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = actions.onPlayPause
-                        )
-                        .pointerHoverIcon(PointerIcon.Hand),
-                    contentAlignment = Alignment.Center
+                FullPlayerCover(
+                    state = state,
+                    bitmap = coverBitmap,
+                    modifier = Modifier.fillMaxSize(),
+                    coverCornerRadius = coverCornerRadius,
+                    onClick = actions.onPlayPause,
                 ) {
-                    if (coverBitmap != null) {
-                        Image(
-                            bitmap = coverBitmap,
-                            contentDescription = "Обложка альбома",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            if (state.isPaused) {
-                                Icon(
-                                    imageVector = Icons.Filled.Pause,
-                                    contentDescription = "Пауза",
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(64.dp)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Filled.MusicNote,
-                                    contentDescription = "Музыка",
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(72.dp)
-                                )
-                            }
-                        }
-                    }
-
                     CoverSpectrumVisualizer(
                         isPlaying = state.isActivelyPlaying,
                         glowLeft = glowLeft,
@@ -800,43 +739,14 @@ fun MobileFullPlayerSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(
-                    modifier = Modifier.weight(1f).padding(end = 12.dp)
-                ) {
-                    BouncingMarqueeText(
-                        text = state.trackTitle,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = state.artistName.ifBlank { "Яндекс Музыка" },
-                            modifier = Modifier.weight(1f, fill = false)
-                                .then(
-                                    if (actions.onOpenArtist != null) Modifier
-                                        .pointerHoverIcon(PointerIcon.Hand)
-                                        .then(controlModifier)
-                                        .clickable(onClick = actions.onOpenArtist)
-                                    else Modifier
-                                ),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 15.sp
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        AiArtistBadge(state.trackArtists)
-                    }
-                }
+                FullPlayerTrackInfo(
+                    state = state,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    onOpenArtist = actions.onOpenArtist,
+                    controlModifier = controlModifier,
+                    animateTitle = true,
+                    showArtistBadge = true,
+                )
 
                 actions.onToggleFavorite?.let { toggleFavorite ->
                     FavoriteButton(
@@ -848,55 +758,11 @@ fun MobileFullPlayerSheet(
                 }
             }
 
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
-            ) {
-                PlayerSeekBar(
-                    state = state,
-                    preview = seekPreview,
-                    onPreviewChange = { seekPreview = it },
-                    onSeek = actions.onSeek,
-                    barHeight = 6.dp,
-                    touchTargetHeight = 36.dp,
-                )
-
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
-                ) {
-                    Text(
-                        text = formatTime(currentMs),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontFeatureSettings = "tnum",
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.CenterStart)
-                    )
-
-                    if (state.bitrate != null && state.bitrate > 0) {
-                        val bitrateText = if (state.bitrate >= 1000) "${state.bitrate / 1000}M" else "${state.bitrate}k"
-                        Text(
-                            text = bitrateText,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFeatureSettings = "tnum",
-                                fontWeight = FontWeight.Normal
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-
-                    Text(
-                        text = formatTime(state.durationMs),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontFeatureSettings = "tnum",
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                    )
-                }
-            }
+            FullPlayerTimeline(
+                state = state,
+                onSeek = actions.onSeek,
+                modifier = Modifier.padding(top = 10.dp),
+            )
 
             val playButtonSize = if (isNarrow) 58.dp else 68.dp
             val skipButtonSize = if (isNarrow) 44.dp else 52.dp
@@ -914,14 +780,12 @@ fun MobileFullPlayerSheet(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    GhostIconButton(
-                        icon = Icons.Filled.Shuffle,
-                        contentDescription = "Случайный порядок",
+                    PlayerShuffleButton(
+                        state = state,
+                        onToggle = actions.onToggleShuffle,
                         modifier = controlModifier,
                         size = sideSlotButtonSize,
                         iconSize = if (isNarrow) 20.dp else 24.dp,
-                        contentColor = if (state.isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        onClick = { actions.onToggleShuffle?.invoke() }
                     )
                 }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -23,7 +24,8 @@ fun ThinSlider(
     modifier: Modifier = Modifier,
     barHeight: Dp = 2.5.dp,
     touchTargetHeight: Dp = 16.dp,
-    onValueChangeFinished: ((Float) -> Unit)? = null
+    onValueChangeFinished: ((Float) -> Unit)? = null,
+    thumbSize: Dp = 0.dp,
 ) {
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     val currentOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
@@ -80,6 +82,16 @@ fun ThinSlider(
                 .clip(RoundedCornerShape(barHeight / 2))
                 .background(MaterialTheme.colorScheme.primary)
         )
+        if (thumbSize > 0.dp) {
+            val size = minOf(thumbSize, maxWidth)
+            val thumbOffset = (maxWidth * value.coerceIn(0f, 1f) - size / 2)
+                .coerceIn(0.dp, maxWidth - size)
+            Box(
+                Modifier.offset(x = thumbOffset)
+                    .size(size)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        }
     }
 }
 

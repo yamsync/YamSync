@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -36,6 +37,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -362,33 +364,24 @@ private fun InterfaceModeSettings(state: SettingsState, actions: SettingsActions
         style = MaterialTheme.typography.labelLarge
     )
     Spacer(modifier = Modifier.height(4.dp))
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clickable { actions.onSaveUiMode("mobile") }
-                .pointerHoverIcon(PointerIcon.Hand)
-        ) {
-            RadioButton(
-                selected = state.uiMode != "desktop",
-                onClick = { actions.onSaveUiMode("mobile") }
-            )
-            Text("Мобильный", style = MaterialTheme.typography.bodyMedium)
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clickable { actions.onSaveUiMode("desktop") }
-                .pointerHoverIcon(PointerIcon.Hand)
-        ) {
-            RadioButton(
-                selected = state.uiMode == "desktop",
-                onClick = { actions.onSaveUiMode("desktop") }
-            )
-            Text("ПК", style = MaterialTheme.typography.bodyMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        for ((mode, label) in listOf("mobile" to "Мобильный", "desktop" to "ПК", "car" to "Автомобильный")) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .selectable(
+                        selected = state.uiMode == mode,
+                        onClick = { actions.onSaveUiMode(mode) },
+                        role = Role.RadioButton
+                    )
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RadioButton(selected = state.uiMode == mode, onClick = null)
+                Text(label, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }

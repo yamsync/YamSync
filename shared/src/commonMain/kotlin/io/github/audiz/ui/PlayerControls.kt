@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistAddCheck
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +67,42 @@ internal fun PlayerTransportControls(
 }
 
 @Composable
+internal fun PlayerShuffleButton(
+    state: PlayerUiState,
+    onToggle: (() -> Unit)?,
+    size: Dp,
+    iconSize: Dp,
+    modifier: Modifier = Modifier,
+) {
+    GhostIconButton(
+        icon = Icons.Filled.Shuffle,
+        contentDescription = "Случайный порядок",
+        modifier = modifier,
+        size = size,
+        iconSize = iconSize,
+        contentColor = if (state.isShuffle) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        onClick = { onToggle?.invoke() },
+    )
+}
+
+@Composable
+internal fun PlayingPlaylistButton(
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+) {
+    GhostIconButton(
+        icon = Icons.AutoMirrored.Filled.PlaylistPlay,
+        contentDescription = "Текущий плейлист",
+        modifier = modifier,
+        size = size,
+        iconSize = 22.dp,
+        onClick = onOpen,
+    )
+}
+
+@Composable
 internal fun PlayerSeekBar(
     state: PlayerUiState,
     preview: Float?,
@@ -72,6 +110,7 @@ internal fun PlayerSeekBar(
     onSeek: (Long) -> Unit,
     barHeight: Dp,
     touchTargetHeight: Dp,
+    thumbSize: Dp = 0.dp,
 ) {
     ThinSlider(
         value = preview ?: state.progress,
@@ -83,6 +122,7 @@ internal fun PlayerSeekBar(
         modifier = Modifier.fillMaxWidth(),
         barHeight = barHeight,
         touchTargetHeight = touchTargetHeight,
+        thumbSize = thumbSize,
     )
 }
 

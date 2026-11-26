@@ -65,6 +65,7 @@ import io.github.audiz.ui.SettingsActions
 import io.github.audiz.ui.AppAccentColor
 import io.github.audiz.ui.buildAppColorScheme
 import io.github.audiz.ui.EqualizerDialog
+import io.github.audiz.ui.CarPlayerLayout
 import io.github.audiz.ui.MobileFullPlayerSheet
 import io.github.audiz.ui.clipAboveMiniPlayer
 import io.github.audiz.ui.PlayerTrackRemovalDialog
@@ -161,7 +162,9 @@ fun App() {
                 }
             }
             val eqState by EqualizerEngine.state.collectAsState()
+            val isCarUi = searchViewModel.uiMode == "car"
             val isMobileUi = searchViewModel.isMobileUi
+            var isCarPanelOpen by remember(isCarUi) { mutableStateOf(false) }
 
             val playerState = searchViewModel.playerUiState(showWavePreview = !showTracksScreen).copy(
                 isConfigActive = nav.settingsExpanded,
@@ -173,7 +176,10 @@ fun App() {
                 val upNext = dialog as? AppDialog.UpNext
                 val fromPlayer = upNext?.openedFromPlayer ?: nav.isMobilePlayerExpanded
                 if (upNext != null) dialog = null
-                if (isMobileUi && fromPlayer) {
+                if (isCarUi) {
+                    searchViewModel.openQueueView()
+                    isCarPanelOpen = true
+                } else if (isMobileUi && fromPlayer) {
                     searchViewModel.openQueueView(TracksListOrigin.MOBILE_PLAYER)
                     nav.updateMobilePlayerExpanded(false)
                 } else {
@@ -207,6 +213,7 @@ fun App() {
                 onOpenEqualizer = {
                     dialog = AppDialog.Equalizer(initialTab = 0)
                 },
+                onOpenPlayingPlaylist = openPlayingPlaylist.takeIf { searchViewModel.hasPlaybackQueue },
                 onOpenQueue = {
                     if (searchViewModel.upNextState.pending.isEmpty()) {
                         openPlayingPlaylist()
@@ -234,42 +241,9 @@ fun App() {
                 }
             )
 
-            Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { appTopInRoot = it.positionInRoot().y }) {
-            Scaffold(
-                snackbarHost = { SnackbarHost(messageHost) },
-                bottomBar = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = if (isMobileUi) 10.dp else 16.dp)
-                            .padding(bottom = if (isMobileUi) 6.dp else 16.dp)
-                    ) {
-                        io.github.audiz.support.StarSupportPrompt(
-                            manager = starPromptManager,
-                            // Окна «Далее» и удаления трека из плеера подсказку не скрывают.
-                            canShow = !nav.settingsExpanded &&
-                                (dialog == null || dialog is AppDialog.UpNext || dialog is AppDialog.PlayerTrackRemoval) &&
-                                !showYamSyncDialog && !(isMobileUi && nav.isMobilePlayerExpanded) &&
-                                searchViewModel.errorMessage == null && !searchViewModel.isLoading &&
-                                !searchViewModel.isPlayTrackLoading,
-                            isPlaying = searchViewModel.playerIsPlaying && !searchViewModel.playerIsPaused &&
-                                !searchViewModel.isPlayTrackLoading,
-                            trackId = searchViewModel.playerTrackId,
-                            isLiked = searchViewModel.isCurrentTrackLiked,
-                            isSaved = playerState.isLocalTrack || playerState.isSavedToDisk
-                        )
-                        PlayerBar(
-                            state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
-                            actions = playerActions,
-                            modifier = if (isMobileUi) {
-                                Modifier.onGloballyPositioned { miniPlayerTopInRoot = it.positionInRoot().y }
-                            } else Modifier,
-                        )
-                    }
-                }
-            ) { paddingValues ->
+            val mainContent: @Composable () -> Unit = {
                 Box(
-                    modifier = Modifier.fillMaxSize().padding(paddingValues)
+                    modifier = Modifier.fillMaxSize()
                         .padding(horizontal = if (showTracksScreen) 8.dp else 16.dp)
                         .padding(top = 16.dp)
                 ) {
@@ -578,7 +552,56 @@ fun App() {
                     }
                 }
             }
-            if (isMobileUi) {
+
+            Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { appTopInRoot = it.positionInRoot().y }) {
+            Scaffold(
+                snackbarHost = { SnackbarHost(messageHost) },
+                bottomBar = {
+                    if (!isCarUi) Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (isMobileUi) 10.dp else 16.dp)
+                            .padding(bottom = if (isMobileUi) 6.dp else 16.dp)
+                    ) {
+                        io.github.audiz.support.StarSupportPrompt(
+                            manager = starPromptManager,
+                            // Окна «Далее» и удаления трека из плеера подсказку не скрывают.
+                            canShow = !nav.settingsExpanded &&
+                                (dialog == null || dialog is AppDialog.UpNext || dialog is AppDialog.PlayerTrackRemoval) &&
+                                !showYamSyncDialog && !(isMobileUi && nav.isMobilePlayerExpanded) &&
+                                searchViewModel.errorMessage == null && !searchViewModel.isLoading &&
+                                !searchViewModel.isPlayTrackLoading,
+                            isPlaying = searchViewModel.playerIsPlaying && !searchViewModel.playerIsPaused &&
+                                !searchViewModel.isPlayTrackLoading,
+                            trackId = searchViewModel.playerTrackId,
+                            isLiked = searchViewModel.isCurrentTrackLiked,
+                            isSaved = playerState.isLocalTrack || playerState.isSavedToDisk
+                        )
+                        PlayerBar(
+                            state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                            actions = playerActions,
+                            modifier = if (isMobileUi) {
+                                Modifier.onGloballyPositioned { miniPlayerTopInRoot = it.positionInRoot().y }
+                            } else Modifier,
+                        )
+                    }
+                }
+            ) { paddingValues ->
+                if (isCarUi) {
+                    CarPlayerLayout(
+                        state = playerState.copy(currentPositionMs = searchViewModel.playerPositionMs),
+                        actions = playerActions,
+                        isPanelOpen = isCarPanelOpen,
+                        onPanelOpenChange = { isCarPanelOpen = it },
+                        modifier = Modifier.padding(paddingValues),
+                        content = mainContent,
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().padding(paddingValues)) { mainContent() }
+                }
+            }
+
+            if (isMobileUi && !isCarUi) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
                     val openingProgress = remember {

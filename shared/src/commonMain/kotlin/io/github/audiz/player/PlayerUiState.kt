@@ -86,4 +86,5 @@ data class PlayerActions(
     val onOpenWaveThemes: (() -> Unit)? = null,
     val onMobilePlayerDrag: (Float?) -> Unit = {},
     val onMobilePlayerDragEnd: (Boolean) -> Unit = {},
+    val onOpenPlayingPlaylist: (() -> Unit)? = null,
 )
