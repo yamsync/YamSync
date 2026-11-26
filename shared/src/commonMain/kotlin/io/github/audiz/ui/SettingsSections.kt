@@ -83,10 +83,6 @@ internal enum class SettingsBlock {
 @Composable
 private fun WaveLoopProtectionSettings(state: SettingsState, actions: SettingsActions) {
     var historyLimit by remember(state.waveLoopHistoryLimit) { mutableFloatStateOf(state.waveLoopHistoryLimit.toFloat()) }
-    if (state.uiMode == "desktop") {
-        Text("Моя волна", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

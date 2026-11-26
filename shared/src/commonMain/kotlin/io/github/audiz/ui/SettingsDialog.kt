@@ -97,9 +97,8 @@ fun SettingsDialog(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val useSectionMenu = state.uiMode != "desktop"
     var selectedSection by remember { mutableStateOf<SettingsSection?>(null) }
-    val currentSection = selectedSection.takeIf { useSectionMenu }
+    val currentSection = selectedSection
     var selectedAddon by remember { mutableStateOf<SettingsAddon?>(null) }
     val currentAddon = selectedAddon.takeIf { currentSection == SettingsSection.Addons }
 
@@ -127,7 +126,7 @@ fun SettingsDialog(
         exit = fadeOut(),
         modifier = modifier.fillMaxSize()
     ) {
-        val settingsScrollState = key(useSectionMenu, currentSection, currentAddon) { rememberScrollState() }
+        val settingsScrollState = key(currentSection, currentAddon) { rememberScrollState() }
         var dragOffsetY by remember { mutableStateOf(0f) }
         val animatedOffsetY by animateFloatAsState(targetValue = dragOffsetY)
 
@@ -241,7 +240,7 @@ fun SettingsDialog(
                                 }
                                 Text(
                                     text = currentAddon?.title ?: currentSection?.title ?: "Настройки",
-                                    style = if (useSectionMenu) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -250,7 +249,7 @@ fun SettingsDialog(
                             TopBarIconButton(
                                 icon = Icons.Filled.Close,
                                 contentDescription = "Закрыть настройки",
-                                size = if (useSectionMenu) 40.dp else 32.dp,
+                                size = 40.dp,
                                 modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                                 outlined = true,
                                 onClick = {
@@ -272,7 +271,7 @@ fun SettingsDialog(
                                 .padding(end = endContentPadding)
                                 .padding(vertical = if (currentSection == null) 0.dp else 12.dp)
                         ) {
-                            if (useSectionMenu && currentSection == null) {
+                            if (currentSection == null) {
                                 SettingsSectionMenu(state, onOpen = { selectedSection = it })
                             } else if (currentSection == SettingsSection.Addons && currentAddon == null) {
                                 SettingsAddon.entries.forEach { addon ->
@@ -282,7 +281,7 @@ fun SettingsDialog(
                                 }
                             } else {
                                 val blocks = currentAddon?.let { listOf(it.block) }
-                                    ?: currentSection?.blocks ?: SettingsBlock.entries
+                                    ?: currentSection.blocks
                                 blocks.forEachIndexed { index, block ->
                                     if (index > 0) {
                                         Spacer(Modifier.height(12.dp))
