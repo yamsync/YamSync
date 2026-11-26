@@ -287,11 +287,12 @@ actual class AudioPlayer actual constructor() {
         activeBackend?.pause()
     }
 
-    actual fun resume() {
+    actual fun resume(): Boolean {
         val resumePos = currentPositionMs
         isPlayingState = true
         isPausedState = false
         activeBackend?.resume(resumePos)
+        return true
     }
 
     actual fun stop() {

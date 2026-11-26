@@ -608,7 +608,7 @@ actual class AudioPlayer actual constructor() {
         unregisterNoisyReceiver()
     }
 
-    actual fun resume() {
+    actual fun resume(): Boolean {
         requestAudioFocus()
         registerNoisyReceiver()
         try {
@@ -631,6 +631,7 @@ actual class AudioPlayer actual constructor() {
                 }
             } catch (_: Throwable) {}
         } catch (_: Throwable) {}
+        return true
     }
 
     actual fun stop() {

@@ -332,6 +332,7 @@ class PlaybackManager(
         audioPlayer.setOnInterruptionListener { shouldPause, canResume ->
             scope.launch {
                 if (shouldPause) {
+                    if (!canResume) wasInterruptedBySystem = false
                     if (isPlaying && !isPaused) {
                         positionMs = audioPlayer.getCurrentPositionMs()
                         audioPlayer.pause()
@@ -340,13 +341,9 @@ class PlaybackManager(
                         systemMediaControls.updatePlaybackState(isPlaying = false, isPaused = true, positionMs)
                     }
                 } else {
-                    if (wasInterruptedBySystem && isPaused && canResume) {
-                        wasInterruptedBySystem = false
-                        audioPlayer.resume()
-                        isPaused = false
-                        systemMediaControls.updatePlaybackState(isPlaying = true, isPaused = false, positionMs)
-                        startProgressPolling()
-                    }
+                    val shouldResume = wasInterruptedBySystem && isPaused && canResume
+                    wasInterruptedBySystem = false
+                    if (shouldResume) resumePausedPlayback()
                 }
             }
         }
@@ -474,10 +471,7 @@ class PlaybackManager(
             isPaused = true
             systemMediaControls.updatePlaybackState(false, true, positionMs)
         } else if (isPaused) {
-            audioPlayer.resume()
-            isPaused = false
-            systemMediaControls.updatePlaybackState(true, false, positionMs)
-            startProgressPolling()
+            resumePausedPlayback()
         } else if (trackId == null) {
             if (upNextQueue.state.pending.isNotEmpty()) {
                 playNextTrack(source = TrackPlaySource.PLAY)
@@ -500,6 +494,13 @@ class PlaybackManager(
                 queueSelection = upNextQueue.state.current?.inserted == true
             )
         }
+    }
+
+    private fun resumePausedPlayback() {
+        if (!audioPlayer.resume()) return
+        isPaused = false
+        systemMediaControls.updatePlaybackState(true, false, positionMs)
+        startProgressPolling()
     }
 
     /**
@@ -1280,10 +1281,7 @@ class PlaybackManager(
                 lastPrevClickTimestamp = now
                 seekTo(0L)
                 if (isPaused) {
-                    audioPlayer.resume()
-                    isPaused = false
-                    systemMediaControls.updatePlaybackState(isPlaying = true, isPaused = false, 0L)
-                    startProgressPolling()
+                    resumePausedPlayback()
                 } else if (!isPlaying) {
                     togglePlayPause()
                 }

@@ -11,7 +11,7 @@ expect class AudioPlayer() {
     fun playFromUrl(url: String, crossfadeMs: Long)
 
     fun pause()
-    fun resume()
+    fun resume(): Boolean
     fun stop()
     fun isPlaying(): Boolean
     fun getDurationMs(): Long

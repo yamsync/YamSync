@@ -10,6 +10,7 @@ import platform.Foundation.NSData
 import platform.Foundation.create
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSNotification
+import platform.Foundation.NSError
 import platform.Foundation.NSNumber
 import platform.Foundation.NSOperationQueue
 import platform.darwin.NSObjectProtocol
@@ -17,11 +18,17 @@ import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMakeWithSeconds
 import platform.darwin.dispatch_queue_create
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
 import io.github.audiz.stream.AudioResourceLoaderDelegate
 import io.github.audiz.stream.LocalStreamProxy
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -70,8 +77,8 @@ actual class AudioPlayer actual constructor() {
                 val userInfo = notification?.userInfo ?: return@addObserverForName
                 val typeValue = (userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.unsignedLongValue
                 if (typeValue == AVAudioSessionInterruptionTypeBegan) {
-                    AppLogger.d("AudioPlayer", "Прерывание аудио (звонок/будильник) началось -> пауза")
-                    avPlayer?.pause()
+                    AppLogger.d("AudioPlayer", "Прерывание аудиосессии началось")
+                    pause()
                     onInterruptionListener?.invoke(true, true)
                 } else if (typeValue == AVAudioSessionInterruptionTypeEnded) {
                     val optionsValue = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)?.unsignedLongValue ?: 0uL
@@ -79,6 +86,8 @@ actual class AudioPlayer actual constructor() {
                     AppLogger.d("AudioPlayer", "Прерывание аудио закончилось. shouldResume=$shouldResume")
                     onInterruptionListener?.invoke(false, shouldResume)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (t: Throwable) {
                 AppLogger.e("AudioPlayer", "Ошибка обработки interruptionNotification: ${t.message}", t)
             }
@@ -93,14 +102,38 @@ actual class AudioPlayer actual constructor() {
                 val userInfo = notification?.userInfo ?: return@addObserverForName
                 val reasonValue = (userInfo[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.unsignedLongValue
                 if (reasonValue == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) {
-                    AppLogger.d("AudioPlayer", "Аудиоустройство отключено (BT/наушники) -> пауза (Becoming Noisy)")
-                    avPlayer?.pause()
-                    onInterruptionListener?.invoke(true, false)
+                    val previousRoute = userInfo[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription
+                    val currentRoute = AVAudioSession.sharedInstance().currentRoute
+                    val hadExternalOutput = previousRoute?.hasExternalOutput()
+                    val hasExternalOutput = currentRoute.hasExternalOutput()
+                    AppLogger.d("AudioPlayer", "Прежний аудиовыход отключён: внешний=$hadExternalOutput, текущий внешний=$hasExternalOutput")
+                    if (hadExternalOutput != false && !hasExternalOutput) {
+                        pause()
+                        onInterruptionListener?.invoke(true, false)
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (t: Throwable) {
                 AppLogger.e("AudioPlayer", "Ошибка обработки routeChangeNotification: ${t.message}", t)
             }
         }
+    }
+
+    private fun AVAudioSessionRouteDescription.hasExternalOutput(): Boolean =
+        outputs.filterIsInstance<AVAudioSessionPortDescription>().any { output ->
+            output.portType != AVAudioSessionPortBuiltInSpeaker &&
+                output.portType != AVAudioSessionPortBuiltInReceiver
+        }
+
+    private fun activateAudioSession(): Boolean = memScoped {
+        val error = alloc<ObjCObjectVar<NSError?>>()
+        error.value = null
+        val activated = AVAudioSession.sharedInstance().setActive(true, error = error.ptr)
+        if (!activated) {
+            AppLogger.e("AudioPlayer", "Ошибка активации AVAudioSession: ${error.value?.localizedDescription}")
+        }
+        activated
     }
 
     private var timeObserverPlayer: AVPlayer? = null
@@ -277,8 +310,7 @@ actual class AudioPlayer actual constructor() {
 
     actual fun playFromUrl(url: String, crossfadeMs: Long) {
         try {
-            val session = AVAudioSession.sharedInstance()
-            session.setActive(true, error = null)
+            activateAudioSession()
 
             val playerItem = if (url.startsWith("yamusic-stream://")) {
                 val nsUrl = NSURL.URLWithString(url) ?: return
@@ -316,6 +348,8 @@ actual class AudioPlayer actual constructor() {
             newPlayer.play()
             startIosCrossfade(newPlayer, crossfadeMs)
             onPlaybackStartedListener?.invoke()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             AppLogger.e("AudioPlayer", "Ошибка воспроизведения url: ${e.message}", e)
         }
@@ -373,8 +407,7 @@ actual class AudioPlayer actual constructor() {
 
     private fun playFileInternal(filePath: String, crossfadeMs: Long = 0L) {
         try {
-            val session = AVAudioSession.sharedInstance()
-            session.setActive(true, error = null)
+            activateAudioSession()
             val resolvedPath = resolveIosLocalPath(filePath)
             val url = NSURL.fileURLWithPath(resolvedPath)
             val playerItem = AVPlayerItem(uRL = url)
@@ -389,6 +422,8 @@ actual class AudioPlayer actual constructor() {
             newPlayer.play()
             startIosCrossfade(newPlayer, crossfadeMs)
             onPlaybackStartedListener?.invoke()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             AppLogger.e("AudioPlayer", "Ошибка воспроизведения файла: ${e.message}", e)
         }
@@ -399,9 +434,12 @@ actual class AudioPlayer actual constructor() {
         fadingAvPlayer?.pause()
     }
 
-    actual fun resume() {
-        avPlayer?.play()
+    actual fun resume(): Boolean {
+        val player = avPlayer ?: return false
+        if (!activateAudioSession()) return false
+        player.play()
         fadingAvPlayer?.play()
+        return true
     }
 
     actual fun stop() {
