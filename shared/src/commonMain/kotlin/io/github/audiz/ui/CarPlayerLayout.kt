@@ -197,7 +197,6 @@ private fun CarPlayer(
                     FullPlayerTrackInfo(
                         state = state,
                         modifier = Modifier.weight(1f),
-                        showArtistBadge = true,
                         titleSize = if (short) 20.sp else 32.sp,
                         artistSize = if (short) 14.sp else 20.sp,
                     )
@@ -209,7 +208,7 @@ private fun CarPlayer(
                 ) {
                     AnimatedPlayerCover(state, Modifier.size(minOf(maxWidth, maxHeight)))
                 }
-                FullPlayerTrackInfo(state, Modifier.fillMaxWidth(), showArtistBadge = true)
+                FullPlayerTrackInfo(state, Modifier.fillMaxWidth())
             }
 
             FullPlayerTimeline(

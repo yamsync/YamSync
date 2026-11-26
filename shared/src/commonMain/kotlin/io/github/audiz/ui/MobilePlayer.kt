@@ -636,7 +636,6 @@ fun MobileFullPlayerSheet(
                     onOpenArtist = actions.onOpenArtist,
                     controlModifier = controlModifier,
                     animateTitle = true,
-                    showArtistBadge = true,
                 )
 
                 actions.onToggleFavorite?.let { toggleFavorite ->

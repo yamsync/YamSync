@@ -133,7 +133,6 @@ internal fun FullPlayerTrackInfo(
     onOpenArtist: (() -> Unit)? = null,
     controlModifier: Modifier = Modifier,
     animateTitle: Boolean = false,
-    showArtistBadge: Boolean = false,
     titleSize: TextUnit = 22.sp,
     artistSize: TextUnit = 15.sp,
 ) {
@@ -179,7 +178,7 @@ internal fun FullPlayerTrackInfo(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (showArtistBadge) AiArtistBadge(state.trackArtists)
+            AiTrackBadge(state.trackId, state.trackArtists)
         }
     }
 }
