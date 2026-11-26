@@ -160,14 +160,13 @@ class LocalTrackListPreviewTest {
                 fixture.coordinator.loadDownloadedTracksPlaylist(fixture.file.absolutePath, previewOnly = true)
             }
             fixture.awaitLoaded()
-            assertTrue(fixture.coordinator.usesCompactRows)
             assertEquals("playing", fixture.playback.trackId)
             assertEquals(LastPlaybackType.WAVE, fixture.sessionManager.currentSession?.type)
         } finally { fixture.close() }
     }
 
     @Test
-    fun importedPlaylistUsesCompactRowsWhileAnotherSessionIsPlaying() = runBlocking {
+    fun importedPlaylistCanBeBrowsedWhileAnotherSessionIsPlaying() = runBlocking {
         val fixture = Fixture()
         try {
             val m3u = File(fixture.directory, "preview.m3u").apply {
@@ -180,8 +179,27 @@ class LocalTrackListPreviewTest {
                 fixture.coordinator.openCustomSource(source, previewOnly = true)
             }
             fixture.awaitLoaded()
-            assertTrue(fixture.coordinator.usesCompactRows)
+            assertEquals("local:${fixture.file.absolutePath}", fixture.coordinator.loadedTracks.single().id)
             assertEquals(LastPlaybackType.WAVE, fixture.sessionManager.currentSession?.type)
+        } finally { fixture.close() }
+    }
+
+    @Test
+    fun openingWaveQueueFromFullPlayerShowsWaveTracksAndKeepsReturnOrigin() = runBlocking {
+        val fixture = Fixture()
+        try {
+            val waveTracks = listOf(FullTrackInfo(id = "wave-1"), FullTrackInfo(id = "wave-2"))
+            withContext(Dispatchers.Main) {
+                fixture.coordinator.openQueueView(
+                    origin = TracksListOrigin.MOBILE_PLAYER,
+                    isWaveMode = true,
+                    waveTracks = waveTracks,
+                    waveTitle = "Моя волна",
+                )
+            }
+            assertEquals(waveTracks, fixture.coordinator.loadedTracks.toList())
+            assertEquals("Моя волна", fixture.coordinator.currentScreenTitle)
+            assertEquals(TracksListOrigin.MOBILE_PLAYER, fixture.coordinator.tracksListOrigin)
         } finally { fixture.close() }
     }
 

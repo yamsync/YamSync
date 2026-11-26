@@ -842,9 +842,6 @@ class SearchViewModel(private val repository: MusicRepository = MusicRepository(
     val isPreviewingTrackList: Boolean
         get() = trackListNavigation.isPreview
 
-    internal val usesCompactTrackRows: Boolean
-        get() = trackListCoordinator.usesCompactRows
-
     private fun browseTrackList(session: LastPlaybackSession, load: (TrackListCoordinator) -> Unit) {
         queueScrollRequest = null
         closeTrackListPreview()

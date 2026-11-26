@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -17,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -34,6 +37,11 @@ import io.github.audiz.models.FullTrackInfo
 import io.github.audiz.models.isLocalTrackId
 
 @Composable
+internal fun LazyListState.rememberVisiblePlaylistTrackIndices(): State<Set<Int>> = remember(this) {
+    derivedStateOf { layoutInfo.visibleItemsInfo.mapTo(hashSetOf()) { it.index } }
+}
+
+@Composable
 internal fun PlaylistTrackRow(
     track: FullTrackInfo,
     artists: String,
@@ -44,10 +52,11 @@ internal fun PlaylistTrackRow(
     isPlaying: Boolean,
     chartPosition: ChartPositionInfo?,
     narrow: Boolean,
-    onActivate: () -> Unit,
+    onActivate: (() -> Unit)?,
     onAddToPlaylist: (() -> Unit)?,
     onQueue: (() -> Unit)?,
     onRemove: (() -> Unit)?,
+    extraMenuItems: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val corner = 14.dp
@@ -60,6 +69,14 @@ internal fun PlaylistTrackRow(
     val title = track.title.ifBlank { "Без названия" }
     val album = track.albums.firstOrNull()?.title.orEmpty()
 
+    val playbackModifier = if (onActivate == null) Modifier else Modifier
+        .clickable(
+            role = Role.Button,
+            onClickLabel = if (isPlaying) "Пауза" else "Воспроизвести",
+            onClick = onActivate,
+        )
+        .pointerHoverIcon(PointerIcon.Hand)
+
     Column(
         modifier = Modifier.fillMaxWidth().clip(shape).background(colors.surfaceContainerHigh)
     ) {
@@ -67,12 +84,7 @@ internal fun PlaylistTrackRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (isActive) colors.primary.copy(alpha = 0.10f) else colors.surfaceContainerHigh)
-                .clickable(
-                    role = Role.Button,
-                    onClickLabel = if (isPlaying) "Пауза" else "Воспроизвести",
-                    onClick = onActivate,
-                )
-                .pointerHoverIcon(PointerIcon.Hand)
+                .then(playbackModifier)
                 .padding(start = 12.dp, end = 2.dp, top = 8.dp, bottom = 8.dp)
                 .heightIn(min = 54.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -87,7 +99,7 @@ internal fun PlaylistTrackRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         if (chartPosition != null) {
-                            ChartPositionBadge(chartPosition, isPlaying = false)
+                            ChartPositionBadge(chartPosition)
                         }
                         Text(
                             text = title,
@@ -144,7 +156,7 @@ internal fun PlaylistTrackRow(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        PlaylistTrackMenu(onAddToPlaylist, onQueue, onRemove)
+                        PlaylistTrackMenu(onAddToPlaylist, onQueue, onRemove, extraMenuItems)
                     }
                 },
             ) { measurables, constraints ->
@@ -222,8 +234,9 @@ private fun PlaylistTrackMenu(
     onAddToPlaylist: (() -> Unit)?,
     onQueue: (() -> Unit)?,
     onRemove: (() -> Unit)?,
+    extraMenuItems: (@Composable (dismiss: () -> Unit) -> Unit)?,
 ) {
-    if (onAddToPlaylist == null && onQueue == null && onRemove == null) return
+    if (onAddToPlaylist == null && onQueue == null && onRemove == null && extraMenuItems == null) return
 
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -234,6 +247,7 @@ private fun PlaylistTrackMenu(
             Icon(Icons.Filled.MoreVert, contentDescription = "Действия с треком", modifier = Modifier.size(20.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            extraMenuItems?.invoke { expanded = false }
             if (onAddToPlaylist != null) {
                 DropdownMenuItem(
                     text = { Text("Добавить в плейлист", maxLines = 1) },
@@ -260,6 +274,39 @@ private fun PlaylistTrackMenu(
                     modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ChartPositionBadge(chart: ChartPositionInfo) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "#${chart.position}",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
+        val trend = when (chart.progress?.lowercase()) {
+            "up" -> (if (chart.shift > 0) "↑${chart.shift}" else "↑") to
+                if (isDark) Color(0xFF4ADE80) else Color(0xFF16A34A)
+            "down" -> (if (chart.shift > 0) "↓${chart.shift}" else "↓") to MaterialTheme.colorScheme.error
+            "new" -> "NEW" to MaterialTheme.colorScheme.primary
+            else -> null
+        }
+        if (trend != null) {
+            Text(
+                text = trend.first,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = trend.second,
+                maxLines = 1
+            )
         }
     }
 }

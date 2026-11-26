@@ -138,7 +138,6 @@ fun App() {
             // Открытый для просмотра список остаётся видимым, даже если в нём нет треков.
             val showTracksScreen = searchViewModel.isTracksListVisible &&
                 (searchViewModel.isPreviewingTrackList || searchViewModel.loadedTracks.isNotEmpty() || searchViewModel.isLoading)
-            val showPlaylistScreen = showTracksScreen && searchViewModel.usesCompactTrackRows
             val isSearchVisible = searchViewModel.searchResult != null || searchViewModel.activeSearchQuery != null
             val nav = rememberAppNavigationState()
             val homeScrollState = rememberScrollState()
@@ -363,7 +362,7 @@ fun App() {
             ) { paddingValues ->
                 Box(
                     modifier = Modifier.fillMaxSize().padding(paddingValues)
-                        .padding(horizontal = if (showPlaylistScreen) 8.dp else 16.dp)
+                        .padding(horizontal = if (showTracksScreen) 8.dp else 16.dp)
                         .padding(top = 16.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
@@ -616,7 +615,6 @@ fun App() {
                         BackHandler(enabled = showTracksScreen, onBack = goBackFromTracks)
 
                         ArtistTracksList(
-                            compactPlaylist = showPlaylistScreen,
                             onQueuePlaylistTrack = { track -> searchViewModel.addToUpNext(track) },
                             onManagePlaylistTrackRemoval = { track -> dialog = AppDialog.PlayerTrackRemoval(track) },
                             isPlaybackQueue = !searchViewModel.isPreviewingTrackList,
@@ -627,38 +625,18 @@ fun App() {
                             tracks = searchViewModel.loadedTracks,
                             canLoadMore = searchViewModel.canLoadMore,
                             onLoadMore = { searchViewModel.loadNextPage() },
-                            onHomeClick = {
-                                nav.showCollections = false
-                                searchViewModel.clearSearch()
-                                searchViewModel.closeArtistTracks()
-                            }.takeUnless { showPlaylistScreen },
-                            onBackClick = goBackFromTracks.takeIf {
-                                showPlaylistScreen || isBackGoingToFolderBrowser || isBackGoingToMediaLibrary || isBackGoingToMobilePlayer ||
-                                    searchViewModel.tracksListOrigin == TracksListOrigin.SEARCH ||
-                                    searchViewModel.tracksListOrigin == TracksListOrigin.COLLECTIONS
-                            },
-                            isTrackDownloading = searchViewModel.isTrackDownloading,
-                            downloadingTrackId = searchViewModel.downloadingTrackId,
-                            onDownloadTrack = { trackId, trackTitle, artistName ->
-                                searchViewModel.downloadTrack(trackId, trackTitle, artistName)
-                            },
+                            onBackClick = goBackFromTracks,
                             onPlayTrack = { trackId, trackTitle, artistName ->
                                 searchViewModel.playTrackFromDisplayedList(trackId, trackTitle, artistName)
                             },
                             playingTrackId = searchViewModel.playerTrackId,
                             isPlaying = searchViewModel.playerIsPlaying,
                             isPaused = searchViewModel.playerIsPaused,
-                            playbackPositionMs = searchViewModel.playerPositionMs,
-                            playbackDurationMs = searchViewModel.playerDurationMs,
                             onTogglePlayPause = { searchViewModel.togglePlayPause() },
-                            onStopPlayback = { searchViewModel.stopPlayback() },
-                            onSeek = { searchViewModel.seekPlayer(it) },
                             totalTracksCount = searchViewModel.totalTracksCount,
                             isLoading = searchViewModel.isLoading,
                             isLoadingAllPages = searchViewModel.isLoadingAllPages,
                             onLoadAllClick = { searchViewModel.loadAllRemainingPages() },
-                            isTrackDownloaded = { artist, title -> searchViewModel.isTrackDownloaded(artist, title) },
-                            isTrackInPlaylist = { searchViewModel.isTrackInAnyPlaylist(it) },
                             title = searchViewModel.currentScreenTitle,
                             onRefresh = if (searchViewModel.isDownloadedTracksScreen) {
                                 {
@@ -680,25 +658,7 @@ fun App() {
                                     }
                                 }
                             } else null,
-                            onDeleteTrack = { trackId, trackTitle, artistName ->
-                                dialog = AppDialog.DeleteTrack(trackId, trackTitle, artistName)
-                            },
                             onAddToPlaylist = { track -> dialog = AppDialog.AddToPlaylist(track) },
-                            onRemoveFromPlaylist = if (searchViewModel.isDownloadedTracksScreen) {
-                                val currentLocal = searchViewModel.localPlaylists.firstOrNull { it.title == searchViewModel.currentScreenTitle }
-                                if (currentLocal != null) {
-                                    { track ->
-                                        searchViewModel.removeTrackFromLocalPlaylist(currentLocal.id, track.realId ?: track.id)
-                                    }
-                                } else null
-                            } else if (searchViewModel.currentOpenUserPlaylist != null) {
-                                val currentYandex = searchViewModel.currentOpenUserPlaylist
-                                if (currentYandex != null) {
-                                    { track ->
-                                        searchViewModel.removeTrackFromYandexPlaylist(currentYandex, track)
-                                    }
-                                } else null
-                            } else null,
                             onArtistClick = { artistId, artistName ->
                                 searchViewModel.loadArtistTracks(artistId, artistName)
                             },
