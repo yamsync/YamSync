@@ -117,7 +117,7 @@ fun ArtistTracksList(
         Row(
             modifier = Modifier.fillMaxWidth().padding(
                 horizontal = 8.dp,
-                vertical = 8.dp,
+                vertical = 4.dp,
             ),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -128,22 +128,27 @@ fun ArtistTracksList(
                 outlined = true,
                 onClick = onBackClick,
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             val total = if (totalTracksCount > tracks.size) totalTracksCount else tracks.size
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = when {
-                        isLoading && tracks.isEmpty() -> "Загрузка треков..."
-                        isLoading && tracks.isNotEmpty() -> "Показано: ${tracks.size} (обновление...)"
+                    text = "· " + when {
+                        isLoading && tracks.isEmpty() -> "Загрузка…"
+                        isLoading -> "Обновление…"
                         tracks.isEmpty() -> "Нет треков"
-                        total > tracks.size -> "Показано: ${tracks.size} из $total"
+                        total > tracks.size -> "${tracks.size} из $total"
                         else -> playlistTrackCountLabel(total)
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -195,7 +200,7 @@ fun ArtistTracksList(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
             val narrowRows = maxWidth < 360.dp

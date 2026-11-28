@@ -259,7 +259,7 @@ fun App() {
                 Box(
                     modifier = Modifier.fillMaxSize()
                         .padding(horizontal = if (showTracksScreen) 8.dp else 16.dp)
-                        .padding(top = 16.dp)
+                        .padding(top = if (showTracksScreen) 6.dp else 16.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         if (!showTracksScreen) {

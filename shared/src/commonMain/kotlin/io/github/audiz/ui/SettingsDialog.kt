@@ -1,15 +1,10 @@
 package io.github.audiz.ui
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,18 +22,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import io.github.audiz.addons.AiFilterMode
 import io.github.audiz.player.RecentPlaybackHistory
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 
 data class SettingsState(
@@ -97,15 +89,18 @@ fun SettingsDialog(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val onClose by rememberUpdatedState(actions.onClose)
     var selectedSection by remember { mutableStateOf<SettingsSection?>(null) }
     val currentSection = selectedSection
     var selectedAddon by remember { mutableStateOf<SettingsAddon?>(null) }
     val currentAddon = selectedAddon.takeIf { currentSection == SettingsSection.Addons }
 
-    fun goBack() {
+    fun clearFocus() {
         focusManager.clearFocus()
         keyboardController?.hide()
+    }
+
+    fun goBack() {
+        clearFocus()
         when {
             currentAddon != null -> selectedAddon = null
             currentSection != null -> selectedSection = null
@@ -114,7 +109,9 @@ fun SettingsDialog(
     }
 
     LaunchedEffect(visible) {
-        if (!visible) {
+        if (visible) {
+            clearFocus()
+        } else {
             selectedSection = null
             selectedAddon = null
         }
@@ -128,148 +125,53 @@ fun SettingsDialog(
         modifier = modifier.fillMaxSize()
     ) {
         val settingsScrollState = key(currentSection, currentAddon) { rememberScrollState() }
-        var dragOffsetY by remember { mutableStateOf(0f) }
-        val animatedOffsetY by animateFloatAsState(targetValue = dragOffsetY)
 
-        LaunchedEffect(visible) {
-            if (!visible) {
-                dragOffsetY = 0f
-            }
-        }
-
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
-                    actions.onClose()
-                }
-        ) {
-            val isCompact = maxWidth < 450.dp
-            val horizontalCardPadding = if (isCompact) 8.dp else 16.dp
-            val horizontalContentPadding = if (isCompact) 10.dp else 16.dp
-            val endContentPadding = if (isCompact) 8.dp else 12.dp
-            val headerDragModifier = Modifier.pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { change, dragAmount ->
-                        if (dragAmount > 0 || dragOffsetY > 0) {
-                            dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
-                            change.consume()
-                        }
-                    },
-                    onDragEnd = {
-                        if (dragOffsetY > 100f) {
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                            onClose()
-                        }
-                        dragOffsetY = 0f
-                    },
-                    onDragCancel = {
-                        dragOffsetY = 0f
-                    }
-                )
-            }
-
-            ElevatedCard(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(horizontal = horizontalCardPadding)
-                    .padding(top = 8.dp, bottom = 76.dp)
-                    .offset { IntOffset(0, animatedOffsetY.toInt()) }
-                    .animateEnterExit(
-                        enter = slideInVertically { it / 2 },
-                        exit = slideOutVertically { it / 2 }
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { /* Предотвращаем закрытие при клике по самой карточке */ },
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+        Surface(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
             ) {
+                val horizontalPadding = if (maxWidth < 450.dp) 12.dp else 16.dp
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(headerDragModifier)
-                                .padding(top = 8.dp, bottom = 2.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(36.dp)
-                                    .height(4.dp)
-                                    .background(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                        shape = RoundedCornerShape(2.dp)
-                                    )
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f).padding(end = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (currentSection != null) {
-                                    TopBarIconButton(
-                                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = if (currentAddon != null) "К дополнениям" else "К разделам настроек",
-                                        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
-                                        size = 40.dp,
-                                        onClick = ::goBack
-                                    )
-                                }
-                                Text(
-                                    text = currentAddon?.title ?: currentSection?.title ?: "Настройки",
-                                    modifier = Modifier.weight(1f).then(headerDragModifier),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = horizontalPadding, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (currentSection != null) {
                             TopBarIconButton(
-                                icon = Icons.Filled.Close,
-                                contentDescription = "Закрыть настройки",
+                                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (currentAddon != null) "К дополнениям" else "К разделам настроек",
                                 size = 40.dp,
-                                modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
-                                outlined = true,
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    keyboardController?.hide()
-                                    actions.onClose()
-                                }
+                                onClick = ::goBack,
                             )
                         }
+                        Text(
+                            text = currentAddon?.title ?: currentSection?.title ?: "Настройки",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        TopBarIconButton(
+                            icon = Icons.Filled.Close,
+                            contentDescription = "Закрыть настройки",
+                            size = 40.dp,
+                            outlined = true,
+                            onClick = {
+                                clearFocus()
+                                actions.onClose()
+                            },
+                        )
                     }
                     HorizontalDivider()
 
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                                 .verticalScroll(settingsScrollState)
-                                .padding(horizontalContentPadding)
-                                .padding(end = endContentPadding)
+                                .padding(start = horizontalPadding, end = horizontalPadding + 8.dp)
                                 .padding(vertical = if (currentSection == null) 0.dp else 12.dp)
                         ) {
                             if (currentSection == null) {
@@ -281,8 +183,7 @@ fun SettingsDialog(
                                     }
                                 }
                             } else {
-                                val blocks = currentAddon?.let { listOf(it.block) }
-                                    ?: currentSection.blocks
+                                val blocks = currentAddon?.let { listOf(it.block) } ?: currentSection.blocks
                                 blocks.forEachIndexed { index, block ->
                                     if (index > 0) {
                                         Spacer(Modifier.height(12.dp))
@@ -304,7 +205,6 @@ fun SettingsDialog(
         }
     }
 }
-
 
 private enum class SettingsAddon(val title: String, val icon: ImageVector, val block: SettingsBlock) {
     AiFilter("Фильтр ИИ-музыки", Icons.Filled.GraphicEq, SettingsBlock.AiFilter);
