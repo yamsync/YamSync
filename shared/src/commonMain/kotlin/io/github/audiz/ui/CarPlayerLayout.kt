@@ -164,6 +164,7 @@ private fun CompactFullPlayer(
 ) {
     BoxWithConstraints(modifier.clipToBounds()) {
         val short = maxHeight < 440.dp
+        val isNarrow = maxWidth < 360.dp
         val sideBySide = (!isSplit && maxWidth >= 540.dp) || (short && maxWidth >= 300.dp)
         val inset = if (maxWidth >= 540.dp) 24.dp else 12.dp
         val controlWidth = (maxWidth - inset * 2).coerceAtLeast(0.dp)
@@ -177,6 +178,31 @@ private fun CompactFullPlayer(
             .coerceIn(0.dp, 100.dp)
         val headerButtonSize = if (short) 44.dp else 54.dp
         val sectionGap = if (short) 4.dp else 12.dp
+        val trackInfo: @Composable (Modifier) -> Unit = { infoModifier ->
+            Row(infoModifier, verticalAlignment = Alignment.CenterVertically) {
+                FullPlayerTrackInfo(
+                    state = state,
+                    modifier = Modifier.weight(1f),
+                    onOpenArtist = actions.onOpenArtist.takeIf { mobileControls },
+                    titleSize = if (sideBySide) {
+                        if (short) 20.sp else 32.sp
+                    } else 22.sp,
+                    artistSize = if (sideBySide) {
+                        if (short) 14.sp else 20.sp
+                    } else 15.sp,
+                )
+                if (mobileControls) {
+                    actions.onToggleFavorite?.let { toggleFavorite ->
+                        Spacer(Modifier.width(8.dp))
+                        FavoriteButton(
+                            isFavorite = state.isFavorite,
+                            size = if (short) 40.dp else 48.dp,
+                            onClick = toggleFavorite,
+                        )
+                    }
+                }
+            }
+        }
 
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = inset)
@@ -195,11 +221,6 @@ private fun CompactFullPlayer(
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     FullPlayerContextLabel(state)
-                }
-                if (mobileControls) {
-                    actions.onToggleFavorite?.let { toggleFavorite ->
-                        FavoriteButton(isFavorite = state.isFavorite, size = headerButtonSize, onClick = toggleFavorite)
-                    }
                 }
                 IconButton(
                     onClick = { actions.onConfigClick?.invoke() },
@@ -223,13 +244,7 @@ private fun CompactFullPlayer(
                             onOpenEqualizer = actions.onOpenEqualizer.takeIf { mobileControls },
                         )
                     }
-                    FullPlayerTrackInfo(
-                        state = state,
-                        modifier = Modifier.weight(1f),
-                        onOpenArtist = actions.onOpenArtist.takeIf { mobileControls },
-                        titleSize = if (short) 20.sp else 32.sp,
-                        artistSize = if (short) 14.sp else 20.sp,
-                    )
+                    trackInfo(Modifier.weight(1f))
                 }
             } else {
                 BoxWithConstraints(
@@ -242,9 +257,7 @@ private fun CompactFullPlayer(
                         onOpenEqualizer = actions.onOpenEqualizer.takeIf { mobileControls },
                     )
                 }
-                FullPlayerTrackInfo(
-                    state, Modifier.fillMaxWidth(), onOpenArtist = actions.onOpenArtist.takeIf { mobileControls }
-                )
+                trackInfo(Modifier.fillMaxWidth())
             }
 
             FullPlayerTimeline(
@@ -266,9 +279,16 @@ private fun CompactFullPlayer(
                         volume = state.volume,
                         onVolumeChange = actions.onVolumeChange,
                         buttonSize = sideButtonSize,
-                        shuffleIconSize = sideIconSize,
+                        shuffleIconSize = sideIconSize.takeUnless { mobileControls },
                     )
                 }
+            }
+            if (mobileControls) {
+                FullPlayerAuxiliaryControls(
+                    state = state,
+                    actions = actions,
+                    isNarrow = isNarrow,
+                )
             }
         }
     }

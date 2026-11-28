@@ -232,7 +232,9 @@ fun App() {
                     if (searchViewModel.upNextState.pending.isEmpty()) {
                         openPlayingPlaylist()
                     } else {
-                        dialog = AppDialog.UpNext(openedFromPlayer = isMobileUi && nav.isMobilePlayerExpanded)
+                        dialog = AppDialog.UpNext(
+                            openedFromPlayer = isMobileUi && !usesCompactFullPlayer && nav.isMobilePlayerExpanded
+                        )
                     }
                 },
                 onOpenArtist = if (playerState.artistName.isNotBlank()) {

@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
-import kotlinx.coroutines.delay
 import io.github.audiz.player.PlayerActions
 import io.github.audiz.player.PlayerUiState
 import androidx.compose.ui.graphics.Color
@@ -698,116 +697,13 @@ fun MobileFullPlayerSheet(
                 }
             }
 
-            var justCopiedShare by remember { mutableStateOf(false) }
-
-            LaunchedEffect(justCopiedShare) {
-                if (justCopiedShare) {
-                    delay(1500)
-                    justCopiedShare = false
-                }
-            }
-
-            val actionButtonSize = if (isNarrow) 34.dp else 40.dp
-            val actionIconSize = if (isNarrow) 20.dp else 22.dp
-            val defaultActionTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PlayerRemovalButton(state, actions.onManageTrackRemoval, actionButtonSize, actionIconSize, controlModifier)
-                }
-
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    BadgedBox(badge = {
-                        if (state.upNextCount > 0) Badge { Text(state.upNextCount.toString()) }
-                    }) {
-                        GhostIconButton(
-                            icon = Icons.AutoMirrored.Filled.FormatListBulleted,
-                            contentDescription = "Очередь воспроизведения",
-                            modifier = controlModifier,
-                            size = actionButtonSize,
-                            iconSize = actionIconSize,
-                            contentColor = if (state.isQueueOpen) MaterialTheme.colorScheme.primary else defaultActionTint,
-                            onClick = {
-                                actions.onOpenQueue?.invoke()
-                                onDismiss()
-                            }
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    GhostIconButton(
-                        icon = Icons.Default.Tune,
-                        contentDescription = "Эквалайзер",
-                        modifier = controlModifier,
-                        size = actionButtonSize,
-                        iconSize = actionIconSize,
-                        contentColor = if (state.isEqualizerActive) MaterialTheme.colorScheme.primary else defaultActionTint,
-                        onClick = { actions.onOpenEqualizer?.invoke() }
-                    )
-                }
-
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PlayerSaveButton(state, actions.onSaveOrManageTrack, actionButtonSize, actionIconSize, controlModifier)
-                }
-
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PlayerPlaylistButton(state, actions.onAddToPlaylist, actionButtonSize, actionIconSize, controlModifier)
-                }
-
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (state.isSharing) {
-                        Box(
-                            modifier = Modifier.size(actionButtonSize).then(controlModifier),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(actionIconSize),
-                                strokeWidth = 1.8.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        val shareIcon = if (justCopiedShare) Icons.Filled.Check else Icons.Filled.Share
-                        val shareTint = if (justCopiedShare) Color(0xFF1D9E75) else defaultActionTint
-                        GhostIconButton(
-                            icon = shareIcon,
-                            contentDescription = if (justCopiedShare) "Ссылка скопирована" else "Поделиться треком",
-                            modifier = controlModifier,
-                            size = actionButtonSize,
-                            iconSize = actionIconSize,
-                            contentColor = shareTint,
-                            onClick = {
-                                justCopiedShare = true
-                                actions.onShareTrack?.invoke()
-                            }
-                        )
-                    }
-                }
-            }
+            FullPlayerAuxiliaryControls(
+                state = state,
+                actions = actions,
+                isNarrow = isNarrow,
+                controlModifier = controlModifier,
+                onQueueOpened = onDismiss,
+            )
 
         }
     }
